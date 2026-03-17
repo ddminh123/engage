@@ -1,0 +1,68 @@
+# i-engage Project Rules
+
+## Module Status
+
+| Module       | Status         | Notes                     |
+| ------------ | -------------- | ------------------------- |
+| `settings`   | 🔲 Placeholder | Reference data, templates |
+| `teams`      | 🔲 Placeholder | Users, roles, permissions |
+| `universe`   | 🔲 Placeholder | Auditable entities        |
+| `plan`       | 🔲 Placeholder | Audit planning            |
+| `engagement` | 🔲 Placeholder | Core audit workflow       |
+| `finding`    | 🔲 Placeholder | Findings & remediation    |
+| `document`   | 🔲 Placeholder | File storage              |
+
+**Legend:** 🔲 Placeholder (design only) · 🚧 In Progress · ✅ Implemented
+
+> ⚠️ **All module docs are currently design placeholders.** Schema, routes, actions, and components will be finalized during implementation. Do not treat placeholder docs as final specs.
+
+---
+
+## Documentation Index
+
+- Architecture & system design: `docs/Overview.md`
+- Frontend guidelines: `docs/FE.md`
+- Product requirements (overview): `docs/PRD.md`
+- Detailed module PRDs: `docs/prd/[module].md`
+- Module design maps: `docs/modules/[module].md` _(see status above)_
+
+## Before Implementing Any Feature
+
+1. Check module status above — if 🔲 Placeholder, expect design changes during implementation
+2. Read `docs/modules/[module].md` — identifies schema, routes, actions, components
+3. Follow layer rules in `docs/Overview.md`
+4. Follow frontend patterns in `docs/FE.md`
+5. **Update the module doc** as you implement — mark status 🚧 → ✅
+
+## Architecture Rules
+
+- UI → API routes only. Never import server actions in client components.
+- All API routes use `withAccess(permission, handler)` middleware — no exceptions.
+- Actions use Prisma directly for DB. Services are for external integrations only.
+- No external API calls. On-premises only.
+- CRUD API routes in a single file: `src/app/api/[module]/route.ts` handles GET + POST + PATCH (batch update) + DELETE (batch delete); `src/app/api/[module]/[id]/route.ts` handles GET + PATCH + DELETE for single resource. No separate `/batch` endpoint.
+- **Permission check:** Every route must call `checkAccess(userId, permission)` from teams module. Initial scaffolding returns `true`. See `docs/modules/teams.md`.
+- **Audit logging:** All Create, Update, Delete operations must log to `AuditLog` table (user_id, action, entity_type, entity_id, timestamp, changes). See `docs/Overview.md` §13.
+
+## Frontend Rules
+
+- Shadcn components only. Never create custom basic components (Button, Input, Dialog, Select, etc.).
+- **All list/table views must use the shared `DataTable` component** (`src/components/shared/DataTable`). Never build one-off tables. DataTable wraps Shadcn Table + TanStack Table with built-in sort, filter, column selector, and pagination. Each feature defines only its `columns.tsx`. See `docs/FE.md` §5.
+- Components are self-sustained — fetch their own data via hooks, except small presentational components.
+- Complex state: useReducer inside a custom hook. Component just renders.
+- Data fetching: TanStack Query + feature api.ts. Forms: React Hook Form + Zod.
+- No custom CSS. Tailwind + Shadcn conventions only.
+
+## Code Conventions
+
+- API response: `{ data, meta? }` or `{ error: { code, message } }`
+- Permission format: `module:action` (e.g., `engagement:create`, `finding:approve`)
+- DB naming: snake_case tables/columns
+- File storage path: `/storage/documents/{documentId}/{filename}`
+
+## Security
+
+- Zero high/critical npm vulnerabilities before deploy
+- All secrets in `.env`, never in code
+- Validate all inputs with Zod
+- Prisma ORM only — no raw SQL

@@ -1,0 +1,35 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// AUDIT LOG - Tracks all Create, Update, Delete operations
+// =============================================================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  user_id     String
+  user_name   String
+  action      String   // create | update | delete
+  entity_type String   // e.g., "auditable_entity", "engagement"
+  entity_id   String
+  changes     Json?    // For updates: { field: { old, new } }
+  timestamp   DateTime @default(now())
+
+  @@index([entity_type, entity_id])
+  @@index([user_id])
+  @@index([timestamp])
+  @@map("audit_log")
+}
