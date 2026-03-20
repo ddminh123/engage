@@ -194,7 +194,8 @@ export function buildSectionTree(
     });
   }
 
-  // Add direct procedure phantom or button (under section)
+  // Add direct procedure phantom (under section) — only when actively adding
+  // The button is already in the btn_add_objective row above
   if (
     state.addingType === "procedure" &&
     state.addingForId === `sec:${section.id}`
@@ -202,15 +203,6 @@ export function buildSectionTree(
     rows.push({
       id: `_add_proc_sec_${section.id}`,
       type: "add_procedure",
-      title: "",
-      status: null,
-      parentId: section.id,
-      children: [],
-    });
-  } else {
-    rows.push({
-      id: `_btn_add_proc_sec_${section.id}`,
-      type: "btn_add_procedure",
       title: "",
       status: null,
       parentId: section.id,

@@ -170,45 +170,46 @@ export function DataTable<TData, TValue>({
         />
       )}
 
-      <div className="rounded-md border">
-        <Table>
-          {!hideToolbar && (
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                    </TableHead>
+      {enableRowReorder ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[restrictToVerticalAxis]}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="rounded-md border">
+            <Table>
+              {!hideToolbar && (
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {enableRowReorder && <TableHead className="w-6" />}
+                      {headerGroup.headers.map((header) => (
+                        <TableHead key={header.id}>
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext(),
+                              )}
+                        </TableHead>
+                      ))}
+                    </TableRow>
                   ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-          )}
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {columns.map((_, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : rows.length ? (
-              enableRowReorder ? (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  modifiers={[restrictToVerticalAxis]}
-                  onDragEnd={handleDragEnd}
-                >
+                </TableHeader>
+              )}
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {columns.map((_, j) => (
+                        <TableCell key={j}>
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : rows.length ? (
                   <SortableContext
                     items={rowIds}
                     strategy={verticalListSortingStrategy}
@@ -222,15 +223,63 @@ export function DataTable<TData, TValue>({
                       />
                     ))}
                   </SortableContext>
-                </DndContext>
-              ) : (
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length + 1}
+                      className="h-24 text-center"
+                    >
+                      {emptyMessage}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DndContext>
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            {!hideToolbar && (
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
+            )}
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {columns.map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : rows.length ? (
                 rows.map((row) => (
                   <ContextMenu key={row.id}>
                     <ContextMenuTrigger asChild>
                       <TableRow
                         data-state={row.getIsSelected() && "selected"}
-                        className={`group/row ${onRowClick ? "cursor-pointer" : ""}`}
-                        onClick={() => onRowClick?.(row.original)}
+                        className={`group/row ${onRowClick || row.getCanExpand() ? "cursor-pointer" : ""}`}
+                        onClick={() => {
+                          if (onRowClick) onRowClick(row.original);
+                          else if (row.getCanExpand()) row.toggleExpanded();
+                        }}
                       >
                         {row.getVisibleCells().map((cell) => (
                           <TableCell key={cell.id}>
@@ -245,20 +294,20 @@ export function DataTable<TData, TValue>({
                     {renderContextMenu?.(row.original)}
                   </ContextMenu>
                 ))
-              )
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  {emptyMessage}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
+                  >
+                    {emptyMessage}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {!isTree && <DataTablePagination table={table} />}
     </div>
@@ -300,8 +349,11 @@ function SortableRow<TData>({
           ref={setNodeRef}
           style={style}
           data-state={row.getIsSelected() && "selected"}
-          className={`group/row ${onRowClick ? "cursor-pointer" : ""}`}
-          onClick={() => onRowClick?.(row.original)}
+          className={`group/row ${onRowClick || row.getCanExpand() ? "cursor-pointer" : ""}`}
+          onClick={() => {
+            if (onRowClick) onRowClick(row.original);
+            else if (row.getCanExpand()) row.toggleExpanded();
+          }}
         >
           {/* Drag handle cell */}
           <TableCell className="w-6 px-1">

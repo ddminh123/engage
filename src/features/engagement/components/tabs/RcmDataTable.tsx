@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { Plus, Pencil, Trash2, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Download, ArrowUpToLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenuContent,
@@ -38,6 +38,8 @@ export function RcmDataTable({
     deleteTitle,
     deleteDesc,
     isDeleting,
+    handleReorderRows,
+    handleMoveToTop,
   } = editor;
 
   const columns = useRcmColumns(editor);
@@ -58,6 +60,13 @@ export function RcmDataTable({
       if (row.type === "objective") {
         return (
           <ContextMenuContent>
+            <ContextMenuItem
+              onClick={() => handleMoveToTop(row.id, "objective")}
+            >
+              <ArrowUpToLine className="mr-2 h-4 w-4" />
+              Đưa lên đầu
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem
               onClick={() =>
                 dispatch({
@@ -103,6 +112,11 @@ export function RcmDataTable({
         const risk = riskMap.get(row.id);
         return (
           <ContextMenuContent>
+            <ContextMenuItem onClick={() => handleMoveToTop(row.id, "risk")}>
+              <ArrowUpToLine className="mr-2 h-4 w-4" />
+              Đưa lên đầu
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem
               onClick={() =>
                 dispatch({ type: "START_ADD_CONTROL", riskId: row.id })
@@ -144,6 +158,11 @@ export function RcmDataTable({
         const lookup = controlMap.get(row.id);
         return (
           <ContextMenuContent>
+            <ContextMenuItem onClick={() => handleMoveToTop(row.id, "control")}>
+              <ArrowUpToLine className="mr-2 h-4 w-4" />
+              Đưa lên đầu
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             {lookup && (
               <ContextMenuItem
                 onClick={() =>
@@ -181,7 +200,7 @@ export function RcmDataTable({
 
       return null;
     },
-    [dispatch, riskMap, controlMap],
+    [dispatch, riskMap, controlMap, handleMoveToTop],
   );
 
   return (
@@ -218,6 +237,8 @@ export function RcmDataTable({
         emptyMessage={LR.noData}
         pageSize={100}
         hideToolbar
+        enableRowReorder
+        onRowReorder={handleReorderRows}
       />
 
       <ConfirmDialog

@@ -17,14 +17,26 @@ import {
   Shield,
   ChevronsUpDown,
   Layers,
+  ArrowUpToLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@/components/ui/context-menu";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { LabeledSelect } from "@/components/shared/LabeledSelect";
+import {
+  SortableList,
+  DragHandle,
+  type DragHandleRenderProps,
+} from "@/components/shared/SortableList";
 import {
   RichTextEditor,
   RichTextDisplay,
@@ -83,6 +95,8 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
     handleConfirmDelete,
     handleSaveUnderstanding,
     isSavingUnderstanding,
+    handleReorderAuditObjectives,
+    handleMoveToTopAuditObjective,
   } = usePlanningEditor(engagement);
 
   const isCollapsed = (key: string) => collapsed.has(key);
@@ -149,62 +163,87 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
           <p className="py-2 text-sm text-muted-foreground">{LAO.noData}</p>
         )}
 
-        {engagement.auditObjectives.map((obj, idx) => (
-          <div
-            key={obj.id}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
-          >
-            <span className="w-6 text-center text-xs text-muted-foreground">
-              {idx + 1}
-            </span>
+        <SortableList
+          items={engagement.auditObjectives}
+          onReorder={handleReorderAuditObjectives}
+          renderItem={(obj, dragHandle) => {
+            const idx = engagement.auditObjectives.findIndex(
+              (o) => o.id === obj.id,
+            );
+            return (
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <div className="group/row flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
+                    <DragHandle {...dragHandle} />
+                    <span className="w-6 text-center text-xs text-muted-foreground">
+                      {idx + 1}
+                    </span>
 
-            {state.editingObjectiveId === obj.id ? (
-              <InlineInput
-                value={state.editingObjectiveTitle}
-                onChange={(t) =>
-                  dispatch({ type: "SET_EDITING_OBJECTIVE_TITLE", title: t })
-                }
-                onSubmit={() => handleUpdateObjective(obj.id)}
-                onCancel={() => dispatch({ type: "CANCEL_EDIT_OBJECTIVE" })}
-                autoFocus
-              />
-            ) : (
-              <>
-                <span className="flex-1 text-sm">{obj.title}</span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() =>
-                    dispatch({
-                      type: "START_EDIT_OBJECTIVE",
-                      id: obj.id,
-                      title: obj.title,
-                    })
-                  }
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() =>
-                    dispatch({
-                      type: "SET_DELETE_TARGET",
-                      target: {
-                        type: "objective",
-                        id: obj.id,
-                        title: obj.title,
-                      },
-                    })
-                  }
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </>
-            )}
-          </div>
-        ))}
+                    {state.editingObjectiveId === obj.id ? (
+                      <InlineInput
+                        value={state.editingObjectiveTitle}
+                        onChange={(t) =>
+                          dispatch({
+                            type: "SET_EDITING_OBJECTIVE_TITLE",
+                            title: t,
+                          })
+                        }
+                        onSubmit={() => handleUpdateObjective(obj.id)}
+                        onCancel={() =>
+                          dispatch({ type: "CANCEL_EDIT_OBJECTIVE" })
+                        }
+                        autoFocus
+                      />
+                    ) : (
+                      <>
+                        <span className="flex-1 text-sm">{obj.title}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() =>
+                            dispatch({
+                              type: "START_EDIT_OBJECTIVE",
+                              id: obj.id,
+                              title: obj.title,
+                            })
+                          }
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() =>
+                            dispatch({
+                              type: "SET_DELETE_TARGET",
+                              target: {
+                                type: "objective",
+                                id: obj.id,
+                                title: obj.title,
+                              },
+                            })
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem
+                    onClick={() => handleMoveToTopAuditObjective(obj.id)}
+                    disabled={idx === 0}
+                  >
+                    <ArrowUpToLine className="mr-2 h-3.5 w-3.5" />
+                    Đưa lên đầu
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+            );
+          }}
+        />
 
         {state.addingObjective && (
           <div className="px-2 py-1.5">
@@ -343,20 +382,20 @@ function CollapsibleCard({
 }) {
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3">
-        <button
-          onClick={onToggle}
-          className="shrink-0 rounded p-0.5 hover:bg-muted"
-        >
+      <div
+        className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none"
+        onClick={onToggle}
+      >
+        <span className="shrink-0 rounded p-0.5">
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />
           ) : (
             <ChevronDown className="h-4 w-4" />
           )}
-        </button>
+        </span>
         {icon}
         <span className="flex-1 text-sm font-semibold">{title}</span>
-        {action}
+        {action && <span onClick={(e) => e.stopPropagation()}>{action}</span>}
       </div>
       {!collapsed && (
         <div className="px-4 pb-4">

@@ -27,7 +27,7 @@ export async function checkAccess(
 // AUDIT LOGGING
 // =============================================================================
 
-export type AuditAction = 'create' | 'update' | 'delete';
+export type AuditAction = 'create' | 'update' | 'delete' | 'reorder';
 
 export interface AuditLogData {
   userId: string;

@@ -10,6 +10,7 @@ import {
   useCreateProcedure,
   useUpdateProcedure,
   useDeleteProcedure,
+  useReorderItems,
 } from "../../hooks/useEngagements";
 import type {
   EngagementSection,
@@ -74,6 +75,7 @@ export function useWorkProgramEditor(
   const createProcedure = useCreateProcedure();
   const updateProcedure = useUpdateProcedure();
   const deleteProcedure = useDeleteProcedure();
+  const reorderItems = useReorderItems();
 
   // ── Top-level nodes ──
 
@@ -258,6 +260,143 @@ export function useWorkProgramEditor(
     [deleteProcedure, engagementId],
   );
 
+  // ── Reorder handlers ──
+
+  const handleReorderTopNodes = useCallback(
+    (activeId: string, overId: string) => {
+      const oldIdx = topNodes.findIndex((n) => n.id === activeId);
+      const newIdx = topNodes.findIndex((n) => n.id === overId);
+      if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return;
+
+      // Separate sections and objectives — reorder each group independently
+      // Sections maintain sort_order relative to other sections
+      // Standalone objectives maintain sort_order relative to other standalone objectives
+      const activeNode = topNodes[oldIdx];
+      const overNode = topNodes[newIdx];
+
+      // Only allow reorder within same type
+      if (activeNode.type !== overNode.type) return;
+
+      if (activeNode.type === "section") {
+        const sectionNodes = topNodes.filter((n) => n.type === "section");
+        const sOldIdx = sectionNodes.findIndex((n) => n.id === activeId);
+        const sNewIdx = sectionNodes.findIndex((n) => n.id === overId);
+        if (sOldIdx === -1 || sNewIdx === -1 || sOldIdx === sNewIdx) return;
+        const reordered = [...sectionNodes];
+        const [moved] = reordered.splice(sOldIdx, 1);
+        reordered.splice(sNewIdx, 0, moved);
+        reorderItems.mutate({
+          engagementId,
+          entityType: "section",
+          items: reordered.map((n, i) => ({ id: n.id, sortOrder: i })),
+        });
+      } else {
+        const objNodes = topNodes.filter((n) => n.type === "objective");
+        const oOldIdx = objNodes.findIndex((n) => n.id === activeId);
+        const oNewIdx = objNodes.findIndex((n) => n.id === overId);
+        if (oOldIdx === -1 || oNewIdx === -1 || oOldIdx === oNewIdx) return;
+        const reordered = [...objNodes];
+        const [moved] = reordered.splice(oOldIdx, 1);
+        reordered.splice(oNewIdx, 0, moved);
+        reorderItems.mutate({
+          engagementId,
+          entityType: "objective",
+          items: reordered.map((n, i) => ({ id: n.id, sortOrder: i })),
+        });
+      }
+    },
+    [topNodes, engagementId, reorderItems],
+  );
+
+  const handleMoveToTopNode = useCallback(
+    (nodeId: string) => {
+      const node = topNodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      const sameTypeNodes = topNodes.filter((n) => n.type === node.type);
+      const idx = sameTypeNodes.findIndex((n) => n.id === nodeId);
+      if (idx <= 0) return;
+      const reordered = [...sameTypeNodes];
+      const [moved] = reordered.splice(idx, 1);
+      reordered.unshift(moved);
+      reorderItems.mutate({
+        engagementId,
+        entityType: node.type === "section" ? "section" : "objective",
+        items: reordered.map((n, i) => ({ id: n.id, sortOrder: i })),
+      });
+    },
+    [topNodes, engagementId, reorderItems],
+  );
+
+  const handleReorderRows = useCallback(
+    (activeId: string, overId: string) => {
+      // Determine what type of row was moved
+      // Check all sections for matching objectives/procedures
+      for (const section of sections) {
+        // Check objectives within this section
+        const objIdx = section.objectives.findIndex((o) => o.id === activeId);
+        const objOverIdx = section.objectives.findIndex((o) => o.id === overId);
+        if (objIdx !== -1 && objOverIdx !== -1 && objIdx !== objOverIdx) {
+          const reordered = [...section.objectives];
+          const [moved] = reordered.splice(objIdx, 1);
+          reordered.splice(objOverIdx, 0, moved);
+          reorderItems.mutate({
+            engagementId,
+            entityType: "objective",
+            items: reordered.map((o, i) => ({ id: o.id, sortOrder: i })),
+          });
+          return;
+        }
+        // Check procedures within each objective
+        for (const obj of section.objectives) {
+          const procIdx = obj.procedures.findIndex((p) => p.id === activeId);
+          const procOverIdx = obj.procedures.findIndex((p) => p.id === overId);
+          if (procIdx !== -1 && procOverIdx !== -1 && procIdx !== procOverIdx) {
+            const reordered = [...obj.procedures];
+            const [moved] = reordered.splice(procIdx, 1);
+            reordered.splice(procOverIdx, 0, moved);
+            reorderItems.mutate({
+              engagementId,
+              entityType: "procedure",
+              items: reordered.map((p, i) => ({ id: p.id, sortOrder: i })),
+            });
+            return;
+          }
+        }
+        // Check direct procedures under section
+        const sProcIdx = section.procedures.findIndex((p) => p.id === activeId);
+        const sProcOverIdx = section.procedures.findIndex((p) => p.id === overId);
+        if (sProcIdx !== -1 && sProcOverIdx !== -1 && sProcIdx !== sProcOverIdx) {
+          const reordered = [...section.procedures];
+          const [moved] = reordered.splice(sProcIdx, 1);
+          reordered.splice(sProcOverIdx, 0, moved);
+          reorderItems.mutate({
+            engagementId,
+            entityType: "procedure",
+            items: reordered.map((p, i) => ({ id: p.id, sortOrder: i })),
+          });
+          return;
+        }
+      }
+      // Check standalone objectives' procedures
+      for (const obj of standaloneObjectives) {
+        const procIdx = obj.procedures.findIndex((p) => p.id === activeId);
+        const procOverIdx = obj.procedures.findIndex((p) => p.id === overId);
+        if (procIdx !== -1 && procOverIdx !== -1 && procIdx !== procOverIdx) {
+          const reordered = [...obj.procedures];
+          const [moved] = reordered.splice(procIdx, 1);
+          reordered.splice(procOverIdx, 0, moved);
+          reorderItems.mutate({
+            engagementId,
+            entityType: "procedure",
+            items: reordered.map((p, i) => ({ id: p.id, sortOrder: i })),
+          });
+          return;
+        }
+      }
+    },
+    [sections, standaloneObjectives, engagementId, reorderItems],
+  );
+
   // ── Confirm delete dispatch ──
 
   const handleConfirmDelete = useCallback(() => {
@@ -331,6 +470,10 @@ export function useWorkProgramEditor(
     isUpdatingSection: updateSection.isPending,
     isUpdatingObjective: updateObjective.isPending,
     isUpdatingProcedure: updateProcedure.isPending,
+    // Reorder
+    handleReorderTopNodes,
+    handleMoveToTopNode,
+    handleReorderRows,
   };
 }
 

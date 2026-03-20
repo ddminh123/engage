@@ -10,6 +10,7 @@ import {
   useCreateEngagementControl,
   useUpdateEngagementControl,
   useDeleteEngagementControl,
+  useReorderItems,
 } from "../../hooks/useEngagements";
 import type { RcmObjective } from "../../types";
 import {
@@ -39,6 +40,7 @@ export function useRcmEditor(
   const createControl = useCreateEngagementControl();
   const updateControl = useUpdateEngagementControl();
   const deleteControl = useDeleteEngagementControl();
+  const reorderItems = useReorderItems();
 
   // Ref to track current inline input text (avoids state → column recreation → IME breakage)
   const textRef = useRef("");
@@ -215,6 +217,111 @@ export function useRcmEditor(
     [updateControl, controlMap, engagementId],
   );
 
+  // ── Reorder handlers ──
+
+  const handleReorderRows = useCallback(
+    (activeId: string, overId: string) => {
+      // Check objectives
+      const objIdx = rcmObjectives.findIndex((o) => o.id === activeId);
+      const objOverIdx = rcmObjectives.findIndex((o) => o.id === overId);
+      if (objIdx !== -1 && objOverIdx !== -1 && objIdx !== objOverIdx) {
+        const reordered = [...rcmObjectives];
+        const [moved] = reordered.splice(objIdx, 1);
+        reordered.splice(objOverIdx, 0, moved);
+        reorderItems.mutate({
+          engagementId,
+          entityType: 'rcm_objective',
+          items: reordered.map((o, i) => ({ id: o.id, sortOrder: i })),
+        });
+        return;
+      }
+      // Check risks within each objective
+      for (const obj of rcmObjectives) {
+        const rIdx = obj.risks.findIndex((r) => r.id === activeId);
+        const rOverIdx = obj.risks.findIndex((r) => r.id === overId);
+        if (rIdx !== -1 && rOverIdx !== -1 && rIdx !== rOverIdx) {
+          const reordered = [...obj.risks];
+          const [moved] = reordered.splice(rIdx, 1);
+          reordered.splice(rOverIdx, 0, moved);
+          reorderItems.mutate({
+            engagementId,
+            entityType: 'risk',
+            items: reordered.map((r, i) => ({ id: r.id, sortOrder: i })),
+          });
+          return;
+        }
+        // Check controls within each risk
+        for (const risk of obj.risks) {
+          const cIdx = risk.controls.findIndex((c) => c.id === activeId);
+          const cOverIdx = risk.controls.findIndex((c) => c.id === overId);
+          if (cIdx !== -1 && cOverIdx !== -1 && cIdx !== cOverIdx) {
+            const reordered = [...risk.controls];
+            const [moved] = reordered.splice(cIdx, 1);
+            reordered.splice(cOverIdx, 0, moved);
+            reorderItems.mutate({
+              engagementId,
+              entityType: 'control',
+              items: reordered.map((c, i) => ({ id: c.id, sortOrder: i })),
+            });
+            return;
+          }
+        }
+      }
+    },
+    [rcmObjectives, engagementId, reorderItems],
+  );
+
+  const handleMoveToTop = useCallback(
+    (rowId: string, rowType: 'objective' | 'risk' | 'control') => {
+      if (rowType === 'objective') {
+        const idx = rcmObjectives.findIndex((o) => o.id === rowId);
+        if (idx <= 0) return;
+        const reordered = [...rcmObjectives];
+        const [moved] = reordered.splice(idx, 1);
+        reordered.unshift(moved);
+        reorderItems.mutate({
+          engagementId,
+          entityType: 'rcm_objective',
+          items: reordered.map((o, i) => ({ id: o.id, sortOrder: i })),
+        });
+        return;
+      }
+      if (rowType === 'risk') {
+        for (const obj of rcmObjectives) {
+          const idx = obj.risks.findIndex((r) => r.id === rowId);
+          if (idx <= 0) continue;
+          const reordered = [...obj.risks];
+          const [moved] = reordered.splice(idx, 1);
+          reordered.unshift(moved);
+          reorderItems.mutate({
+            engagementId,
+            entityType: 'risk',
+            items: reordered.map((r, i) => ({ id: r.id, sortOrder: i })),
+          });
+          return;
+        }
+      }
+      if (rowType === 'control') {
+        for (const obj of rcmObjectives) {
+          for (const risk of obj.risks) {
+            const idx = risk.controls.findIndex((c) => c.id === rowId);
+            if (idx <= 0) continue;
+            const reordered = [...risk.controls];
+            const [moved] = reordered.splice(idx, 1);
+            reordered.unshift(moved);
+            reorderItems.mutate({
+              engagementId,
+              entityType: 'control',
+              items: reordered.map((c, i) => ({ id: c.id, sortOrder: i })),
+            });
+            return;
+          }
+        }
+      }
+    },
+    [rcmObjectives, engagementId, reorderItems],
+  );
+
   // Computed delete dialog text
   const deleteTitle =
     state.deleteTarget?.type === "objective"
@@ -263,6 +370,9 @@ export function useRcmEditor(
     isUpdatingRisk: updateRisk.isPending,
     isCreatingControl: createControl.isPending,
     isUpdatingControl: updateControl.isPending,
+    // Reorder
+    handleReorderRows,
+    handleMoveToTop,
   };
 }
 

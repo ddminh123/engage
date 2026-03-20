@@ -21,6 +21,7 @@ import {
   useCreateProcedure,
   useUpdateProcedure,
   useDeleteProcedure,
+  useReorderItems,
 } from "./useEngagements";
 import type {
   EngagementDetail,
@@ -323,6 +324,7 @@ export function usePlanningEditor(engagement: EngagementDetail) {
   const createProc = useCreateProcedure();
   const updateProc = useUpdateProcedure();
   const deleteProc = useDeleteProcedure();
+  const reorderItems = useReorderItems();
 
   // ── Objective handlers ──
 
@@ -605,6 +607,43 @@ export function usePlanningEditor(engagement: EngagementDetail) {
     setCollapsed(new Set(keys));
   }, []);
 
+  // ── Reorder handlers ──
+
+  const handleReorderAuditObjectives = useCallback(
+    (activeId: string, overId: string) => {
+      const items = engagement.auditObjectives;
+      const oldIdx = items.findIndex((i) => i.id === activeId);
+      const newIdx = items.findIndex((i) => i.id === overId);
+      if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return;
+      const reordered = [...items];
+      const [moved] = reordered.splice(oldIdx, 1);
+      reordered.splice(newIdx, 0, moved);
+      reorderItems.mutate({
+        engagementId: engagement.id,
+        entityType: 'audit_objective',
+        items: reordered.map((item, idx) => ({ id: item.id, sortOrder: idx })),
+      });
+    },
+    [engagement.auditObjectives, engagement.id, reorderItems],
+  );
+
+  const handleMoveToTopAuditObjective = useCallback(
+    (id: string) => {
+      const items = engagement.auditObjectives;
+      const idx = items.findIndex((i) => i.id === id);
+      if (idx <= 0) return;
+      const reordered = [...items];
+      const [moved] = reordered.splice(idx, 1);
+      reordered.unshift(moved);
+      reorderItems.mutate({
+        engagementId: engagement.id,
+        entityType: 'audit_objective',
+        items: reordered.map((item, i) => ({ id: item.id, sortOrder: i })),
+      });
+    },
+    [engagement.auditObjectives, engagement.id, reorderItems],
+  );
+
   // ── Confirm delete dispatch ──
 
   const handleConfirmDelete = useCallback(() => {
@@ -640,5 +679,8 @@ export function usePlanningEditor(engagement: EngagementDetail) {
     handleConfirmDelete,
     handleSaveUnderstanding,
     isSavingUnderstanding: updateEngagement.isPending,
+    handleReorderAuditObjectives,
+    handleMoveToTopAuditObjective,
+    reorderItems,
   };
 }

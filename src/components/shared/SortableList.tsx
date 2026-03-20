@@ -9,7 +9,9 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DraggableAttributes,
 } from "@dnd-kit/core";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import {
   SortableContext,
   sortableKeyboardCoordinates,
@@ -30,13 +32,16 @@ export interface SortableItem {
 interface SortableListProps<T extends SortableItem> {
   items: T[];
   onReorder: (activeId: string, overId: string) => void;
-  renderItem: (item: T, dragHandleProps: DragHandleRenderProps) => React.ReactNode;
+  renderItem: (
+    item: T,
+    dragHandleProps: DragHandleRenderProps,
+  ) => React.ReactNode;
   className?: string;
 }
 
 export interface DragHandleRenderProps {
-  attributes: Record<string, unknown>;
-  listeners: Record<string, unknown> | undefined;
+  attributes: DraggableAttributes;
+  listeners: SyntheticListenerMap | undefined;
   isDragging: boolean;
 }
 
@@ -47,8 +52,8 @@ export function DragHandle({
   listeners,
   className,
 }: {
-  attributes: Record<string, unknown>;
-  listeners: Record<string, unknown> | undefined;
+  attributes: DraggableAttributes;
+  listeners: SyntheticListenerMap | undefined;
   className?: string;
 }) {
   return (

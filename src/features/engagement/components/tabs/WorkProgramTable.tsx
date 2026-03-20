@@ -12,11 +12,23 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsUpDown,
+  ArrowUpToLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@/components/ui/context-menu";
 import { DataTable } from "@/components/shared/DataTable";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InlineTableInput } from "@/components/shared/InlineTableInput";
+import {
+  SortableList,
+  DragHandle,
+  type DragHandleRenderProps,
+} from "@/components/shared/SortableList";
 import type { EngagementSection, EngagementObjective } from "../../types";
 import { type WpRow, type TopNode, WP_LABELS } from "./workProgramTypes";
 import { useWorkProgramEditor, type WpMode } from "./useWorkProgramEditor";
@@ -71,6 +83,9 @@ export function WorkProgramTable({
     isDeleting,
     isCreatingSection,
     isCreatingObjective,
+    handleReorderTopNodes,
+    handleMoveToTopNode,
+    handleReorderRows,
   } = editor;
 
   const allNodeIds = topNodes.map((n) => n.id);
@@ -165,9 +180,18 @@ export function WorkProgramTable({
       )}
 
       {/* ── Section / Objective cards ── */}
-      {topNodes.map((node) => (
-        <TopNodeCard key={node.id} node={node} editor={editor} />
-      ))}
+      <SortableList
+        items={topNodes}
+        onReorder={handleReorderTopNodes}
+        className="space-y-3"
+        renderItem={(node, dragHandle) => (
+          <TopNodeCard
+            node={node}
+            editor={editor}
+            dragHandleProps={dragHandle}
+          />
+        )}
+      />
 
       {/* ── Inline add section / top-level objective ── */}
       {state.addingTopType === "section" && (
@@ -252,9 +276,11 @@ export function WorkProgramTable({
 function TopNodeCard({
   node,
   editor,
+  dragHandleProps,
 }: {
   node: TopNode;
   editor: ReturnType<typeof useWorkProgramEditor>;
+  dragHandleProps: DragHandleRenderProps;
 }) {
   const {
     state,
@@ -265,7 +291,10 @@ function TopNodeCard({
     handleTextChange,
     handleUpdateSection,
     handleUpdateTopObjective,
+    handleMoveToTopNode,
+    handleReorderRows,
     treesMap,
+    topNodes,
     isUpdatingSection,
     isUpdatingObjective,
   } = editor;
@@ -286,110 +315,135 @@ function TopNodeCard({
   const isSavingHeader =
     node.type === "section" ? isUpdatingSection : isUpdatingObjective;
 
+  const sameTypeNodes = topNodes.filter((n) => n.type === node.type);
+  const isFirstOfType = sameTypeNodes[0]?.id === node.id;
+
   return (
-    <div className="rounded-lg border">
-      {/* ── Card header ── */}
-      <div className="flex items-center gap-2 px-3 py-2 group/header">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="h-5 w-5"
-          onClick={() => toggleCollapse(node.id)}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5" />
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="rounded-lg border">
+          {/* ── Card header ── */}
+          <div
+            className="flex items-center gap-2 px-3 py-2 group/header cursor-pointer select-none"
+            onClick={() => !isEditingHeader && toggleCollapse(node.id)}
+          >
+            <span onClick={(e) => e.stopPropagation()}>
+              <DragHandle {...dragHandleProps} />
+            </span>
+            <span className="shrink-0">
+              {isCollapsed ? (
+                <ChevronRight className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </span>
+            {icon}
+
+            {isEditingHeader ? (
+              <span className="contents" onClick={(e) => e.stopPropagation()}>
+                <InlineTableInput
+                  initialValue={state.editingNodeTitle}
+                  onChange={handleTextChange}
+                  onSubmit={(v) => {
+                    if (node.type === "section")
+                      handleUpdateSection(node.id, v);
+                    else handleUpdateTopObjective(node.id, v);
+                  }}
+                  onCancel={() => dispatch({ type: "CANCEL_EDIT_NODE" })}
+                  autoFocus
+                />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    if (node.type === "section")
+                      handleUpdateSection(node.id, textRef.current);
+                    else handleUpdateTopObjective(node.id, textRef.current);
+                  }}
+                  disabled={isSavingHeader}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => dispatch({ type: "CANCEL_EDIT_NODE" })}
+                  disabled={isSavingHeader}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </span>
+            ) : (
+              <>
+                <span className="flex-1 text-sm font-medium">{node.title}</span>
+                <span
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-0.5"
+                >
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="opacity-0 group-hover/header:opacity-100 transition-opacity"
+                    onClick={() =>
+                      dispatch({
+                        type: "START_EDIT_NODE",
+                        id: node.id,
+                        title: node.title,
+                      })
+                    }
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive opacity-0 group-hover/header:opacity-100 transition-opacity"
+                    onClick={() =>
+                      dispatch({
+                        type: "SET_DELETE",
+                        target: {
+                          type: node.type,
+                          id: node.id,
+                          title: node.title.slice(0, 40),
+                        },
+                      })
+                    }
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* ── Card body (DataTable) ── */}
+          {!isCollapsed && (
+            <div className="border-t px-1 pb-1 [&>div]:space-y-0 [&_.rounded-md.border]:border-0 [&_.rounded-md.border]:rounded-none">
+              <DataTable
+                columns={columns}
+                data={treeData}
+                getSubRows={(row: WpRow) =>
+                  row.children.length > 0 ? row.children : undefined
+                }
+                emptyMessage="Chưa có mục nào."
+                pageSize={100}
+                hideToolbar
+                enableRowReorder
+                onRowReorder={handleReorderRows}
+              />
+            </div>
           )}
-        </Button>
-        {icon}
-
-        {isEditingHeader ? (
-          <>
-            <InlineTableInput
-              initialValue={state.editingNodeTitle}
-              onChange={handleTextChange}
-              onSubmit={(v) => {
-                if (node.type === "section") handleUpdateSection(node.id, v);
-                else handleUpdateTopObjective(node.id, v);
-              }}
-              onCancel={() => dispatch({ type: "CANCEL_EDIT_NODE" })}
-              autoFocus
-            />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => {
-                if (node.type === "section")
-                  handleUpdateSection(node.id, textRef.current);
-                else handleUpdateTopObjective(node.id, textRef.current);
-              }}
-              disabled={isSavingHeader}
-            >
-              <Check className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => dispatch({ type: "CANCEL_EDIT_NODE" })}
-              disabled={isSavingHeader}
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </>
-        ) : (
-          <>
-            <span className="flex-1 text-sm font-medium">{node.title}</span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="opacity-0 group-hover/header:opacity-100 transition-opacity"
-              onClick={() =>
-                dispatch({
-                  type: "START_EDIT_NODE",
-                  id: node.id,
-                  title: node.title,
-                })
-              }
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-destructive hover:text-destructive opacity-0 group-hover/header:opacity-100 transition-opacity"
-              onClick={() =>
-                dispatch({
-                  type: "SET_DELETE",
-                  target: {
-                    type: node.type,
-                    id: node.id,
-                    title: node.title.slice(0, 40),
-                  },
-                })
-              }
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </>
-        )}
-      </div>
-
-      {/* ── Card body (DataTable) ── */}
-      {!isCollapsed && (
-        <div className="border-t px-1 pb-1 [&>div]:space-y-0 [&_.rounded-md.border]:border-0 [&_.rounded-md.border]:rounded-none">
-          <DataTable
-            columns={columns}
-            data={treeData}
-            getSubRows={(row: WpRow) =>
-              row.children.length > 0 ? row.children : undefined
-            }
-            emptyMessage="Chưa có mục nào."
-            pageSize={100}
-            hideToolbar
-          />
         </div>
-      )}
-    </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem
+          onClick={() => handleMoveToTopNode(node.id)}
+          disabled={isFirstOfType}
+        >
+          <ArrowUpToLine className="mr-2 h-3.5 w-3.5" />
+          Đưa lên đầu
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
