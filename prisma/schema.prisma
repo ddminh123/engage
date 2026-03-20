@@ -70,6 +70,7 @@ model Contact {
   // Engagement relations
   engagement_contact_points    EngagementContactPoint[]    @relation("EngContactPoint")
   engagement_auditee_reps      EngagementAuditeeRep[]      @relation("EngAuditeeRep")
+  finding_risk_owners          DraftFindingRiskOwner[]     @relation("FindingRiskOwner")
 
   @@index([status])
   @@index([unit_id])
@@ -104,6 +105,7 @@ model OrgUnit {
   // Engagement relations
   engagement_owners          EngagementOwner[]          @relation("EngOwner")
   engagement_participants    EngagementParticipant[]    @relation("EngParticipant")
+  finding_unit_owners        DraftFindingUnitOwner[]    @relation("FindingUnitOwner")
 
   @@index([parent_id])
   @@index([status])
@@ -551,6 +553,7 @@ model EngagementRcmObjective {
   engagement      Engagement      @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
   audit_objective AuditObjective? @relation(fields: [audit_objective_id], references: [id], onDelete: SetNull)
   risks           EngagementRisk[]
+  procedure_refs  ProcedureObjectiveRef[]
 
   @@index([engagement_id])
   @@index([audit_objective_id])
@@ -572,6 +575,7 @@ model EngagementRisk {
   engagement      Engagement              @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
   rcm_objective   EngagementRcmObjective?  @relation(fields: [rcm_objective_id], references: [id], onDelete: SetNull)
   controls        EngagementControl[]
+  procedure_refs  ProcedureRiskRef[]
 
   @@index([engagement_id])
   @@index([rcm_objective_id])
@@ -590,6 +594,7 @@ model EngagementControl {
   updated_at    DateTime  @updatedAt
 
   risk EngagementRisk @relation(fields: [risk_id], references: [id], onDelete: Cascade)
+  procedure_refs ProcedureControlRef[]
 
   @@index([risk_id])
   @@index([sort_order])
@@ -651,7 +656,8 @@ model EngagementProcedure {
   objective_id   String?   // nullable — if null, procedure is under section or engagement
   title          String
   description    String?   @db.Text
-  procedure_type String?   // inquiry | observation | inspection | re_performance | analytical | walkthrough | other
+  procedure_type     String?   // inquiry | observation | inspection | re_performance | analytical | walkthrough | other
+  procedure_category String?   // toc | substantive
   status         String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
   added_from     String    @default("execution") // planning | execution
   observations   String?   @db.Text  // what was found during testing
@@ -672,6 +678,9 @@ model EngagementProcedure {
   section    EngagementSection?   @relation(fields: [section_id], references: [id], onDelete: Cascade)
   objective  EngagementObjective? @relation(fields: [objective_id], references: [id], onDelete: Cascade)
   findings   DraftFindingProcedure[]
+  ref_controls   ProcedureControlRef[]
+  ref_risks      ProcedureRiskRef[]
+  ref_objectives ProcedureObjectiveRef[]
 
   @@index([engagement_id])
   @@index([section_id])
@@ -687,7 +696,7 @@ model DraftFinding {
   title         String
   description   String?   @db.Text
   risk_rating   String?   // low | medium | high | critical
-  status        String    @default("draft") // draft | confirmed | rejected
+  status        String    @default("draft") // draft | to_review | reviewed | accepted | rejected
   recommendation String?  @db.Text
   management_response String? @db.Text
   root_cause    String?   @db.Text
@@ -695,8 +704,10 @@ model DraftFinding {
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
 
-  engagement Engagement              @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
-  procedures DraftFindingProcedure[]
+  engagement  Engagement              @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  procedures  DraftFindingProcedure[]
+  risk_owners DraftFindingRiskOwner[]
+  unit_owners DraftFindingUnitOwner[]
 
   @@index([engagement_id])
   @@index([status])
@@ -713,4 +724,64 @@ model DraftFindingProcedure {
 
   @@id([finding_id, procedure_id])
   @@map("draft_finding_procedure")
+}
+
+// Many-to-many: DraftFinding ↔ Contact (risk owners)
+model DraftFindingRiskOwner {
+  finding_id String
+  contact_id String
+
+  finding DraftFinding @relation(fields: [finding_id], references: [id], onDelete: Cascade)
+  contact Contact      @relation("FindingRiskOwner", fields: [contact_id], references: [id])
+
+  @@id([finding_id, contact_id])
+  @@map("draft_finding_risk_owner")
+}
+
+// Many-to-many: DraftFinding ↔ OrgUnit (unit owners)
+model DraftFindingUnitOwner {
+  finding_id String
+  unit_id    String
+
+  finding DraftFinding @relation(fields: [finding_id], references: [id], onDelete: Cascade)
+  unit    OrgUnit      @relation("FindingUnitOwner", fields: [unit_id], references: [id])
+
+  @@id([finding_id, unit_id])
+  @@map("draft_finding_unit_owner")
+}
+
+// Many-to-many: EngagementProcedure ↔ EngagementControl (references)
+model ProcedureControlRef {
+  procedure_id String
+  control_id   String
+
+  procedure EngagementProcedure @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+  control   EngagementControl   @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@id([procedure_id, control_id])
+  @@map("procedure_control_ref")
+}
+
+// Many-to-many: EngagementProcedure ↔ EngagementRisk (references)
+model ProcedureRiskRef {
+  procedure_id String
+  risk_id      String
+
+  procedure EngagementProcedure @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+  risk      EngagementRisk      @relation(fields: [risk_id], references: [id], onDelete: Cascade)
+
+  @@id([procedure_id, risk_id])
+  @@map("procedure_risk_ref")
+}
+
+// Many-to-many: EngagementProcedure ↔ EngagementRcmObjective (references)
+model ProcedureObjectiveRef {
+  procedure_id     String
+  rcm_objective_id String
+
+  procedure    EngagementProcedure  @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+  rcmObjective EngagementRcmObjective @relation(fields: [rcm_objective_id], references: [id], onDelete: Cascade)
+
+  @@id([procedure_id, rcm_objective_id])
+  @@map("procedure_objective_ref")
 }

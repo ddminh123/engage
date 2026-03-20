@@ -102,6 +102,10 @@ export const ENGAGEMENT_LABELS = {
       walkthrough: 'Kiểm tra xuyên suốt',
       other: 'Khác',
     } as Record<string, string>,
+    procedureCategory: {
+      toc: 'Kiểm tra kiểm soát (TOC)',
+      substantive: 'Kiểm tra cơ bản',
+    } as Record<string, string>,
     status: {
       not_started: 'Chưa bắt đầu',
       in_progress: 'Đang thực hiện',
@@ -179,7 +183,9 @@ export const ENGAGEMENT_LABELS = {
     },
     status: {
       draft: 'Bản nháp',
-      confirmed: 'Đã xác nhận',
+      to_review: 'Chờ soát xét',
+      reviewed: 'Đã soát xét',
+      accepted: 'Đã chấp nhận',
       rejected: 'Đã từ chối',
     } as Record<string, string>,
     riskRating: {

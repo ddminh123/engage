@@ -1,7 +1,16 @@
 "use client";
 
-import { useCallback } from "react";
-import { Plus, Pencil, Trash2, Download, ArrowUpToLine } from "lucide-react";
+import { useCallback, useMemo } from "react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Download,
+  ArrowUpToLine,
+  Copy,
+} from "lucide-react";
+import { useBatchAction } from "../../hooks/useEngagements";
+import type { BatchEntityType } from "../../api";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenuContent,
@@ -43,6 +52,90 @@ export function RcmDataTable({
   } = editor;
 
   const columns = useRcmColumns(editor);
+  const batchAction = useBatchAction();
+
+  // Map row type → batch entity type
+  const rcmEntityTypeMap: Record<string, BatchEntityType> = {
+    objective: "rcm_objective",
+    risk: "risk",
+    control: "control",
+  };
+
+  // Build flat ID→type lookup from tree
+  const rowTypeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const walk = (rows: RcmRow[]) => {
+      for (const r of rows) {
+        map.set(r.id, r.type);
+        if (r.children.length) walk(r.children);
+      }
+    };
+    walk(treeData);
+    return map;
+  }, [treeData]);
+
+  const canSelectRcmRow = useCallback(
+    (row: RcmRow) =>
+      row.type === "objective" || row.type === "risk" || row.type === "control",
+    [],
+  );
+
+  const handleBatch = useCallback(
+    (
+      action: "delete" | "duplicate",
+      selectedIds: string[],
+      clear: () => void,
+    ) => {
+      // Group by entity type
+      const groups = new Map<BatchEntityType, string[]>();
+      for (const id of selectedIds) {
+        const rowType = rowTypeMap.get(id);
+        if (!rowType) continue;
+        const entityType = rcmEntityTypeMap[rowType];
+        if (!entityType) continue;
+        const arr = groups.get(entityType) ?? [];
+        arr.push(id);
+        groups.set(entityType, arr);
+      }
+      // Fire one mutation per entity type
+      for (const [entityType, ids] of groups) {
+        batchAction.mutate({ engagementId, action, entityType, ids });
+      }
+      clear();
+    },
+    [engagementId, batchAction, rowTypeMap, rcmEntityTypeMap],
+  );
+
+  const renderBatchBar = useCallback(
+    (selectedIds: string[], clear: () => void) => (
+      <div className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm">
+        <span className="font-medium">{selectedIds.length} đã chọn</span>
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => handleBatch("duplicate", selectedIds, clear)}
+            disabled={batchAction.isPending}
+          >
+            <Copy className="mr-1 h-3 w-3" />
+            Nhân bản
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs text-destructive hover:text-destructive"
+            onClick={() => handleBatch("delete", selectedIds, clear)}
+            disabled={batchAction.isPending}
+          >
+            <Trash2 className="mr-1 h-3 w-3" />
+            Xóa
+          </Button>
+        </div>
+      </div>
+    ),
+    [handleBatch, batchAction.isPending],
+  );
 
   // ── Context menu ──
 
@@ -239,6 +332,9 @@ export function RcmDataTable({
         hideToolbar
         enableRowReorder
         onRowReorder={handleReorderRows}
+        enableRowSelection
+        canSelectRow={canSelectRcmRow}
+        renderBatchBar={renderBatchBar}
       />
 
       <ConfirmDialog

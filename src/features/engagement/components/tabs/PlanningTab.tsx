@@ -49,7 +49,7 @@ import type {
 } from "../../hooks/usePlanningEditor";
 import { InlineInput } from "./InlineInput";
 import { RcmDataTable } from "./RcmDataTable";
-import { WorkProgramTable } from "./WorkProgramTable";
+import { WorkProgramV2 } from "../work-program";
 import type {
   EngagementDetail,
   AuditObjective,
@@ -312,7 +312,7 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
         collapsed={isCollapsed("procedures")}
         onToggle={() => toggleCollapse("procedures")}
       >
-        <WorkProgramTable
+        <WorkProgramV2
           engagementId={engagement.id}
           sections={engagement.sections}
           standaloneObjectives={engagement.standaloneObjectives}

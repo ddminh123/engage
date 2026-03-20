@@ -155,6 +155,7 @@ export interface EngagementProcedure {
   title: string;
   description: string | null;
   procedureType: string | null;
+  procedureCategory: string | null;
   status: string;
   addedFrom: string;
   observations: string | null;
@@ -171,23 +172,31 @@ export interface EngagementProcedure {
   createdAt: string;
   updatedAt: string;
   linkedFindings: { id: string; title: string }[];
+  linkedControls: { id: string; description: string }[];
+  linkedRisks: { id: string; riskDescription: string }[];
+  linkedObjectives: { id: string; title: string }[];
 }
 
 export interface ProcedureInput {
   title: string;
   description?: string | null;
   procedureType?: string | null;
+  procedureCategory?: string | null;
   sectionId?: string | null;
   objectiveId?: string | null;
   priority?: string | null;
   addedFrom?: string;
   sortOrder?: number;
+  controlRefIds?: string[];
+  riskRefIds?: string[];
+  objectiveRefIds?: string[];
 }
 
 export interface ProcedureUpdateInput {
   title?: string;
   description?: string | null;
   procedureType?: string | null;
+  procedureCategory?: string | null;
   priority?: string | null;
   sortOrder?: number;
   status?: string;
@@ -196,6 +205,11 @@ export interface ProcedureUpdateInput {
   sampleSize?: number | null;
   exceptions?: number | null;
   reviewNotes?: string | null;
+  controlRefIds?: string[];
+  riskRefIds?: string[];
+  objectiveRefIds?: string[];
+  sectionId?: string | null;
+  objectiveId?: string | null;
 }
 
 export interface SectionInput {
@@ -220,6 +234,7 @@ export interface ObjectiveInput {
 export interface ObjectiveUpdateInput extends Partial<ObjectiveInput> {
   status?: string;
   reviewNotes?: string | null;
+  sectionId?: string | null;
 }
 
 // =============================================================================
@@ -240,6 +255,8 @@ export interface DraftFinding {
   createdAt: string;
   updatedAt: string;
   linkedProcedures: { id: string; title: string }[];
+  riskOwners: ContactRef[];
+  unitOwners: { id: string; name: string }[];
 }
 
 export interface FindingInput {
@@ -250,10 +267,14 @@ export interface FindingInput {
   managementResponse?: string | null;
   rootCause?: string | null;
   procedureIds?: string[];
+  riskOwnerIds?: string[];
+  unitOwnerIds?: string[];
 }
 
 export interface FindingUpdateInput extends Partial<FindingInput> {
   status?: string;
+  riskOwnerIds?: string[];
+  unitOwnerIds?: string[];
 }
 
 // =============================================================================

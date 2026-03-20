@@ -410,6 +410,28 @@ export type ReorderEntityType =
   | 'section' | 'objective' | 'procedure'
   | 'audit_objective' | 'rcm_objective' | 'risk' | 'control';
 
+// ── Batch Actions ──
+
+export type BatchEntityType =
+  | 'section' | 'objective' | 'procedure'
+  | 'rcm_objective' | 'risk' | 'control';
+
+export type BatchActionType = 'delete' | 'duplicate';
+
+export async function batchActionApi(
+  engagementId: string,
+  action: BatchActionType,
+  entityType: BatchEntityType,
+  ids: string[],
+): Promise<{ deleted?: number; duplicated?: number }> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_BATCH(engagementId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, entityType, ids }),
+  });
+  return handleResponse<{ deleted?: number; duplicated?: number }>(response);
+}
+
 export async function reorderItemsApi(
   engagementId: string,
   entityType: ReorderEntityType,

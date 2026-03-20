@@ -268,40 +268,31 @@ export function useWorkProgramEditor(
       const newIdx = topNodes.findIndex((n) => n.id === overId);
       if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return;
 
-      // Separate sections and objectives — reorder each group independently
-      // Sections maintain sort_order relative to other sections
-      // Standalone objectives maintain sort_order relative to other standalone objectives
-      const activeNode = topNodes[oldIdx];
-      const overNode = topNodes[newIdx];
+      // Reorder ALL top nodes together — sections and objectives share sortOrder space
+      const reordered = [...topNodes];
+      const [moved] = reordered.splice(oldIdx, 1);
+      reordered.splice(newIdx, 0, moved);
 
-      // Only allow reorder within same type
-      if (activeNode.type !== overNode.type) return;
+      // Assign new sortOrders and split by entity type for the API
+      const sectionItems: { id: string; sortOrder: number }[] = [];
+      const objectiveItems: { id: string; sortOrder: number }[] = [];
+      reordered.forEach((n, i) => {
+        if (n.type === "section") sectionItems.push({ id: n.id, sortOrder: i });
+        else objectiveItems.push({ id: n.id, sortOrder: i });
+      });
 
-      if (activeNode.type === "section") {
-        const sectionNodes = topNodes.filter((n) => n.type === "section");
-        const sOldIdx = sectionNodes.findIndex((n) => n.id === activeId);
-        const sNewIdx = sectionNodes.findIndex((n) => n.id === overId);
-        if (sOldIdx === -1 || sNewIdx === -1 || sOldIdx === sNewIdx) return;
-        const reordered = [...sectionNodes];
-        const [moved] = reordered.splice(sOldIdx, 1);
-        reordered.splice(sNewIdx, 0, moved);
+      if (sectionItems.length > 0) {
         reorderItems.mutate({
           engagementId,
           entityType: "section",
-          items: reordered.map((n, i) => ({ id: n.id, sortOrder: i })),
+          items: sectionItems,
         });
-      } else {
-        const objNodes = topNodes.filter((n) => n.type === "objective");
-        const oOldIdx = objNodes.findIndex((n) => n.id === activeId);
-        const oNewIdx = objNodes.findIndex((n) => n.id === overId);
-        if (oOldIdx === -1 || oNewIdx === -1 || oOldIdx === oNewIdx) return;
-        const reordered = [...objNodes];
-        const [moved] = reordered.splice(oOldIdx, 1);
-        reordered.splice(oNewIdx, 0, moved);
+      }
+      if (objectiveItems.length > 0) {
         reorderItems.mutate({
           engagementId,
           entityType: "objective",
-          items: reordered.map((n, i) => ({ id: n.id, sortOrder: i })),
+          items: objectiveItems,
         });
       }
     },
@@ -325,6 +316,116 @@ export function useWorkProgramEditor(
       });
     },
     [topNodes, engagementId, reorderItems],
+  );
+
+  // Keep moved element at the same viewport position after reorder.
+  // Call BEFORE mutating — returns a cleanup fn to call AFTER mutation.
+  const prepareScrollLock = useCallback(
+    (id: string, kind: "node" | "row") => {
+      const selector =
+        kind === "node"
+          ? `[data-node-id="${id}"]`
+          : `[data-row-id="${id}"]`;
+      const el = document.querySelector(selector);
+      const oldTop = el?.getBoundingClientRect().top ?? null;
+
+      // Return fn to call right after mutation triggers optimistic update
+      return () => {
+        if (oldTop === null) return;
+        // Double rAF: first catches React render, second catches DOM paint
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const el2 = document.querySelector(selector);
+            if (!el2) return;
+            const newTop = el2.getBoundingClientRect().top;
+            const diff = newTop - oldTop;
+            if (Math.abs(diff) > 1) {
+              window.scrollBy({ top: diff, behavior: "instant" });
+            }
+          });
+        });
+      };
+    },
+    [],
+  );
+
+  const handleMoveTopNode = useCallback(
+    (nodeId: string, direction: "up" | "down" | "first" | "last") => {
+      const idx = topNodes.findIndex((n) => n.id === nodeId);
+      if (idx === -1) return;
+      const unlock = prepareScrollLock(nodeId, "node");
+      const reordered = [...topNodes];
+      const [moved] = reordered.splice(idx, 1);
+      let newIdx: number;
+      if (direction === "up") newIdx = Math.max(0, idx - 1);
+      else if (direction === "down") newIdx = Math.min(reordered.length, idx + 1);
+      else if (direction === "first") newIdx = 0;
+      else newIdx = reordered.length;
+      reordered.splice(newIdx, 0, moved);
+      const sectionItems: { id: string; sortOrder: number }[] = [];
+      const objectiveItems: { id: string; sortOrder: number }[] = [];
+      reordered.forEach((n, i) => {
+        if (n.type === "section") sectionItems.push({ id: n.id, sortOrder: i });
+        else objectiveItems.push({ id: n.id, sortOrder: i });
+      });
+      if (sectionItems.length > 0) {
+        reorderItems.mutate({ engagementId, entityType: "section", items: sectionItems });
+      }
+      if (objectiveItems.length > 0) {
+        reorderItems.mutate({ engagementId, entityType: "objective", items: objectiveItems });
+      }
+      unlock();
+    },
+    [topNodes, engagementId, reorderItems, prepareScrollLock],
+  );
+
+  const handleMoveRow = useCallback(
+    (rowId: string, direction: "up" | "down" | "first" | "last") => {
+      const unlock = prepareScrollLock(rowId, "row");
+
+      const computeNewIdx = (idx: number, len: number) => {
+        if (direction === "up") return Math.max(0, idx - 1);
+        if (direction === "down") return Math.min(len, idx + 1);
+        if (direction === "first") return 0;
+        return len; // last
+      };
+
+      const doReorder = (
+        list: { id: string }[],
+        entityType: "objective" | "procedure",
+      ) => {
+        const idx = list.findIndex((item) => item.id === rowId);
+        if (idx === -1) return false;
+        const reordered = [...list];
+        const [moved] = reordered.splice(idx, 1);
+        const newIdx = computeNewIdx(idx, reordered.length);
+        reordered.splice(newIdx, 0, moved);
+        reorderItems.mutate({
+          engagementId,
+          entityType,
+          items: reordered.map((item, i) => ({ id: item.id, sortOrder: i })),
+        });
+        return true;
+      };
+
+      let moved = false;
+      for (const section of sections) {
+        if (doReorder(section.objectives, "objective")) { moved = true; break; }
+        let found = false;
+        for (const obj of section.objectives) {
+          if (doReorder(obj.procedures, "procedure")) { found = true; break; }
+        }
+        if (found) { moved = true; break; }
+        if (doReorder(section.procedures, "procedure")) { moved = true; break; }
+      }
+      if (!moved) {
+        for (const obj of standaloneObjectives) {
+          if (doReorder(obj.procedures, "procedure")) { moved = true; break; }
+        }
+      }
+      if (moved) unlock();
+    },
+    [sections, standaloneObjectives, engagementId, reorderItems, prepareScrollLock],
   );
 
   const handleReorderRows = useCallback(
@@ -429,6 +530,7 @@ export function useWorkProgramEditor(
         : WP_LABELS.procedure.deleteDescription(state.deleteTarget?.title ?? "");
 
   return {
+    engagementId,
     state,
     dispatch,
     mode,
@@ -473,6 +575,8 @@ export function useWorkProgramEditor(
     // Reorder
     handleReorderTopNodes,
     handleMoveToTopNode,
+    handleMoveTopNode,
+    handleMoveRow,
     handleReorderRows,
   };
 }

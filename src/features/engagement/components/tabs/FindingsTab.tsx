@@ -1,11 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataTable } from "@/components/shared/DataTable";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import {
+  DetailSheet,
+  DetailSection,
+  DetailField,
+} from "@/components/shared/DetailSheet";
+import { Badge } from "@/components/ui/badge";
 import { COMMON_LABELS, ENGAGEMENT_LABELS } from "@/constants/labels";
 import {
   useCreateFinding,
@@ -13,6 +18,7 @@ import {
   useDeleteFinding,
 } from "../../hooks/useEngagements";
 import { FindingFormSheet } from "./FindingFormSheet";
+import { getFindingColumns } from "./findingColumns";
 import type {
   EngagementDetail,
   EngagementProcedure,
@@ -23,13 +29,6 @@ import type {
 
 const C = COMMON_LABELS;
 const LF = ENGAGEMENT_LABELS.finding;
-
-const RISK_COLORS: Record<string, string> = {
-  low: "bg-green-100 text-green-700",
-  medium: "bg-amber-100 text-amber-700",
-  high: "bg-orange-100 text-orange-700",
-  critical: "bg-red-100 text-red-700",
-};
 
 interface FindingsTabProps {
   engagement: EngagementDetail;
@@ -46,9 +45,18 @@ export function FindingsTab({ engagement }: FindingsTabProps) {
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingFinding, setEditingFinding] =
     React.useState<DraftFinding | null>(null);
+  const [viewFinding, setViewFinding] = React.useState<DraftFinding | null>(
+    null,
+  );
   const [deleteTarget, setDeleteTarget] = React.useState<DraftFinding | null>(
     null,
   );
+
+  // Keep local copy for detail sheet animation
+  const [localView, setLocalView] = React.useState<DraftFinding | null>(null);
+  React.useEffect(() => {
+    if (viewFinding) setLocalView(viewFinding);
+  }, [viewFinding]);
 
   // Collect all procedures for linking
   const allProcedures = React.useMemo(() => {
@@ -61,6 +69,11 @@ export function FindingsTab({ engagement }: FindingsTabProps) {
     }
     return procs;
   }, [engagement]);
+
+  const columns = React.useMemo(
+    () => getFindingColumns((f) => setViewFinding(f)),
+    [],
+  );
 
   const handleAdd = () => {
     setEditingFinding(null);
@@ -98,117 +111,126 @@ export function FindingsTab({ engagement }: FindingsTabProps) {
     );
   };
 
+  const f = localView;
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          {findings.length > 0 ? `${findings.length} phát hiện` : null}
-        </div>
+      <div className="flex items-center justify-end">
         <Button size="sm" onClick={handleAdd}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           {LF.createTitle}
         </Button>
       </div>
 
-      {/* Finding cards */}
-      {findings.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">
-            {LF.noData}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {findings.map((f) => (
-            <Card key={f.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{f.title}</CardTitle>
-                  <div className="flex items-center gap-2">
-                    {f.riskRating && (
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${RISK_COLORS[f.riskRating] ?? "bg-muted text-muted-foreground"}`}
-                      >
-                        {LF.riskRating[f.riskRating] ?? f.riskRating}
-                      </span>
-                    )}
-                    <Badge variant="secondary">
-                      {LF.status[f.status] ?? f.status}
+      {/* DataTable */}
+      <DataTable
+        columns={columns}
+        data={findings}
+        emptyMessage={LF.noData}
+        pageSize={20}
+      />
+
+      {/* Detail sheet */}
+      <DetailSheet
+        open={!!viewFinding}
+        onOpenChange={(open) => {
+          if (!open) setViewFinding(null);
+        }}
+        title={f?.title ?? ""}
+        size="md"
+        onEdit={() => {
+          if (f) {
+            setViewFinding(null);
+            handleEdit(f);
+          }
+        }}
+        onDelete={() => {
+          if (f) {
+            setViewFinding(null);
+            setDeleteTarget(f);
+          }
+        }}
+      >
+        {f && (
+          <>
+            <DetailSection title="Thông tin chung" columns={2} hideDivider>
+              <DetailField label={LF.field.description}>
+                {f.description || "—"}
+              </DetailField>
+              <DetailField label={LF.field.riskRating}>
+                {f.riskRating
+                  ? (LF.riskRating[f.riskRating] ?? f.riskRating)
+                  : "—"}
+              </DetailField>
+              <DetailField label={LF.field.status}>
+                {LF.status[f.status] ?? f.status}
+              </DetailField>
+            </DetailSection>
+
+            {(f.rootCause || f.recommendation || f.managementResponse) && (
+              <DetailSection title="Chi tiết">
+                <DetailField label={LF.field.rootCause}>
+                  {f.rootCause || "—"}
+                </DetailField>
+                <DetailField label={LF.field.recommendation}>
+                  {f.recommendation || "—"}
+                </DetailField>
+                <DetailField label={LF.field.managementResponse}>
+                  {f.managementResponse || "—"}
+                </DetailField>
+              </DetailSection>
+            )}
+
+            {f.linkedProcedures.length > 0 && (
+              <DetailSection title={LF.field.linkedProcedures}>
+                <div className="flex flex-wrap gap-1">
+                  {f.linkedProcedures.map((p) => (
+                    <Badge key={p.id} variant="outline" className="text-xs">
+                      {p.title}
                     </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleEdit(f)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setDeleteTarget(f)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  ))}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                {f.description && (
-                  <p className="text-muted-foreground whitespace-pre-wrap">
-                    {f.description}
-                  </p>
+              </DetailSection>
+            )}
+
+            {(f.riskOwners.length > 0 || f.unitOwners.length > 0) && (
+              <DetailSection title="Chủ sở hữu" columns={2}>
+                {f.riskOwners.length > 0 && (
+                  <DetailField label="Chủ rủi ro">
+                    <div className="flex flex-wrap gap-1">
+                      {f.riskOwners.map((o) => (
+                        <Badge
+                          key={o.id}
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          {o.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </DetailField>
                 )}
-                {f.recommendation && (
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {LF.field.recommendation}:
-                    </span>
-                    <p className="mt-0.5 whitespace-pre-wrap">
-                      {f.recommendation}
-                    </p>
-                  </div>
+                {f.unitOwners.length > 0 && (
+                  <DetailField label="Đơn vị chịu trách nhiệm">
+                    <div className="flex flex-wrap gap-1">
+                      {f.unitOwners.map((o) => (
+                        <Badge
+                          key={o.id}
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          {o.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </DetailField>
                 )}
-                {f.rootCause && (
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {LF.field.rootCause}:
-                    </span>
-                    <p className="mt-0.5 whitespace-pre-wrap">{f.rootCause}</p>
-                  </div>
-                )}
-                {f.managementResponse && (
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {LF.field.managementResponse}:
-                    </span>
-                    <p className="mt-0.5 whitespace-pre-wrap">
-                      {f.managementResponse}
-                    </p>
-                  </div>
-                )}
-                {f.linkedProcedures.length > 0 && (
-                  <div>
-                    <span className="text-xs text-muted-foreground">
-                      {LF.field.linkedProcedures}:{" "}
-                    </span>
-                    {f.linkedProcedures.map((p) => (
-                      <Badge
-                        key={p.id}
-                        variant="outline"
-                        className="mr-1 text-xs"
-                      >
-                        {p.title}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              </DetailSection>
+            )}
+          </>
+        )}
+      </DetailSheet>
 
       {/* Finding form */}
       <FindingFormSheet

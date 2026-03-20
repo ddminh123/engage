@@ -112,9 +112,15 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
           }
 
           // ── Persistent "add" buttons at bottom of each group ──
+          // Extra offset accounts for the chevron + icon space that siblings have
           if (r.type === "btn_add_risk") {
             return (
-              <div style={{ paddingLeft: indent }}>
+              <div
+                className="flex items-center"
+                style={{ paddingLeft: indent }}
+              >
+                {/* spacer matching chevron(18px) + gap(8px) + icon(14px) + gap(8px) */}
+                <span style={{ width: 48 }} className="shrink-0" />
                 <button
                   className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground py-1"
                   onClick={(e) => {
@@ -135,7 +141,12 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
 
           if (r.type === "btn_add_control") {
             return (
-              <div style={{ paddingLeft: indent }}>
+              <div
+                className="flex items-center"
+                style={{ paddingLeft: indent }}
+              >
+                {/* spacer matching spacer(w-4=16px) + gap(8px) + icon(14px) + gap(8px) */}
+                <span style={{ width: 46 }} className="shrink-0" />
                 <button
                   className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground py-1"
                   onClick={(e) => {
@@ -206,7 +217,10 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => row.toggleExpanded()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    row.toggleExpanded();
+                  }}
                   className="shrink-0 rounded p-0.5 hover:bg-muted"
                 >
                   {row.getIsExpanded() ? (
@@ -233,7 +247,10 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
               >
                 {hasControls ? (
                   <button
-                    onClick={() => row.toggleExpanded()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      row.toggleExpanded();
+                    }}
                     className="shrink-0 rounded p-0.5 hover:bg-muted"
                   >
                     {row.getIsExpanded() ? (
@@ -268,13 +285,15 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
         meta: { label: "Mô tả" },
       },
 
-      // ────────────────────── Risk Rating column ──────────────────────
+      // ────────────────────── Rating / Effectiveness (merged) column ──────────────────────
       {
-        id: "riskRating",
-        header: "Mức rủi ro",
+        id: "rating",
+        header: "Đánh giá",
         size: 160,
         cell: ({ row }) => {
           const r = row.original;
+
+          // ── Risk: rating ──
 
           // Phantom add_risk
           if (r.type === "add_risk") {
@@ -334,18 +353,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return <span className="text-xs text-muted-foreground">—</span>;
           }
 
-          return null;
-        },
-        meta: { label: "Mức rủi ro" },
-      },
-
-      // ────────────────────── Effectiveness column ──────────────────────
-      {
-        id: "effectiveness",
-        header: "Hiệu quả KS",
-        size: 150,
-        cell: ({ row }) => {
-          const r = row.original;
+          // ── Control: effectiveness ──
 
           // Phantom add_control
           if (r.type === "add_control") {
@@ -357,7 +365,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                     dispatch({ type: "SET_ADD_EFFECTIVENESS", value: v })
                   }
                   options={EFFECTIVENESS_OPTIONS}
-                  placeholder="Đánh giá..."
+                  placeholder="Hiệu quả..."
                   className="h-7 text-xs"
                 />
               </div>
@@ -378,7 +386,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                     dispatch({ type: "SET_EDIT_EFFECTIVENESS", value: v })
                   }
                   options={EFFECTIVENESS_OPTIONS}
-                  placeholder="Đánh giá..."
+                  placeholder="Hiệu quả..."
                   className="h-7 text-xs"
                 />
               </div>
@@ -400,7 +408,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
 
           return null;
         },
-        meta: { label: "Hiệu quả KS" },
+        meta: { label: "Đánh giá" },
       },
 
       // ────────────────────── Actions column ──────────────────────

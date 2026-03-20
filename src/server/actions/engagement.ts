@@ -13,7 +13,8 @@ const PROCEDURE_TYPES = [
   'inquiry', 'observation', 'inspection', 're_performance',
   'analytical', 'walkthrough', 'other',
 ] as const;
-const FINDING_STATUSES = ['draft', 'confirmed', 'rejected'] as const;
+const FINDING_STATUSES = ['draft', 'to_review', 'reviewed', 'accepted', 'rejected'] as const;
+const PROCEDURE_CATEGORIES = ['toc', 'substantive'] as const;
 const RISK_RATINGS = ['low', 'medium', 'high', 'critical'] as const;
 
 // =============================================================================
@@ -77,21 +78,25 @@ export const createObjectiveSchema = z.object({
 export const updateObjectiveSchema = createObjectiveSchema.partial().extend({
   status: z.enum(WORK_ITEM_STATUSES).optional(),
   reviewNotes: z.string().nullable().optional(),
+  sectionId: z.string().nullable().optional(),
 });
 
 export const createProcedureSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().nullable().optional(),
   procedureType: z.enum(PROCEDURE_TYPES).nullable().optional(),
+  procedureCategory: z.enum(PROCEDURE_CATEGORIES).nullable().optional(),
   sectionId: z.string().nullable().optional(),
   objectiveId: z.string().nullable().optional(),
   priority: z.enum(PRIORITIES).nullable().optional(),
   addedFrom: z.enum(ADDED_FROM).optional(),
   sortOrder: z.number().int().optional(),
+  controlRefIds: z.array(z.string()).optional(),
+  riskRefIds: z.array(z.string()).optional(),
+  objectiveRefIds: z.array(z.string()).optional(),
 });
 
 export const updateProcedureSchema = createProcedureSchema
-  .omit({ sectionId: true, objectiveId: true })
   .partial()
   .extend({
     status: z.enum(WORK_ITEM_STATUSES).optional(),
@@ -100,6 +105,9 @@ export const updateProcedureSchema = createProcedureSchema
     sampleSize: z.number().int().nullable().optional(),
     exceptions: z.number().int().nullable().optional(),
     reviewNotes: z.string().nullable().optional(),
+    controlRefIds: z.array(z.string()).optional(),
+    riskRefIds: z.array(z.string()).optional(),
+    objectiveRefIds: z.array(z.string()).optional(),
   });
 
 export const createFindingSchema = z.object({
@@ -110,10 +118,14 @@ export const createFindingSchema = z.object({
   managementResponse: z.string().nullable().optional(),
   rootCause: z.string().nullable().optional(),
   procedureIds: z.array(z.string()).optional(),
+  riskOwnerIds: z.array(z.string()).optional(),
+  unitOwnerIds: z.array(z.string()).optional(),
 });
 
 export const updateFindingSchema = createFindingSchema.partial().extend({
   status: z.enum(FINDING_STATUSES).optional(),
+  riskOwnerIds: z.array(z.string()).optional(),
+  unitOwnerIds: z.array(z.string()).optional(),
 });
 
 const CONTROL_EFFECTIVENESS = ['strong', 'adequate', 'weak', 'none'] as const;
@@ -177,6 +189,25 @@ const engagementListInclude = {
   },
 } as const;
 
+const procedureInclude = {
+  findings: { include: { finding: { select: { id: true, title: true } } } },
+  ref_controls: { include: { control: { select: { id: true, description: true } } } },
+  ref_risks: { include: { risk: { select: { id: true, risk_description: true } } } },
+  ref_objectives: { include: { rcmObjective: { select: { id: true, title: true } } } },
+} as const;
+
+const findingInclude = {
+  procedures: {
+    include: { procedure: { select: { id: true, title: true } } },
+  },
+  risk_owners: {
+    include: { contact: { select: { id: true, name: true, position: true } } },
+  },
+  unit_owners: {
+    include: { unit: { select: { id: true, name: true } } },
+  },
+} as const;
+
 const engagementDetailInclude = {
   entity: {
     select: {
@@ -235,9 +266,7 @@ const engagementDetailInclude = {
       objectives: {
         include: {
           procedures: {
-            include: {
-              findings: { include: { finding: { select: { id: true, title: true } } } },
-            },
+            include: procedureInclude,
             orderBy: { sort_order: 'asc' as const },
           },
         },
@@ -245,9 +274,7 @@ const engagementDetailInclude = {
       },
       procedures: {
         where: { objective_id: null },
-        include: {
-          findings: { include: { finding: { select: { id: true, title: true } } } },
-        },
+        include: procedureInclude,
         orderBy: { sort_order: 'asc' as const },
       },
     },
@@ -257,9 +284,7 @@ const engagementDetailInclude = {
     where: { section_id: null },
     include: {
       procedures: {
-        include: {
-          findings: { include: { finding: { select: { id: true, title: true } } } },
-        },
+        include: procedureInclude,
         orderBy: { sort_order: 'asc' as const },
       },
     },
@@ -267,17 +292,11 @@ const engagementDetailInclude = {
   },
   procedures: {
     where: { section_id: null, objective_id: null },
-    include: {
-      findings: { include: { finding: { select: { id: true, title: true } } } },
-    },
+    include: procedureInclude,
     orderBy: { sort_order: 'asc' as const },
   },
   findings: {
-    include: {
-      procedures: {
-        include: { procedure: { select: { id: true, title: true } } },
-      },
-    },
+    include: findingInclude,
     orderBy: { created_at: 'desc' as const },
   },
 } as const;
@@ -295,6 +314,7 @@ function mapProcedure(p: any) {
     title: p.title as string,
     description: p.description as string | null,
     procedureType: p.procedure_type as string | null,
+    procedureCategory: p.procedure_category as string | null,
     status: p.status as string,
     addedFrom: (p.added_from as string) ?? 'execution',
     observations: p.observations as string | null,
@@ -313,6 +333,18 @@ function mapProcedure(p: any) {
     linkedFindings: (p.findings ?? []).map((f: any) => ({
       id: f.finding.id,
       title: f.finding.title,
+    })),
+    linkedControls: (p.ref_controls ?? []).map((r: any) => ({
+      id: r.control.id,
+      description: r.control.description,
+    })),
+    linkedRisks: (p.ref_risks ?? []).map((r: any) => ({
+      id: r.risk.id,
+      riskDescription: r.risk.risk_description,
+    })),
+    linkedObjectives: (p.ref_objectives ?? []).map((r: any) => ({
+      id: r.rcmObjective.id,
+      title: r.rcmObjective.title,
     })),
   };
 }
@@ -367,6 +399,15 @@ function mapFinding(f: any) {
     linkedProcedures: (f.procedures ?? []).map((p: any) => ({
       id: p.procedure.id,
       title: p.procedure.title,
+    })),
+    riskOwners: (f.risk_owners ?? []).map((o: any) => ({
+      id: o.contact.id,
+      name: o.contact.name,
+      position: o.contact.position ?? null,
+    })),
+    unitOwners: (f.unit_owners ?? []).map((o: any) => ({
+      id: o.unit.id,
+      name: o.unit.name,
     })),
   };
 }
@@ -963,6 +1004,7 @@ export async function updateObjective(
   if (parsed.status !== undefined) data.status = parsed.status;
   if (parsed.sortOrder !== undefined) data.sort_order = parsed.sortOrder;
   if (parsed.reviewNotes !== undefined) data.review_notes = parsed.reviewNotes ?? null;
+  if (parsed.sectionId !== undefined) data.section_id = parsed.sectionId;
 
   const objective = await prisma.engagementObjective.update({
     where: { id: objectiveId },
@@ -1034,13 +1076,21 @@ export async function createProcedure(
       title: parsed.title,
       description: parsed.description ?? null,
       procedure_type: parsed.procedureType ?? null,
+      procedure_category: parsed.procedureCategory ?? null,
       priority: parsed.priority ?? null,
       added_from: parsed.addedFrom ?? 'execution',
       sort_order: parsed.sortOrder ?? (maxOrder._max.sort_order ?? 0) + 1,
+      ...(parsed.controlRefIds && parsed.controlRefIds.length > 0 && {
+        ref_controls: { create: parsed.controlRefIds.map((cid) => ({ control_id: cid })) },
+      }),
+      ...(parsed.riskRefIds && parsed.riskRefIds.length > 0 && {
+        ref_risks: { create: parsed.riskRefIds.map((rid) => ({ risk_id: rid })) },
+      }),
+      ...(parsed.objectiveRefIds && parsed.objectiveRefIds.length > 0 && {
+        ref_objectives: { create: parsed.objectiveRefIds.map((oid) => ({ rcm_objective_id: oid })) },
+      }),
     },
-    include: {
-      findings: { include: { finding: { select: { id: true, title: true } } } },
-    },
+    include: procedureInclude,
   });
 
   await logAudit({
@@ -1070,6 +1120,7 @@ export async function updateProcedure(
   if (parsed.title !== undefined) data.title = parsed.title;
   if (parsed.description !== undefined) data.description = parsed.description ?? null;
   if (parsed.procedureType !== undefined) data.procedure_type = parsed.procedureType ?? null;
+  if (parsed.procedureCategory !== undefined) data.procedure_category = parsed.procedureCategory ?? null;
   if (parsed.priority !== undefined) data.priority = parsed.priority ?? null;
   if (parsed.sortOrder !== undefined) data.sort_order = parsed.sortOrder;
   if (parsed.observations !== undefined) data.observations = parsed.observations ?? null;
@@ -1077,6 +1128,8 @@ export async function updateProcedure(
   if (parsed.sampleSize !== undefined) data.sample_size = parsed.sampleSize ?? null;
   if (parsed.exceptions !== undefined) data.exceptions = parsed.exceptions ?? null;
   if (parsed.reviewNotes !== undefined) data.review_notes = parsed.reviewNotes ?? null;
+  if (parsed.sectionId !== undefined) data.section_id = parsed.sectionId;
+  if (parsed.objectiveId !== undefined) data.objective_id = parsed.objectiveId;
 
   if (parsed.status !== undefined && parsed.status !== existing.status) {
     changes.status = { old: existing.status, new: parsed.status };
@@ -1093,12 +1146,36 @@ export async function updateProcedure(
     }
   }
 
+  // Update procedure refs if provided
+  if (parsed.controlRefIds !== undefined) {
+    await prisma.procedureControlRef.deleteMany({ where: { procedure_id: procedureId } });
+    if (parsed.controlRefIds.length > 0) {
+      await prisma.procedureControlRef.createMany({
+        data: parsed.controlRefIds.map((cid) => ({ procedure_id: procedureId, control_id: cid })),
+      });
+    }
+  }
+  if (parsed.riskRefIds !== undefined) {
+    await prisma.procedureRiskRef.deleteMany({ where: { procedure_id: procedureId } });
+    if (parsed.riskRefIds.length > 0) {
+      await prisma.procedureRiskRef.createMany({
+        data: parsed.riskRefIds.map((rid) => ({ procedure_id: procedureId, risk_id: rid })),
+      });
+    }
+  }
+  if (parsed.objectiveRefIds !== undefined) {
+    await prisma.procedureObjectiveRef.deleteMany({ where: { procedure_id: procedureId } });
+    if (parsed.objectiveRefIds.length > 0) {
+      await prisma.procedureObjectiveRef.createMany({
+        data: parsed.objectiveRefIds.map((oid) => ({ procedure_id: procedureId, rcm_objective_id: oid })),
+      });
+    }
+  }
+
   const procedure = await prisma.engagementProcedure.update({
     where: { id: procedureId },
     data,
-    include: {
-      findings: { include: { finding: { select: { id: true, title: true } } } },
-    },
+    include: procedureInclude,
   });
 
   if (Object.keys(changes).length > 0) {
@@ -1165,12 +1242,18 @@ export async function createFinding(
             })),
           }
         : undefined,
+      risk_owners: parsed.riskOwnerIds && parsed.riskOwnerIds.length > 0
+        ? {
+            create: parsed.riskOwnerIds.map((cid) => ({ contact_id: cid })),
+          }
+        : undefined,
+      unit_owners: parsed.unitOwnerIds && parsed.unitOwnerIds.length > 0
+        ? {
+            create: parsed.unitOwnerIds.map((uid) => ({ unit_id: uid })),
+          }
+        : undefined,
     },
-    include: {
-      procedures: {
-        include: { procedure: { select: { id: true, title: true } } },
-      },
-    },
+    include: findingInclude,
   });
 
   await logAudit({
@@ -1213,15 +1296,29 @@ export async function updateFinding(
       });
     }
   }
+  // Update risk owners if provided
+  if (parsed.riskOwnerIds !== undefined) {
+    await prisma.draftFindingRiskOwner.deleteMany({ where: { finding_id: findingId } });
+    if (parsed.riskOwnerIds.length > 0) {
+      await prisma.draftFindingRiskOwner.createMany({
+        data: parsed.riskOwnerIds.map((cid) => ({ finding_id: findingId, contact_id: cid })),
+      });
+    }
+  }
+  // Update unit owners if provided
+  if (parsed.unitOwnerIds !== undefined) {
+    await prisma.draftFindingUnitOwner.deleteMany({ where: { finding_id: findingId } });
+    if (parsed.unitOwnerIds.length > 0) {
+      await prisma.draftFindingUnitOwner.createMany({
+        data: parsed.unitOwnerIds.map((uid) => ({ finding_id: findingId, unit_id: uid })),
+      });
+    }
+  }
 
   const finding = await prisma.draftFinding.update({
     where: { id: findingId },
     data,
-    include: {
-      procedures: {
-        include: { procedure: { select: { id: true, title: true } } },
-      },
-    },
+    include: findingInclude,
   });
 
   await logAudit({
@@ -1765,4 +1862,248 @@ export async function reorderItems(
   });
 
   return { reordered: items.length };
+}
+
+// =============================================================================
+// BATCH ACTIONS (delete / duplicate)
+// =============================================================================
+
+export type BatchEntityType =
+  | 'section' | 'objective' | 'procedure'
+  | 'rcm_objective' | 'risk' | 'control';
+
+const batchSchema = z.object({
+  action: z.enum(['delete', 'duplicate']),
+  entityType: z.enum(['section', 'objective', 'procedure', 'rcm_objective', 'risk', 'control']),
+  ids: z.array(z.string()).min(1),
+});
+
+const BATCH_MODEL_MAP: Record<string, string> = {
+  section: 'engagementSection',
+  objective: 'engagementObjective',
+  procedure: 'engagementProcedure',
+  rcm_objective: 'engagementRcmObjective',
+  risk: 'engagementRisk',
+  control: 'engagementControl',
+};
+
+const BATCH_ENTITY_TYPE_MAP: Record<string, string> = {
+  section: 'engagement_section',
+  objective: 'engagement_objective',
+  procedure: 'engagement_procedure',
+  rcm_objective: 'engagement_rcm_objective',
+  risk: 'engagement_risk',
+  control: 'engagement_control',
+};
+
+// Include maps for duplication (which nested relations to copy)
+const DUPLICATE_INCLUDE: Record<string, object | undefined> = {
+  section: {
+    objectives: { include: { procedures: true } },
+    procedures: true,
+  },
+  objective: { procedures: true },
+  procedure: undefined,
+  rcm_objective: { risks: { include: { controls: true } } },
+  risk: { controls: true },
+  control: undefined,
+};
+
+export async function batchAction(
+  engagementId: string,
+  input: unknown,
+  userId: string,
+  userName: string,
+) {
+  const { action, entityType, ids } = batchSchema.parse(input);
+
+  if (action === 'delete') {
+    return batchDelete(engagementId, entityType, ids, userId, userName);
+  }
+  return batchDuplicate(engagementId, entityType, ids, userId, userName);
+}
+
+async function batchDelete(
+  engagementId: string,
+  entityType: string,
+  ids: string[],
+  userId: string,
+  userName: string,
+) {
+  const modelName = BATCH_MODEL_MAP[entityType];
+  const auditType = BATCH_ENTITY_TYPE_MAP[entityType];
+
+  // Prisma cascade handles children automatically
+  await (prisma as any)[modelName].deleteMany({
+    where: { id: { in: ids } },
+  });
+
+  // Audit log each deletion
+  await Promise.all(
+    ids.map((id) =>
+      logAudit({ userId, userName, action: 'delete', entityType: auditType, entityId: id }),
+    ),
+  );
+
+  return { deleted: ids.length };
+}
+
+async function batchDuplicate(
+  engagementId: string,
+  entityType: string,
+  ids: string[],
+  userId: string,
+  userName: string,
+) {
+  const modelName = BATCH_MODEL_MAP[entityType];
+  const auditType = BATCH_ENTITY_TYPE_MAP[entityType];
+  const include = DUPLICATE_INCLUDE[entityType];
+
+  // Fetch originals with nested relations
+  const originals = await (prisma as any)[modelName].findMany({
+    where: { id: { in: ids } },
+    ...(include ? { include } : {}),
+  });
+
+  // Find max sort_order for positioning duplicates
+  const maxResult = await (prisma as any)[modelName].aggregate({
+    where: getParentFilter(entityType, originals[0]),
+    _max: { sort_order: true },
+  });
+  let nextOrder = (maxResult._max?.sort_order ?? 0) + 1;
+
+  const created: string[] = [];
+
+  for (const orig of originals) {
+    const newId = await duplicateEntity(
+      entityType, modelName, orig, engagementId, nextOrder++,
+    );
+    created.push(newId);
+
+    await logAudit({
+      userId, userName, action: 'create', entityType: auditType, entityId: newId,
+      changes: { duplicated_from: orig.id },
+    });
+  }
+
+  return { duplicated: created.length };
+}
+
+function getParentFilter(entityType: string, sample: any): object {
+  switch (entityType) {
+    case 'section': return { engagement_id: sample.engagement_id };
+    case 'objective': return sample.section_id
+      ? { section_id: sample.section_id }
+      : { engagement_id: sample.engagement_id, section_id: null };
+    case 'procedure': return sample.objective_id
+      ? { objective_id: sample.objective_id }
+      : sample.section_id
+        ? { section_id: sample.section_id }
+        : { engagement_id: sample.engagement_id };
+    case 'rcm_objective': return { engagement_id: sample.engagement_id };
+    case 'risk': return { rcm_objective_id: sample.rcm_objective_id };
+    case 'control': return { risk_id: sample.risk_id };
+    default: return {};
+  }
+}
+
+async function duplicateEntity(
+  entityType: string,
+  modelName: string,
+  orig: any,
+  engagementId: string,
+  sortOrder: number,
+): Promise<string> {
+  // Strip IDs and timestamps for the copy
+  const { id, created_at, updated_at, ...rest } = orig;
+
+  switch (entityType) {
+    case 'section': {
+      const { objectives, procedures, ...sectionData } = rest;
+      const dup = await prisma.engagementSection.create({
+        data: { ...sectionData, sort_order: sortOrder, title: `${sectionData.title} (bản sao)` },
+      });
+      // Duplicate nested objectives + their procedures
+      for (const obj of (objectives || [])) {
+        const { id: _oid, created_at: _oc, updated_at: _ou, procedures: procs, section_id: _sid, ...objData } = obj;
+        const dupObj = await prisma.engagementObjective.create({
+          data: { ...objData, section_id: dup.id, sort_order: obj.sort_order },
+        });
+        for (const proc of (procs || [])) {
+          const { id: _pid, created_at: _pc, updated_at: _pu, findings: _f, section_id: _psid, objective_id: _poid, ...procData } = proc;
+          await prisma.engagementProcedure.create({
+            data: { ...procData, section_id: dup.id, objective_id: dupObj.id, sort_order: proc.sort_order },
+          });
+        }
+      }
+      // Duplicate section-level procedures (no objective)
+      for (const proc of (procedures || [])) {
+        const { id: _pid, created_at: _pc, updated_at: _pu, findings: _f, section_id: _psid, objective_id: _poid, ...procData } = proc;
+        await prisma.engagementProcedure.create({
+          data: { ...procData, section_id: dup.id, objective_id: null, sort_order: proc.sort_order },
+        });
+      }
+      return dup.id;
+    }
+    case 'objective': {
+      const { procedures, section_id, ...objData } = rest;
+      const dup = await prisma.engagementObjective.create({
+        data: { ...objData, section_id, sort_order: sortOrder, title: `${objData.title} (bản sao)` },
+      });
+      for (const proc of (procedures || [])) {
+        const { id: _pid, created_at: _pc, updated_at: _pu, findings: _f, section_id: _psid, objective_id: _poid, ...procData } = proc;
+        await prisma.engagementProcedure.create({
+          data: { ...procData, section_id: dup.section_id, objective_id: dup.id, sort_order: proc.sort_order },
+        });
+      }
+      return dup.id;
+    }
+    case 'procedure': {
+      const { findings, ...procData } = rest;
+      const dup = await prisma.engagementProcedure.create({
+        data: { ...procData, sort_order: sortOrder, title: `${procData.title} (bản sao)` },
+      });
+      return dup.id;
+    }
+    case 'rcm_objective': {
+      const { risks, ...objData } = rest;
+      const dup = await prisma.engagementRcmObjective.create({
+        data: { ...objData, sort_order: sortOrder, title: `${objData.title} (bản sao)` },
+      });
+      for (const risk of (risks || [])) {
+        const { id: _rid, created_at: _rc, updated_at: _ru, controls, rcm_objective_id: _roid, ...riskData } = risk;
+        const dupRisk = await prisma.engagementRisk.create({
+          data: { ...riskData, rcm_objective_id: dup.id, sort_order: risk.sort_order },
+        });
+        for (const ctrl of (controls || [])) {
+          const { id: _cid, created_at: _cc, updated_at: _cu, risk_id: _crid, ...ctrlData } = ctrl;
+          await prisma.engagementControl.create({
+            data: { ...ctrlData, risk_id: dupRisk.id, sort_order: ctrl.sort_order },
+          });
+        }
+      }
+      return dup.id;
+    }
+    case 'risk': {
+      const { controls, ...riskData } = rest;
+      const dup = await prisma.engagementRisk.create({
+        data: { ...riskData, sort_order: sortOrder, risk_description: `${riskData.risk_description} (bản sao)` },
+      });
+      for (const ctrl of (controls || [])) {
+        const { id: _cid, created_at: _cc, updated_at: _cu, risk_id: _crid, ...ctrlData } = ctrl;
+        await prisma.engagementControl.create({
+          data: { ...ctrlData, risk_id: dup.id, sort_order: ctrl.sort_order },
+        });
+      }
+      return dup.id;
+    }
+    case 'control': {
+      const dup = await prisma.engagementControl.create({
+        data: { ...rest, sort_order: sortOrder, description: `${rest.description} (bản sao)` },
+      });
+      return dup.id;
+    }
+    default:
+      throw new Error(`Unknown entity type: ${entityType}`);
+  }
 }

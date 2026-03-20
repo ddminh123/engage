@@ -12,6 +12,11 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  Maximize2,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpToLine,
+  ArrowDownToLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +36,7 @@ import {
 function StatusBadge({ status }: { status: string | null }) {
   if (!status) return <span className="text-muted-foreground">—</span>;
   const dot = PROCEDURE_STATUS_DOT[status] ?? "bg-muted-foreground/30";
-  const label =
-    WP_LABELS.procedure.status[status] ?? status;
+  const label = WP_LABELS.procedure.status[status] ?? status;
   return (
     <Badge variant="outline" className="text-[10px] gap-1.5">
       <span className={cn("inline-block size-2 shrink-0 rounded-full", dot)} />
@@ -47,6 +51,8 @@ export function useWpColumns(
   editor: WpEditor,
   cardId: string,
   cardType: "section" | "objective",
+  onViewItem?: (type: "objective" | "procedure", id: string) => void,
+  onOpenForm?: (type: "objective" | "procedure", id: string) => void,
 ): ColumnDef<WpRow>[] {
   const {
     state,
@@ -63,11 +69,12 @@ export function useWpColumns(
     isCreatingProcedure,
     isUpdatingObjective,
     isUpdatingProcedure,
+    handleMoveRow,
   } = editor;
 
   return useMemo(
     () => [
-      // ────────────────────── Title column ──────────────────────
+      // ────────────────────── Title column (includes inline edit/delete on hover) ──────────────────────
       {
         id: "title",
         header: "Mô tả",
@@ -87,6 +94,22 @@ export function useWpColumns(
                   onCancel={() => dispatch({ type: "CANCEL_ADD" })}
                   autoFocus
                 />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => handleAddObjective(textRef.current, cardId)}
+                  disabled={isCreatingObjective}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => dispatch({ type: "CANCEL_ADD" })}
+                  disabled={isCreatingObjective}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
               </div>
             );
           }
@@ -96,23 +119,39 @@ export function useWpColumns(
             return (
               <div
                 className="flex items-center gap-2"
-                style={{ paddingLeft: `${(depth) * 24 + 4}px` }}
+                style={{ paddingLeft: `${depth * 24 + 4}px` }}
               >
                 <ClipboardList className="h-3.5 w-3.5 shrink-0 text-violet-500" />
                 <InlineTableInput
                   placeholder="Tên thủ tục..."
                   onChange={handleTextChange}
-                  onSubmit={(v) =>
-                    handleAddProcedure(v, r.parentId ?? cardId)
-                  }
+                  onSubmit={(v) => handleAddProcedure(v, r.parentId ?? cardId)}
                   onCancel={() => dispatch({ type: "CANCEL_ADD" })}
                   autoFocus
                 />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() =>
+                    handleAddProcedure(textRef.current, r.parentId ?? cardId)
+                  }
+                  disabled={isCreatingProcedure}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => dispatch({ type: "CANCEL_ADD" })}
+                  disabled={isCreatingProcedure}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
               </div>
             );
           }
 
-          // ── Button: add objective ──
+          // ── Button: add objective + add procedure (section bottom) ──
           if (r.type === "btn_add_objective") {
             return (
               <div className="flex items-center gap-3 pl-1">
@@ -145,12 +184,12 @@ export function useWpColumns(
             );
           }
 
-          // ── Button: add procedure ──
+          // ── Button: add procedure (objective bottom) ──
           if (r.type === "btn_add_procedure") {
             return (
               <div
                 className="flex items-center gap-2"
-                style={{ paddingLeft: `${(depth) * 24 + 4}px` }}
+                style={{ paddingLeft: `${depth * 24 + 4}px` }}
               >
                 <Button
                   variant="ghost"
@@ -171,7 +210,11 @@ export function useWpColumns(
           }
 
           // ── Editing objective ──
-          if (r.type === "objective" && state.editingId === r.id && state.editingType === "objective") {
+          if (
+            r.type === "objective" &&
+            state.editingId === r.id &&
+            state.editingType === "objective"
+          ) {
             return (
               <div className="flex items-center gap-2 pl-1">
                 <Target className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
@@ -182,176 +225,10 @@ export function useWpColumns(
                   onCancel={() => dispatch({ type: "CANCEL_EDIT" })}
                   autoFocus
                 />
-              </div>
-            );
-          }
-
-          // ── Editing procedure ──
-          if (r.type === "procedure" && state.editingId === r.id && state.editingType === "procedure") {
-            return (
-              <div
-                className="flex items-center gap-2"
-                style={{ paddingLeft: `${(depth) * 24 + 4}px` }}
-              >
-                <ClipboardList className="h-3.5 w-3.5 shrink-0 text-violet-500" />
-                <InlineTableInput
-                  initialValue={r.title}
-                  onChange={handleTextChange}
-                  onSubmit={(v) => handleUpdateProcedure(r.id, v)}
-                  onCancel={() => dispatch({ type: "CANCEL_EDIT" })}
-                  autoFocus
-                />
-              </div>
-            );
-          }
-
-          // ── Normal objective ──
-          if (r.type === "objective") {
-            return (
-              <div className="flex items-center gap-2 pl-1">
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() => row.toggleExpanded()}
-                  className="h-5 w-5"
-                >
-                  {row.getIsExpanded() ? (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-                <Target className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                <span className="flex-1 text-sm font-medium">{r.title}</span>
-              </div>
-            );
-          }
-
-          // ── Normal procedure ──
-          if (r.type === "procedure") {
-            return (
-              <div
-                className="flex items-center gap-2"
-                style={{ paddingLeft: `${(depth) * 24 + 4}px` }}
-              >
-                <ClipboardList className="h-3 w-3 shrink-0 text-violet-500" />
-                <span className="flex-1 text-sm">{r.title}</span>
-              </div>
-            );
-          }
-
-          return null;
-        },
-      },
-
-      // ────────────────────── Status column (execution mode only) ──────────────────────
-      ...(mode === "execution"
-        ? [
-            {
-              id: "status",
-              header: "Trạng thái",
-              size: 160,
-              cell: ({ row }: { row: { original: WpRow } }) => {
-                const r = row.original;
-
-                // Only procedures have status
-                if (r.type !== "procedure") return null;
-                if (
-                  r.type === "procedure" &&
-                  state.editingId === r.id &&
-                  state.editingType === "procedure"
-                ) {
-                  return null; // handled in actions column
-                }
-
-                return (
-                  <LabeledSelect
-                    value={r.status ?? "not_started"}
-                    onChange={(v) => handleUpdateProcedureStatus(r.id, v)}
-                    options={PROCEDURE_STATUS_OPTIONS}
-                    className="h-7 w-36 text-xs"
-                  />
-                );
-              },
-            } satisfies ColumnDef<WpRow>,
-          ]
-        : []),
-
-      // ────────────────────── Actions column ──────────────────────
-      {
-        id: "_actions",
-        header: "",
-        size: 80,
-        cell: ({ row }) => {
-          const r = row.original;
-
-          // ── Phantom add_objective — confirm/cancel ──
-          if (r.type === "add_objective") {
-            return (
-              <div className="flex items-center gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => handleAddObjective(textRef.current, cardId)}
-                  disabled={isCreatingObjective}
-                >
-                  <Check className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => dispatch({ type: "CANCEL_ADD" })}
-                  disabled={isCreatingObjective}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            );
-          }
-
-          // ── Phantom add_procedure — confirm/cancel ──
-          if (r.type === "add_procedure") {
-            return (
-              <div className="flex items-center gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() =>
-                    handleAddProcedure(
-                      textRef.current,
-                      r.parentId ?? cardId,
-                    )
-                  }
-                  disabled={isCreatingProcedure}
-                >
-                  <Check className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => dispatch({ type: "CANCEL_ADD" })}
-                  disabled={isCreatingProcedure}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            );
-          }
-
-          // ── Editing objective — confirm/cancel ──
-          if (
-            r.type === "objective" &&
-            state.editingId === r.id &&
-            state.editingType === "objective"
-          ) {
-            return (
-              <div className="flex items-center gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() =>
-                    handleUpdateObjective(r.id, textRef.current)
-                  }
+                  onClick={() => handleUpdateObjective(r.id, textRef.current)}
                   disabled={isUpdatingObjective}
                 >
                   <Check className="h-3.5 w-3.5" />
@@ -368,14 +245,25 @@ export function useWpColumns(
             );
           }
 
-          // ── Editing procedure — confirm/cancel ──
+          // ── Editing procedure ──
           if (
             r.type === "procedure" &&
             state.editingId === r.id &&
             state.editingType === "procedure"
           ) {
             return (
-              <div className="flex items-center gap-0.5">
+              <div
+                className="flex items-center gap-2"
+                style={{ paddingLeft: `${depth * 24 + 4}px` }}
+              >
+                <ClipboardList className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+                <InlineTableInput
+                  initialValue={r.title}
+                  onChange={handleTextChange}
+                  onSubmit={(v) => handleUpdateProcedure(r.id, v)}
+                  onCancel={() => dispatch({ type: "CANCEL_EDIT" })}
+                  autoFocus
+                />
                 {mode === "execution" && (
                   <LabeledSelect
                     value={state.editingStatus || r.status || "not_started"}
@@ -389,9 +277,18 @@ export function useWpColumns(
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() =>
-                    handleUpdateProcedure(r.id, textRef.current)
-                  }
+                  onClick={() => {
+                    dispatch({ type: "CANCEL_EDIT" });
+                    onOpenForm?.("procedure", r.id);
+                  }}
+                  title="Mở biểu mẫu đầy đủ"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => handleUpdateProcedure(r.id, textRef.current)}
                   disabled={isUpdatingProcedure}
                 >
                   <Check className="h-3.5 w-3.5" />
@@ -408,99 +305,192 @@ export function useWpColumns(
             );
           }
 
-          // ── Button rows — no actions ──
-          if (
-            r.type === "btn_add_objective" ||
-            r.type === "btn_add_procedure"
-          ) {
-            return null;
-          }
-
-          // ── Normal objective — edit/delete on hover ──
+          // ── Normal objective ──
           if (r.type === "objective") {
             return (
-              <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
+              <div className="flex items-center gap-2 pl-1 group/title">
                 <Button
                   variant="ghost"
                   size="icon-sm"
                   onClick={(e) => {
                     e.stopPropagation();
+                    row.toggleExpanded();
+                  }}
+                  className="h-5 w-5"
+                >
+                  {row.getIsExpanded() ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+                <Target className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                <span
+                  className="text-sm font-medium cursor-pointer hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewItem?.("objective", r.id);
+                  }}
+                >
+                  {r.title}
+                </span>
+              </div>
+            );
+          }
+
+          // ── Normal procedure ──
+          if (r.type === "procedure") {
+            return (
+              <div
+                className="flex items-center gap-2 group/title"
+                style={{ paddingLeft: `${depth * 24 + 4}px` }}
+              >
+                <ClipboardList className="h-3 w-3 shrink-0 text-violet-500" />
+                <span
+                  className="text-sm cursor-pointer hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewItem?.("procedure", r.id);
+                  }}
+                >
+                  {r.title}
+                </span>
+              </div>
+            );
+          }
+
+          return null;
+        },
+      },
+
+      // ────────────────────── Status column — always visible for procedures ──────────────────────
+      {
+        id: "status",
+        header: "",
+        size: mode === "execution" ? 160 : 100,
+        cell: ({ row }) => {
+          const r = row.original;
+          if (r.type !== "procedure") return null;
+          if (state.editingId === r.id && state.editingType === "procedure")
+            return null;
+
+          if (mode === "execution") {
+            return (
+              <LabeledSelect
+                value={r.status ?? "not_started"}
+                onChange={(v) => handleUpdateProcedureStatus(r.id, v)}
+                options={PROCEDURE_STATUS_OPTIONS}
+                className="h-7 w-36 text-xs"
+              />
+            );
+          }
+          return <StatusBadge status={r.status} />;
+        },
+      },
+      // ────────────────────── Actions column — edit/delete + reorder, hover only ──────────────────────
+      {
+        id: "_actions",
+        header: "",
+        size: 160,
+        cell: ({ row, table }) => {
+          const r = row.original;
+          if (r.type !== "objective" && r.type !== "procedure") return null;
+          if (state.editingId === r.id) return null;
+
+          const parentRow = row.getParentRow();
+          const pool = parentRow ? parentRow.subRows : table.getRowModel().rows;
+          const sameType = pool.filter((sr) => sr.original.type === r.type);
+          const idx = sameType.findIndex((sr) => sr.id === row.id);
+          const isFirst = idx <= 0;
+          const isLast = idx >= sameType.length - 1;
+
+          return (
+            <span
+              className="flex items-center justify-end gap-0 opacity-0 group-hover/row:opacity-100 transition-opacity"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => {
+                  if (r.type === "objective") {
                     dispatch({
                       type: "START_EDIT_OBJECTIVE",
                       id: r.id,
                       title: r.title,
                     });
-                  }}
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    dispatch({
-                      type: "SET_DELETE",
-                      target: {
-                        type: "objective",
-                        id: r.id,
-                        title: r.title.slice(0, 40),
-                      },
-                    });
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            );
-          }
-
-          // ── Normal procedure — edit/delete on hover ──
-          if (r.type === "procedure") {
-            return (
-              <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                {mode === "planning" && r.status && (
-                  <StatusBadge status={r.status} />
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  } else {
                     dispatch({
                       type: "START_EDIT_PROCEDURE",
                       id: r.id,
                       title: r.title,
                       status: r.status ?? "not_started",
                     });
-                  }}
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    dispatch({
-                      type: "SET_DELETE",
-                      target: {
-                        type: "procedure",
-                        id: r.id,
-                        title: r.title.slice(0, 40),
-                      },
-                    });
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            );
-          }
-
-          return null;
+                  }
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() =>
+                  dispatch({
+                    type: "SET_DELETE",
+                    target: {
+                      type: r.type as "objective" | "procedure",
+                      id: r.id,
+                      title: r.title.slice(0, 40),
+                    },
+                  })
+                }
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+              {sameType.length > 1 && (
+                <>
+                  <span className="mx-0.5 h-4 w-px bg-border" />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={isFirst}
+                    onClick={() => handleMoveRow(r.id, "first")}
+                    title="Đưa lên đầu"
+                  >
+                    <ArrowUpToLine className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={isFirst}
+                    onClick={() => handleMoveRow(r.id, "up")}
+                    title="Lên trên"
+                  >
+                    <ArrowUp className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={isLast}
+                    onClick={() => handleMoveRow(r.id, "down")}
+                    title="Xuống dưới"
+                  >
+                    <ArrowDown className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={isLast}
+                    onClick={() => handleMoveRow(r.id, "last")}
+                    title="Đưa xuống cuối"
+                  >
+                    <ArrowDownToLine className="h-3 w-3" />
+                  </Button>
+                </>
+              )}
+            </span>
+          );
         },
       },
     ],
@@ -509,7 +499,6 @@ export function useWpColumns(
       dispatch,
       mode,
       cardId,
-      cardType,
       textRef,
       handleTextChange,
       handleAddObjective,
@@ -517,10 +506,13 @@ export function useWpColumns(
       handleAddProcedure,
       handleUpdateProcedure,
       handleUpdateProcedureStatus,
+      handleMoveRow,
       isCreatingObjective,
       isCreatingProcedure,
       isUpdatingObjective,
       isUpdatingProcedure,
+      onViewItem,
+      onOpenForm,
     ],
   );
 }

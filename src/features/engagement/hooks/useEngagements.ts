@@ -33,8 +33,12 @@ import {
   syncRcmObjectivesApi,
   reorderItemsApi,
   type ReorderEntityType,
+  batchActionApi,
+  type BatchEntityType,
+  type BatchActionType,
 } from '../api';
 import type {
+  EngagementDetail,
   EngagementInput,
   EngagementUpdateInput,
   SectionInput,
@@ -527,7 +531,74 @@ export function useDeleteEngagementControl() {
   });
 }
 
-// ── Reorder ──
+// ── Reorder (optimistic) ──
+
+function applyReorder(
+  detail: EngagementDetail,
+  entityType: ReorderEntityType,
+  items: { id: string; sortOrder: number }[],
+): EngagementDetail {
+  const orderMap = new Map(items.map((i) => [i.id, i.sortOrder]));
+  const sortBy = <T extends { id: string }>(arr: T[]) =>
+    [...arr].sort(
+      (a, b) => (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity),
+    );
+
+  switch (entityType) {
+    case 'audit_objective':
+      return { ...detail, auditObjectives: sortBy(detail.auditObjectives) };
+    case 'section':
+      return { ...detail, sections: sortBy(detail.sections) };
+    case 'rcm_objective':
+      return { ...detail, rcmObjectives: sortBy(detail.rcmObjectives) };
+    case 'objective':
+      return {
+        ...detail,
+        sections: detail.sections.map((s) => ({
+          ...s,
+          objectives: sortBy(s.objectives),
+        })),
+        standaloneObjectives: sortBy(detail.standaloneObjectives),
+      };
+    case 'procedure':
+      return {
+        ...detail,
+        sections: detail.sections.map((s) => ({
+          ...s,
+          objectives: s.objectives.map((o) => ({
+            ...o,
+            procedures: sortBy(o.procedures),
+          })),
+          procedures: sortBy(s.procedures),
+        })),
+        standaloneObjectives: detail.standaloneObjectives.map((o) => ({
+          ...o,
+          procedures: sortBy(o.procedures),
+        })),
+      };
+    case 'risk':
+      return {
+        ...detail,
+        rcmObjectives: detail.rcmObjectives.map((o) => ({
+          ...o,
+          risks: sortBy(o.risks),
+        })),
+      };
+    case 'control':
+      return {
+        ...detail,
+        rcmObjectives: detail.rcmObjectives.map((o) => ({
+          ...o,
+          risks: o.risks.map((r) => ({
+            ...r,
+            controls: sortBy(r.controls),
+          })),
+        })),
+      };
+    default:
+      return detail;
+  }
+}
 
 export function useReorderItems() {
   const qc = useQueryClient();
@@ -541,6 +612,45 @@ export function useReorderItems() {
       entityType: ReorderEntityType;
       items: { id: string; sortOrder: number }[];
     }) => reorderItemsApi(engagementId, entityType, items),
+    onMutate: async (variables) => {
+      const key = engagementKey(variables.engagementId);
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<{ data: EngagementDetail }>(key);
+      if (previous?.data) {
+        qc.setQueryData(key, {
+          ...previous,
+          data: applyReorder(previous.data, variables.entityType, variables.items),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, variables, context) => {
+      if (context?.previous) {
+        qc.setQueryData(engagementKey(variables.engagementId), context.previous);
+      }
+    },
+    onSettled: (_, __, variables) => {
+      qc.invalidateQueries({ queryKey: engagementKey(variables.engagementId) });
+    },
+  });
+}
+
+// ── Batch Action (delete / duplicate) ──
+
+export function useBatchAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      action,
+      entityType,
+      ids,
+    }: {
+      engagementId: string;
+      action: BatchActionType;
+      entityType: BatchEntityType;
+      ids: string[];
+    }) => batchActionApi(engagementId, action, entityType, ids),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: engagementKey(variables.engagementId) });
     },

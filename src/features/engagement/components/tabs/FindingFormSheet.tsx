@@ -24,6 +24,10 @@ import {
 } from "@/components/ui/popover";
 import { FormSheet } from "@/components/shared/FormSheet";
 import { LabeledSelect } from "@/components/shared/LabeledSelect";
+import {
+  MultiSelectCommand,
+  type MultiSelectOption,
+} from "@/components/shared/MultiSelectCommand";
 import { COMMON_LABELS, ENGAGEMENT_LABELS } from "@/constants/labels";
 import type {
   EngagementProcedure,
@@ -64,6 +68,8 @@ interface FindingFormSheetProps {
   allProcedures: EngagementProcedure[];
   onSubmit: (data: FindingInput | FindingUpdateInput) => void;
   isLoading?: boolean;
+  riskOwnerOptions?: MultiSelectOption[];
+  unitOwnerOptions?: MultiSelectOption[];
 }
 
 export function FindingFormSheet({
@@ -73,8 +79,14 @@ export function FindingFormSheet({
   allProcedures,
   onSubmit,
   isLoading,
+  riskOwnerOptions = [],
+  unitOwnerOptions = [],
 }: FindingFormSheetProps) {
   const isEdit = !!initialData;
+
+  // Multi-select state for owners
+  const [riskOwnerIds, setRiskOwnerIds] = React.useState<string[]>([]);
+  const [unitOwnerIds, setUnitOwnerIds] = React.useState<string[]>([]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -102,6 +114,8 @@ export function FindingFormSheet({
         rootCause: initialData?.rootCause ?? "",
         procedureIds: initialData?.linkedProcedures.map((p) => p.id) ?? [],
       });
+      setRiskOwnerIds(initialData?.riskOwners?.map((o) => o.id) ?? []);
+      setUnitOwnerIds(initialData?.unitOwners?.map((o) => o.id) ?? []);
     }
   }, [open, initialData, form]);
 
@@ -114,6 +128,8 @@ export function FindingFormSheet({
       managementResponse: values.managementResponse || null,
       rootCause: values.rootCause || null,
       procedureIds: values.procedureIds,
+      riskOwnerIds,
+      unitOwnerIds,
     };
     if (isEdit) {
       onSubmit({
@@ -304,6 +320,35 @@ export function FindingFormSheet({
               </FormItem>
             )}
           />
+
+          {/* Owner multi-selects */}
+          {riskOwnerOptions.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-1.5">Chủ rủi ro</p>
+              <MultiSelectCommand
+                options={riskOwnerOptions}
+                selected={riskOwnerIds}
+                onChange={setRiskOwnerIds}
+                placeholder="Chọn chủ rủi ro..."
+                searchPlaceholder="Tìm liên hệ..."
+              />
+            </div>
+          )}
+
+          {unitOwnerOptions.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-1.5">
+                Đơn vị chịu trách nhiệm
+              </p>
+              <MultiSelectCommand
+                options={unitOwnerOptions}
+                selected={unitOwnerIds}
+                onChange={setUnitOwnerIds}
+                placeholder="Chọn đơn vị..."
+                searchPlaceholder="Tìm đơn vị..."
+              />
+            </div>
+          )}
         </form>
       </Form>
     </FormSheet>

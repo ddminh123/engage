@@ -42,6 +42,7 @@ export const API_ROUTES = {
   ENGAGEMENT_CONTROLS: (id: string, rId: string) => `/api/engagement/${id}/risks/${rId}/controls`,
   ENGAGEMENT_CONTROL_BY_ID: (id: string, rId: string, cId: string) => `/api/engagement/${id}/risks/${rId}/controls/${cId}`,
   ENGAGEMENT_REORDER: (id: string) => `/api/engagement/${id}/reorder`,
+  ENGAGEMENT_BATCH: (id: string) => `/api/engagement/${id}/batch`,
 
   // Finding module
   FINDING: "/api/finding",
