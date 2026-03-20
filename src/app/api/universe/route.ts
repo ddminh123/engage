@@ -1,0 +1,31 @@
+import { NextRequest } from 'next/server';
+import { withAccess, type Session } from '@/server/middleware/withAccess';
+import { listEntities, createEntity } from '@/server/actions/universe';
+
+export const GET = withAccess(
+  'universe:view',
+  async (req: NextRequest, _ctx: { params: Promise<Record<string, string>> }, _session: Session) => {
+    const { searchParams } = new URL(req.url);
+    const q = searchParams.get('q') ?? undefined;
+    const data = await listEntities(q);
+    return Response.json({ data });
+  },
+);
+
+export const POST = withAccess(
+  'universe:create',
+  async (req: NextRequest, _ctx: { params: Promise<Record<string, string>> }, session: Session) => {
+    try {
+      const body = await req.json();
+      const data = await createEntity(body, session.user.id, session.user.name);
+      return Response.json({ data }, { status: 201 });
+    } catch (error) {
+      const message = (error as Error).message;
+      const status = message.includes('required') || message.includes('validation') ? 400 : 500;
+      return Response.json(
+        { error: { code: status === 400 ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR', message } },
+        { status },
+      );
+    }
+  },
+);

@@ -17,26 +17,47 @@ model SystemSetting {
   @@map("system_setting")
 }
 
-model OrgUnit {
-  id             String    @id @default(cuid())
-  name           String
-  code           String?   @unique
-  parent_id      String?
-  head           String?
-  contact_email  String?
-  phone          String?
-  description    String?   @db.Text
-  status         String    @default("active") // active | inactive
-  established    DateTime?
-  discontinued   DateTime?
-  updated_at     DateTime  @updatedAt
-  updated_by     String?
+model Contact {
+  id         String    @id @default(cuid())
+  name       String
+  position   String?
+  email      String?
+  phone      String?
+  status     String    @default("active")
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  updated_by String?
 
-  parent   OrgUnit?  @relation("OrgUnitHierarchy", fields: [parent_id], references: [id])
-  children OrgUnit[] @relation("OrgUnitHierarchy")
+  led_units      OrgUnit[] @relation("OrgUnitLeader")
+  contact_units  OrgUnit[] @relation("OrgUnitContactPoint")
+
+  @@index([name])
+  @@map("contact")
+}
+
+model OrgUnit {
+  id               String    @id @default(cuid())
+  name             String
+  code             String?   @unique
+  parent_id        String?
+  leader_id        String?
+  contact_point_id String?
+  description      String?   @db.Text
+  status           String    @default("active")
+  established      DateTime?
+  discontinued     DateTime?
+  updated_at       DateTime  @updatedAt
+  updated_by       String?
+
+  parent        OrgUnit?  @relation("OrgUnitHierarchy", fields: [parent_id], references: [id])
+  children      OrgUnit[] @relation("OrgUnitHierarchy")
+  leader        Contact?  @relation("OrgUnitLeader", fields: [leader_id], references: [id])
+  contact_point Contact?  @relation("OrgUnitContactPoint", fields: [contact_point_id], references: [id])
 
   @@index([parent_id])
   @@index([status])
+  @@index([leader_id])
+  @@index([contact_point_id])
   @@map("org_unit")
 }
 ```
@@ -47,51 +68,76 @@ model OrgUnit {
 
 ---
 
-## API Routes — Org Chart
+## API Routes
 
 ```
-src/app/api/settings/org-units/
-├── route.ts          # GET (list) + POST (create)
-└── [id]/route.ts     # GET + PATCH + DELETE
+src/app/api/settings/
+├── org-units/
+│   ├── route.ts          # GET (list) + POST (create)
+│   └── [id]/route.ts     # GET + PATCH + DELETE
+└── contacts/
+    └── route.ts          # GET (search) + POST (create)
 ```
 
 | Method | Path                           | Permission        | Notes                               |
 | ------ | ------------------------------ | ----------------- | ----------------------------------- |
 | GET    | `/api/settings/org-units`      | `settings:read`   | Flat array, includes `_entityCount` |
-| POST   | `/api/settings/org-units`      | `settings:manage` | Create                              |
-| GET    | `/api/settings/org-units/[id]` | `settings:read`   | Single unit                         |
+| POST   | `/api/settings/org-units`      | `settings:manage` | Create (with nested Contact refs)   |
+| GET    | `/api/settings/org-units/[id]` | `settings:read`   | Single unit + leader/contactPoint   |
 | PATCH  | `/api/settings/org-units/[id]` | `settings:manage` | Update                              |
 | DELETE | `/api/settings/org-units/[id]` | `settings:manage` | Validates no children/entity refs   |
+| GET    | `/api/settings/contacts?q=`    | `settings:read`   | Search contacts by name/email/phone |
+| POST   | `/api/settings/contacts`       | `settings:manage` | Create new contact                  |
 
 Response: camelCase. DB: snake_case. Map in action layer.
 
 ---
 
-## Actions (`src/server/actions/orgUnit.ts`)
+## Actions
 
-| Function                  | Notes                                                                |
-| ------------------------- | -------------------------------------------------------------------- |
-| `getOrgUnits(filters?)`   | Flat array. Filters: `status`, `search`. Includes `_entityCount`.    |
-| `getOrgUnitById(id)`      | With parent name                                                     |
-| `createOrgUnit(data)`     | Zod validation, code unique, parent exists, max depth 5. `logAudit`. |
-| `updateOrgUnit(id, data)` | No circular parent, max depth. `logAudit`.                           |
-| `deleteOrgUnit(id)`       | No children, no entity refs. `logAudit`.                             |
+### `src/server/actions/orgUnit.ts`
+
+| Function                  | Notes                                                                                                                |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `getOrgUnits(filters?)`   | Flat array. Filters: `status`, `search`. Includes leader, contactPoint.                                              |
+| `getOrgUnitById(id)`      | With parent name, leader, contactPoint.                                                                              |
+| `createOrgUnit(data)`     | Zod validation, code unique, parent exists, max depth 5. `$transaction` to create contacts then OrgUnit. `logAudit`. |
+| `updateOrgUnit(id, data)` | No circular parent, max depth. `$transaction` to update/create/delete contacts. `logAudit`.                          |
+| `deleteOrgUnit(id)`       | No children, no entity refs. `logAudit`.                                                                             |
+
+### `src/server/actions/contact.ts`
+
+| Function                      | Notes                                         |
+| ----------------------------- | --------------------------------------------- |
+| `searchContacts(query)`       | Search by name, email, phone. Returns top 20. |
+| `createContact(data, userId)` | Zod validation. `logAudit`.                   |
 
 ---
 
 ## Frontend (`src/features/settings/`)
 
-| File                             | Purpose                                                  |
-| -------------------------------- | -------------------------------------------------------- |
-| `types.ts`                       | `OrgUnit`, `OrgUnitCreateInput`, `OrgUnitUpdateInput`    |
-| `api.ts`                         | Fetch wrappers for all org-unit endpoints                |
-| `hooks/useOrgUnits.ts`           | TanStack Query: `useOrgUnits()`, `useOrgUnit(id)`        |
-| `hooks/useOrgUnitMutations.ts`   | Create / update / delete mutations                       |
-| `components/OrgChartWrapper.tsx` | d3-org-chart React bridge (`useRef` + `useLayoutEffect`) |
-| `components/OrgUnitTree.tsx`     | Tree view + toolbar (zoom, expand/collapse)              |
-| `components/OrgUnitList.tsx`     | Shadcn DataTable (flat list, search, filters)            |
-| `components/OrgUnitForm.tsx`     | Create/Edit form (React Hook Form + Zod)                 |
-| `components/OrgUnitDetail.tsx`   | Detail side panel (Sheet)                                |
+| File                            | Purpose                                                       |
+| ------------------------------- | ------------------------------------------------------------- |
+| `types.ts`                      | `Contact`, `ContactInput`, `OrgUnit`, `OrgUnitCreateInput`    |
+| `api.ts`                        | Fetch wrappers for org-unit + contact endpoints               |
+| `hooks/useOrgUnits.ts`          | TanStack Query: `useOrgUnits()`, `useOrgUnit(id)`             |
+| `hooks/useOrgUnitMutations.ts`  | Create / update / delete mutations                            |
+| `hooks/useOrgChartState.ts`     | `useReducer` for all dialog/form state (incl. form switching) |
+| `hooks/useContacts.ts`          | `useContactSearch(query)`, `useCreateContact()`               |
+| `components/OrgChartView.tsx`   | Orchestrator — tabs, detail, form, contact form, delete       |
+| `components/OrgUnitList.tsx`    | Shadcn DataTable (flat list, search, filters)                 |
+| `components/OrgUnitColumns.tsx` | Column definitions (uses label constants)                     |
+| `components/OrgUnitForm.tsx`    | Create/Edit form (FormDialog + ContactSearch)                 |
+| `components/OrgUnitDetail.tsx`  | Detail side panel (Sheet)                                     |
+| `components/ContactSearch.tsx`  | Autocomplete with "Add new" option                            |
+| `components/ContactForm.tsx`    | Standalone contact creation form (FormDialog)                 |
+
+### Shared Components Used
+
+| Component    | Path                               | Notes                                 |
+| ------------ | ---------------------------------- | ------------------------------------- |
+| `FormDialog` | `src/components/shared/FormDialog` | Sticky header/footer, scrollable body |
+| `DataTable`  | `src/components/shared/DataTable`  | Standard list table                   |
 
 **Page:** `src/app/(main)/settings/org-chart/page.tsx` — toggle tree/list view, + New Unit, Import/Export.
 

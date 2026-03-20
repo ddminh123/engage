@@ -11,7 +11,6 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
 }
 
 // =============================================================================
@@ -32,4 +31,686 @@ model AuditLog {
   @@index([user_id])
   @@index([timestamp])
   @@map("audit_log")
+}
+
+// =============================================================================
+// SETTINGS MODULE
+// =============================================================================
+
+model SystemSetting {
+  key        String   @id
+  value      Json
+  updated_at DateTime @updatedAt
+  updated_by String?
+
+  @@map("system_setting")
+}
+
+model Contact {
+  id         String    @id @default(cuid())
+  name       String
+  position   String?
+  email      String?
+  phone      String?
+  unit_id    String?
+  status     String    @default("active") // active | inactive
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  updated_by String?
+
+  unit          OrgUnit?  @relation("ContactUnit", fields: [unit_id], references: [id])
+  led_units     OrgUnit[] @relation("OrgUnitLeader")
+  contact_units OrgUnit[] @relation("OrgUnitContactPoint")
+  audit_sponsored_entities AuditableEntityAuditSponsor[] @relation("EntityAuditSponsor")
+  auditee_rep_entities     AuditableEntityAuditeeRep[]   @relation("EntityAuditeeRep")
+  entity_contact_points    AuditableEntityContactPoint[] @relation("EntityContactPoint")
+  // PlannedAudit relations
+  planned_audit_contact_points PlannedAuditContactPoint[] @relation("PAContactPoint")
+  planned_audit_auditee_reps   PlannedAuditAuditeeRep[]   @relation("PAAuditeeRep")
+  // Engagement relations
+  engagement_contact_points    EngagementContactPoint[]    @relation("EngContactPoint")
+  engagement_auditee_reps      EngagementAuditeeRep[]      @relation("EngAuditeeRep")
+
+  @@index([status])
+  @@index([unit_id])
+  @@map("contact")
+}
+
+model OrgUnit {
+  id               String    @id @default(cuid())
+  name             String
+  code             String?   @unique
+  parent_id        String?
+  leader_id        String?
+  contact_point_id String?
+  description      String?   @db.Text
+  status           String    @default("active") // active | inactive
+  established      DateTime?
+  discontinued     DateTime?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  updated_by       String?
+
+  parent        OrgUnit?  @relation("OrgUnitHierarchy", fields: [parent_id], references: [id])
+  children      OrgUnit[] @relation("OrgUnitHierarchy")
+  leader        Contact?  @relation("OrgUnitLeader", fields: [leader_id], references: [id])
+  contact_point Contact?  @relation("OrgUnitContactPoint", fields: [contact_point_id], references: [id])
+  contacts      Contact[] @relation("ContactUnit")
+  owned_entities        AuditableEntityOwner[]       @relation("EntityOwner")
+  participated_entities AuditableEntityParticipant[] @relation("EntityParticipant")
+  // PlannedAudit relations
+  planned_audit_owners       PlannedAuditOwner[]       @relation("PAOwner")
+  planned_audit_participants PlannedAuditParticipant[] @relation("PAParticipant")
+  // Engagement relations
+  engagement_owners          EngagementOwner[]          @relation("EngOwner")
+  engagement_participants    EngagementParticipant[]    @relation("EngParticipant")
+
+  @@index([parent_id])
+  @@index([status])
+  @@map("org_unit")
+}
+
+// =============================================================================
+// UNIVERSE MODULE — Reference Data
+// =============================================================================
+
+model EntityType {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?  @unique
+  description String?
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  entities AuditableEntity[]
+
+  @@index([is_active])
+  @@map("entity_type")
+}
+
+model AuditArea {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?  @unique
+  description String?
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  entity_areas AuditableEntityArea[]
+
+  @@index([is_active])
+  @@map("audit_area")
+}
+
+// =============================================================================
+// UNIVERSE MODULE — Auditable Entities
+// =============================================================================
+
+model AuditableEntity {
+  id                 String    @id @default(cuid())
+  name               String
+  code               String?   @unique
+  description        String?   @db.Text
+  entity_type_id     String?   // FK to EntityType (nullable for migration)
+  status             String    @default("active") // active | inactive | archived
+  audit_cycle        String?   // Annual, Biennial, Triennial, Ad-hoc, Continuous
+  // Denormalized risk (populated from latest RiskAssessment)
+  risk_score              Int?      // residual (effective) score
+  risk_level              String?   // derived from risk_score
+  inherent_risk_score     Int?      // inherent_impact × inherent_likelihood
+  inherent_risk_level     String?   // derived from inherent_risk_score
+  // Timestamps
+  last_audited_at    DateTime?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  updated_by         String?
+
+  entity_type           EntityType? @relation(fields: [entity_type_id], references: [id])
+  areas                 AuditableEntityArea[]
+  owner_units           AuditableEntityOwner[]
+  participating_units   AuditableEntityParticipant[]
+  audit_sponsors        AuditableEntityAuditSponsor[]
+  auditee_reps          AuditableEntityAuditeeRep[]
+  contact_points        AuditableEntityContactPoint[]
+  risk_assessments      RiskAssessment[]
+  planned_audits        PlannedAudit[]
+  engagements           Engagement[]
+
+  @@index([entity_type_id])
+  @@index([status])
+  @@index([risk_level])
+  @@map("auditable_entity")
+}
+
+model AuditableEntityArea {
+  entity_id String
+  area_id   String
+
+  entity AuditableEntity @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+  area   AuditArea       @relation(fields: [area_id], references: [id])
+
+  @@id([entity_id, area_id])
+  @@map("auditable_entity_area")
+}
+
+model AuditableEntityOwner {
+  entity_id String
+  unit_id   String
+
+  entity AuditableEntity @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+  unit   OrgUnit         @relation("EntityOwner", fields: [unit_id], references: [id])
+
+  @@id([entity_id, unit_id])
+  @@map("auditable_entity_owner")
+}
+
+model AuditableEntityParticipant {
+  entity_id String
+  unit_id   String
+
+  entity AuditableEntity @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+  unit   OrgUnit         @relation("EntityParticipant", fields: [unit_id], references: [id])
+
+  @@id([entity_id, unit_id])
+  @@map("auditable_entity_participant")
+}
+
+model AuditableEntityContactPoint {
+  entity_id  String
+  contact_id String
+
+  entity  AuditableEntity @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+  contact Contact         @relation("EntityContactPoint", fields: [contact_id], references: [id])
+
+  @@id([entity_id, contact_id])
+  @@map("auditable_entity_contact_point")
+}
+
+model AuditableEntityAuditSponsor {
+  entity_id  String
+  contact_id String
+
+  entity  AuditableEntity @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+  contact Contact         @relation("EntityAuditSponsor", fields: [contact_id], references: [id])
+
+  @@id([entity_id, contact_id])
+  @@map("auditable_entity_audit_sponsor")
+}
+
+model AuditableEntityAuditeeRep {
+  entity_id  String
+  contact_id String
+
+  entity  AuditableEntity @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+  contact Contact         @relation("EntityAuditeeRep", fields: [contact_id], references: [id])
+
+  @@id([entity_id, contact_id])
+  @@map("auditable_entity_auditee_rep")
+}
+
+model RiskAssessment {
+  id                    String    @id @default(cuid())
+  entity_id             String
+
+  // Section 1: Inherent Risk
+  inherent_score        Int       // required — auto I×L or user-overridden
+  inherent_level        String    // Low, Medium, High, Critical — derived from inherent_score
+  inherent_impact       Int?      // 1-5 — optional detail
+  inherent_likelihood   Int?      // 1-5 — optional detail
+  impact_rationale      String?   @db.Text  // optional rationale for impact score
+  likelihood_rationale  String?   @db.Text  // optional rationale for likelihood score
+
+  // Section 2: Control Environment
+  control_effectiveness String?   // Strong | Medium | Weak
+  control_rationale     String?   @db.Text  // optional rationale for control assessment
+
+  // Section 3: Assessment Info
+  risk_factors          Json?     // { impact: string[], likelihood: string[], control: string[] }
+  assessment_source_id  String?   // FK to AssessmentSource
+  note                  String?   @db.Text  // detailed assessment note
+  management_request    Boolean   @default(false) // yêu cầu của ban lãnh đạo
+
+  // Section 4: Residual Risk
+  residual_score        Int?      // auto-calculated or user-overridden
+  residual_level        String?   // derived from residual_score
+  conclusion            String?   @db.Text  // residual risk conclusion
+
+  // Section 5: Metadata (placeholders — will link to User when Teams module is implemented)
+  evaluated_by          String?
+  approved_by           String?
+  evaluation_date       DateTime  @default(now())
+
+  entity            AuditableEntity  @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+  assessment_source AssessmentSource? @relation(fields: [assessment_source_id], references: [id])
+
+  @@index([entity_id])
+  @@index([evaluation_date])
+  @@index([assessment_source_id])
+  @@map("risk_assessment")
+}
+
+model AssessmentSource {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?  @unique
+  description String?
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  risk_assessments RiskAssessment[]
+
+  @@index([is_active])
+  @@map("assessment_source")
+}
+
+// =============================================================================
+// RISK ASSESSMENT FACTORS - Dynamic factors for risk assessment (managed in Settings)
+// =============================================================================
+
+model RiskAssessmentFactor {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?  @unique
+  description String?
+  relates_to  String   @default("impact") // impact | likelihood | control
+  is_positive Boolean  @default(false)    // false = negative factor (increases risk), true = positive (mitigates risk)
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@index([is_active])
+  @@index([relates_to])
+  @@map("risk_assessment_factor")
+}
+
+// =============================================================================
+// PLAN MODULE — Audit Planning
+// =============================================================================
+
+model AuditPlan {
+  id           String    @id @default(cuid())
+  title        String
+  description  String?   @db.Text
+  period_type  String    // annual | quarterly | monthly | custom
+  period_start DateTime  @db.Date
+  period_end   DateTime  @db.Date
+  status       String    @default("draft") // draft | approved | in_progress | closed
+  created_by   String?   // placeholder — will link to User
+  approved_by  String?   // placeholder — who approved
+  approved_at  DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  updated_by   String?
+
+  planned_audits PlannedAudit[]
+
+  @@index([status])
+  @@index([period_type])
+  @@index([period_start])
+  @@map("audit_plan")
+}
+
+model PlannedAudit {
+  id              String    @id @default(cuid())
+  plan_id         String
+  entity_id       String
+  title           String?   // override title; defaults to entity name if empty
+  objective       String?   @db.Text
+  scope           String?   @db.Text
+  scheduled_start DateTime  @db.Date
+  scheduled_end   DateTime  @db.Date
+  status          String    @default("planned") // planned | in_progress | completed | deferred | cancelled
+  priority        String?   // high | medium | low
+  estimated_days  Int?
+  notes           String?   @db.Text
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  plan       AuditPlan       @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  entity     AuditableEntity @relation(fields: [entity_id], references: [id])
+  engagement Engagement?     // reverse 1:1
+  owner_units         PlannedAuditOwner[]
+  participating_units PlannedAuditParticipant[]
+  contact_points      PlannedAuditContactPoint[]
+  auditee_reps        PlannedAuditAuditeeRep[]
+
+  @@unique([plan_id, entity_id]) // entity can only appear once per plan
+  @@index([plan_id])
+  @@index([entity_id])
+  @@index([status])
+  @@map("planned_audit")
+}
+
+model PlannedAuditOwner {
+  planned_audit_id String
+  unit_id          String
+
+  planned_audit PlannedAudit @relation(fields: [planned_audit_id], references: [id], onDelete: Cascade)
+  unit          OrgUnit      @relation("PAOwner", fields: [unit_id], references: [id])
+
+  @@id([planned_audit_id, unit_id])
+  @@map("planned_audit_owner")
+}
+
+model PlannedAuditParticipant {
+  planned_audit_id String
+  unit_id          String
+
+  planned_audit PlannedAudit @relation(fields: [planned_audit_id], references: [id], onDelete: Cascade)
+  unit          OrgUnit      @relation("PAParticipant", fields: [unit_id], references: [id])
+
+  @@id([planned_audit_id, unit_id])
+  @@map("planned_audit_participant")
+}
+
+model PlannedAuditContactPoint {
+  planned_audit_id String
+  contact_id       String
+
+  planned_audit PlannedAudit @relation(fields: [planned_audit_id], references: [id], onDelete: Cascade)
+  contact       Contact      @relation("PAContactPoint", fields: [contact_id], references: [id])
+
+  @@id([planned_audit_id, contact_id])
+  @@map("planned_audit_contact_point")
+}
+
+model PlannedAuditAuditeeRep {
+  planned_audit_id String
+  contact_id       String
+
+  planned_audit PlannedAudit @relation(fields: [planned_audit_id], references: [id], onDelete: Cascade)
+  contact       Contact      @relation("PAAuditeeRep", fields: [contact_id], references: [id])
+
+  @@id([planned_audit_id, contact_id])
+  @@map("planned_audit_auditee_rep")
+}
+
+// =============================================================================
+// ENGAGEMENT MODULE — Audit Execution
+// =============================================================================
+
+model Engagement {
+  id               String    @id @default(cuid())
+  title            String
+  entity_id        String
+  planned_audit_id String?   @unique // nullable — only set when created from plan
+  status           String    @default("planning") // planning | fieldwork | review | reporting | closed
+  objective        String?   @db.Text
+  scope            String?   @db.Text
+  understanding    String?   @db.Text  // rich-text HTML from Tiptap
+  start_date       DateTime  @db.Date
+  end_date         DateTime  @db.Date
+  estimated_days   Int?
+  priority         String?   // high | medium | low
+  notes            String?   @db.Text
+  created_by       String?   // placeholder — will link to User
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  updated_by       String?
+
+  entity        AuditableEntity @relation(fields: [entity_id], references: [id])
+  planned_audit PlannedAudit?   @relation(fields: [planned_audit_id], references: [id])
+  sections           EngagementSection[]
+  objectives         EngagementObjective[] // includes standalone objectives (no section)
+  procedures         EngagementProcedure[] // procedures directly under engagement (no section)
+  findings           DraftFinding[]
+  audit_objectives   AuditObjective[]
+  rcm_objectives     EngagementRcmObjective[]
+  risks              EngagementRisk[]
+  owner_units         EngagementOwner[]
+  participating_units EngagementParticipant[]
+  contact_points      EngagementContactPoint[]
+  auditee_reps        EngagementAuditeeRep[]
+
+  @@index([status])
+  @@index([entity_id])
+  @@index([planned_audit_id])
+  @@map("engagement")
+}
+
+model EngagementOwner {
+  engagement_id String
+  unit_id       String
+
+  engagement Engagement @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  unit       OrgUnit    @relation("EngOwner", fields: [unit_id], references: [id])
+
+  @@id([engagement_id, unit_id])
+  @@map("engagement_owner")
+}
+
+model EngagementParticipant {
+  engagement_id String
+  unit_id       String
+
+  engagement Engagement @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  unit       OrgUnit    @relation("EngParticipant", fields: [unit_id], references: [id])
+
+  @@id([engagement_id, unit_id])
+  @@map("engagement_participant")
+}
+
+model EngagementContactPoint {
+  engagement_id String
+  contact_id    String
+
+  engagement Engagement @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  contact    Contact    @relation("EngContactPoint", fields: [contact_id], references: [id])
+
+  @@id([engagement_id, contact_id])
+  @@map("engagement_contact_point")
+}
+
+model EngagementAuditeeRep {
+  engagement_id String
+  contact_id    String
+
+  engagement Engagement @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  contact    Contact    @relation("EngAuditeeRep", fields: [contact_id], references: [id])
+
+  @@id([engagement_id, contact_id])
+  @@map("engagement_auditee_rep")
+}
+
+// Planning-level audit objectives (distinct from execution EngagementObjective)
+model AuditObjective {
+  id            String    @id @default(cuid())
+  engagement_id String
+  title         String
+  description   String?   @db.Text
+  sort_order    Int       @default(0)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  engagement      Engagement              @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  rcm_objectives EngagementRcmObjective[]
+
+  @@index([engagement_id])
+  @@index([sort_order])
+  @@map("audit_objective")
+}
+
+// RCM Objective — detached copy of AuditObjective for independent editing in RCM
+model EngagementRcmObjective {
+  id                 String    @id @default(cuid())
+  engagement_id      String
+  audit_objective_id String?   // reference back to source audit objective (nullable)
+  title              String
+  description        String?   @db.Text
+  sort_order         Int       @default(0)
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  engagement      Engagement      @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  audit_objective AuditObjective? @relation(fields: [audit_objective_id], references: [id], onDelete: SetNull)
+  risks           EngagementRisk[]
+
+  @@index([engagement_id])
+  @@index([audit_objective_id])
+  @@index([sort_order])
+  @@map("engagement_rcm_objective")
+}
+
+// RACM light — risk rows mapped to RCM objectives
+model EngagementRisk {
+  id                 String    @id @default(cuid())
+  engagement_id      String
+  rcm_objective_id   String?
+  risk_description   String    @db.Text
+  risk_rating        String?   // low | medium | high | critical
+  sort_order         Int       @default(0)
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  engagement      Engagement              @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  rcm_objective   EngagementRcmObjective?  @relation(fields: [rcm_objective_id], references: [id], onDelete: SetNull)
+  controls        EngagementControl[]
+
+  @@index([engagement_id])
+  @@index([rcm_objective_id])
+  @@index([sort_order])
+  @@map("engagement_risk")
+}
+
+// Control rows linked to a risk (1 risk → N controls)
+model EngagementControl {
+  id            String    @id @default(cuid())
+  risk_id       String
+  description   String    @db.Text
+  effectiveness String?   // strong | adequate | weak | none
+  sort_order    Int       @default(0)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  risk EngagementRisk @relation(fields: [risk_id], references: [id], onDelete: Cascade)
+
+  @@index([risk_id])
+  @@index([sort_order])
+  @@map("engagement_control")
+}
+
+model EngagementSection {
+  id            String    @id @default(cuid())
+  engagement_id String
+  title         String
+  description   String?   @db.Text
+  status        String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
+  added_from    String    @default("execution") // planning | execution
+  sort_order    Int       @default(0)
+  review_notes  String?   @db.Text
+  reviewed_by   String?
+  reviewed_at   DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  engagement Engagement            @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  objectives EngagementObjective[]
+  procedures EngagementProcedure[] // procedures directly under section (no objective)
+
+  @@index([engagement_id])
+  @@index([sort_order])
+  @@map("engagement_section")
+}
+
+model EngagementObjective {
+  id            String    @id @default(cuid())
+  engagement_id String
+  section_id    String?   // nullable — if null, objective is standalone (top-level)
+  title         String
+  description   String?   @db.Text
+  status        String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
+  added_from    String    @default("execution") // planning | execution
+  sort_order    Int       @default(0)
+  review_notes  String?   @db.Text
+  reviewed_by   String?
+  reviewed_at   DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  engagement Engagement            @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  section    EngagementSection?    @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  procedures EngagementProcedure[]
+
+  @@index([engagement_id])
+  @@index([section_id])
+  @@index([sort_order])
+  @@map("engagement_objective")
+}
+
+model EngagementProcedure {
+  id             String    @id @default(cuid())
+  engagement_id  String
+  section_id     String?   // nullable — if null, procedure is directly under engagement
+  objective_id   String?   // nullable — if null, procedure is under section or engagement
+  title          String
+  description    String?   @db.Text
+  procedure_type String?   // inquiry | observation | inspection | re_performance | analytical | walkthrough | other
+  status         String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
+  added_from     String    @default("execution") // planning | execution
+  observations   String?   @db.Text  // what was found during testing
+  conclusion     String?   @db.Text  // auditor's conclusion
+  sample_size    Int?      // number of items tested
+  exceptions     Int?      // number of exceptions found
+  sort_order     Int       @default(0)
+  priority       String?   // high | medium | low
+  review_notes   String?   @db.Text
+  performed_by   String?   // placeholder — will link to User
+  reviewed_by    String?   // placeholder — will link to User
+  performed_at   DateTime?
+  reviewed_at    DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  engagement Engagement           @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  section    EngagementSection?   @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  objective  EngagementObjective? @relation(fields: [objective_id], references: [id], onDelete: Cascade)
+  findings   DraftFindingProcedure[]
+
+  @@index([engagement_id])
+  @@index([section_id])
+  @@index([objective_id])
+  @@index([sort_order])
+  @@index([status])
+  @@map("engagement_procedure")
+}
+
+model DraftFinding {
+  id            String    @id @default(cuid())
+  engagement_id String
+  title         String
+  description   String?   @db.Text
+  risk_rating   String?   // low | medium | high | critical
+  status        String    @default("draft") // draft | confirmed | rejected
+  recommendation String?  @db.Text
+  management_response String? @db.Text
+  root_cause    String?   @db.Text
+  created_by    String?   // placeholder
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  engagement Engagement              @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  procedures DraftFindingProcedure[]
+
+  @@index([engagement_id])
+  @@index([status])
+  @@map("draft_finding")
+}
+
+// Many-to-many: DraftFinding ↔ EngagementProcedure
+model DraftFindingProcedure {
+  finding_id   String
+  procedure_id String
+
+  finding   DraftFinding        @relation(fields: [finding_id], references: [id], onDelete: Cascade)
+  procedure EngagementProcedure @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+
+  @@id([finding_id, procedure_id])
+  @@map("draft_finding_procedure")
 }

@@ -1,6 +1,6 @@
 # Audit Universe
 
-> 🔲 **PLACEHOLDER** — This is a design document. Schema, routes, and components will be finalized during implementation.
+> � **IN PROGRESS** — Core entity CRUD and risk assessment implemented. Some features pending.
 
 > Registry of all auditable entities in the organization, providing risk overview and basis for audit planning.
 
@@ -8,15 +8,19 @@
 
 ## Schema (`prisma/schema.prisma`)
 
-| Model             | Key Fields                                                                 | Notes                            |
-| ----------------- | -------------------------------------------------------------------------- | -------------------------------- |
-| `AuditableEntity` | `id`, `name`, `type`, `owner_unit`, `risk_rating`, `audit_cycle`, `status` | Core entity record               |
-| `EntityTag`       | `id`, `entity_id`, `tag`                                                   | Tagging/categorization           |
-| `AuditHistory`    | `id`, `entity_id`, `engagement_id`, `audited_at`                           | Manual or linked from engagement |
+| Model                        | Key Fields                                                                                                                                                                                                                                                  | Notes                                                       |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `AuditableEntity`            | `id`, `name`, `code`, `description`, `entity_type_id`, `audit_cycle`, `status`, `risk_score`, `risk_level`, `inherent_risk_score`, `inherent_risk_level`                                                                                                    | Core entity record; risk fields denormalized from latest RA |
+| `EntityType`                 | `id`, `name`, `description`, `is_active`                                                                                                                                                                                                                    | Configurable entity types (Settings → Universe)             |
+| `AuditArea`                  | `id`, `name`, `description`, `is_active`                                                                                                                                                                                                                    | Configurable audit areas (Settings → Universe)              |
+| `AuditableEntityArea`        | `entity_id`, `area_id`                                                                                                                                                                                                                                      | M:N join table for entity ↔ areas                           |
+| `RiskAssessment`             | `id`, `entity_id`, `inherent_impact`, `inherent_likelihood`, `inherent_score`, `inherent_level`, `control_effectiveness`, `residual_score`, `residual_level`, `risk_factors`, `assessment_source`, `note`, `evaluated_by`, `approved_by`, `evaluation_date` | Full risk assessment record                                 |
+| `AuditableEntityOwner`       | `entity_id`, `unit_id`                                                                                                                                                                                                                                      | M:N join table for entity ↔ owner units                     |
+| `AuditableEntityParticipant` | `entity_id`, `unit_id`                                                                                                                                                                                                                                      | M:N join table for entity ↔ participating units             |
 
-**Filterable fields:** `type`, `risk_rating`, `audit_cycle`, `status`, `owner_unit`
-**Searchable fields:** `name`, `owner_unit`
-**Sortable fields:** `name`, `risk_rating`, `last_audited_at`, `createdAt`
+**Filterable fields:** `entity_type_id`, `areas`, `risk_level`, `audit_cycle`, `status`, `owner_units`
+**Searchable fields:** `name`, `code`, `description`
+**Sortable fields:** `name`, `risk_score`, `last_audited_at`, `created_at`
 
 ---
 
@@ -72,6 +76,8 @@
 
 ## Notes
 
-- `risk_rating` values defined in Settings module
+- `EntityType` and `AuditArea` are configurable reference data managed in Settings → Universe
+- An entity can have multiple audit areas (M:N relationship via `AuditableEntityArea`)
 - `audit_cycle` is the expected frequency (annual, bi-annual, etc.)
+- Risk fields on entity are denormalized from the latest `RiskAssessment` record
 - Audit coverage calculated from engagement history

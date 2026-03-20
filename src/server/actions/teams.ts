@@ -46,7 +46,7 @@ export async function logAudit(data: AuditLogData): Promise<void> {
       action: data.action,
       entity_type: data.entityType,
       entity_id: data.entityId,
-      changes: data.changes ?? undefined,
+      changes: data.changes ? JSON.parse(JSON.stringify(data.changes)) : undefined,
     },
   });
 }

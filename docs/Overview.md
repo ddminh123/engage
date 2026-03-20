@@ -1,4 +1,4 @@
-# i-engage Architecture
+# Engage Architecture
 
 ## 1. System Overview
 
@@ -61,12 +61,79 @@ Internal Audit Management system following IIA standards. On-premises deployment
 | Framework    | Next.js 16 (App Router)                    |
 | UI           | React, TypeScript, Shadcn/ui, TailwindCSS  |
 | API          | Next.js API Routes                         |
-| ORM          | Prisma                                     |
-| Database     | MySQL                                      |
+| ORM          | Prisma v7 (prisma-client generator)        |
+| Database     | MySQL (via @prisma/adapter-mariadb)        |
 | Auth         | NextAuth.js (Credentials + Entra ID ready) |
 | File Storage | Local file server (Sharepoint-ready)       |
 | State        | TanStack Query + Zustand                   |
 | Validation   | Zod                                        |
+
+### 4.1 Prisma v7 Setup
+
+Prisma v7 uses the new **Rust-free `prisma-client` generator** with mandatory driver adapters. No more auto-generation into `node_modules`.
+
+**Packages:**
+
+| Package                   | Type | Purpose                         |
+| ------------------------- | ---- | ------------------------------- |
+| `prisma`                  | dev  | CLI (generate, migrate, studio) |
+| `@prisma/client`          | prod | Generated client runtime        |
+| `@prisma/adapter-mariadb` | prod | MySQL/MariaDB driver adapter    |
+
+> **Both `prisma` and `@prisma/client` must be the same version.** Version mismatch causes build failures.
+
+**Schema** (`prisma/schema.prisma`):
+
+```prisma
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  // url removed in v7 — configured in prisma.config.ts
+}
+```
+
+**Config** (`prisma.config.ts`):
+
+```ts
+import "dotenv/config";
+import { defineConfig, env } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: { path: "prisma/migrations" },
+  datasource: { url: env("DATABASE_URL") },
+});
+```
+
+**Client singleton** (`src/lib/prisma.ts`):
+
+```ts
+import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+
+const adapter = new PrismaMariaDb({
+  host: url.hostname,
+  port: Number(url.port) || 3306,
+  user: url.username,
+  password: url.password,
+  database: url.pathname.slice(1),
+  connectionLimit: 5,
+});
+const prisma = new PrismaClient({ adapter });
+```
+
+**Key rules:**
+
+- Import `PrismaClient` from `@/generated/prisma/client` (not `@prisma/client`)
+- Always pass a driver adapter to `PrismaClient` constructor
+- `output` field is **required** in the generator block
+- `datasource.url` lives in `prisma.config.ts`, not in the schema
+
+**Known vulnerabilities (v7.5.0):** 4 high-severity issues in `prisma` CLI transitive dependencies (dev-only, not in production). See [`docs/security.md`](./security.md) for full details.
 
 ---
 

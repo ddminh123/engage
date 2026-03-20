@@ -39,23 +39,34 @@ Generic key-value store for module-level configuration. Avoids creating singleto
 
 A lightweight organizational hierarchy representing business units, departments, and divisions. **Not a full HR system** — just enough structure for audit ownership, entity assignment, and organizational context.
 
-### Fields
+### Contact (shared entity)
 
-| #   | Field             | Type               | Required | Notes                                                  |
-| --- | ----------------- | ------------------ | -------- | ------------------------------------------------------ |
-| 1   | **Name**          | `string`           | Yes      | Unit name (e.g., "Finance Department", "IT Division")  |
-| 2   | **Code**          | `string`           | No       | Short code (e.g., "FIN", "IT-OPS")                     |
-| 3   | **Parent**        | `ref → OrgUnit`    | No       | Parent unit (null = top-level). Creates hierarchy.     |
-| 4   | **Head**          | `string`           | No       | Unit head name / title                                 |
-| 5   | **Contact Email** | `string`           | No       | Primary contact email                                  |
-| 6   | **Phone**         | `string`           | No       | Contact phone                                          |
-| 7   | **Description**   | `text`             | No       | Responsibilities, scope                                |
-| 8   | **Status**        | `enum`             | Yes      | `active` · `inactive`                                  |
-| 9   | **Established**   | `date`             | No       | Date the unit was created/established                  |
-| 10  | **Discontinued**  | `date`             | No       | Date the unit ceased to function (null = still active) |
-| 11  | **Attachments**   | `ref[] → Document` | No       | Related documents via DocumentAttachment pattern       |
-| 12  | **Updated at**    | `datetime`         | Auto     | Last modification timestamp                            |
-| 13  | **Updated by**    | `ref → User`       | Auto     | Last user who modified this record                     |
+Contacts represent people associated with an org unit (leader, contact point). They are stored as separate records so they can be **searched, reused, and managed independently**.
+
+| #   | Field        | Type     | Required | Notes                     |
+| --- | ------------ | -------- | -------- | ------------------------- |
+| 1   | **Name**     | `string` | Yes      | Full name                 |
+| 2   | **Position** | `string` | No       | Job title / role          |
+| 3   | **Email**    | `string` | No       | Contact email (validated) |
+| 4   | **Phone**    | `string` | No       | Phone number              |
+| 5   | **Status**   | `enum`   | Yes      | `active` · `inactive`     |
+
+### OrgUnit Fields
+
+| #   | Field             | Type               | Required | Notes                                                    |
+| --- | ----------------- | ------------------ | -------- | -------------------------------------------------------- |
+| 1   | **Name**          | `string`           | Yes      | Unit name (e.g., "Finance Department", "IT Division")    |
+| 2   | **Code**          | `string`           | No       | Short code (e.g., "FIN", "IT-OPS")                       |
+| 3   | **Parent**        | `ref → OrgUnit`    | No       | Parent unit (null = top-level). Creates hierarchy.       |
+| 4   | **Leader**        | `ref → Contact`    | No       | Unit leader — searchable autocomplete with "add new"     |
+| 5   | **Contact Point** | `ref → Contact`    | No       | Primary contact — searchable autocomplete with "add new" |
+| 6   | **Description**   | `text`             | No       | Responsibilities, scope                                  |
+| 7   | **Status**        | `enum`             | Yes      | `active` · `inactive`                                    |
+| 8   | **Established**   | `date`             | No       | Date the unit was created/established                    |
+| 9   | **Discontinued**  | `date`             | No       | Date the unit ceased to function (null = still active)   |
+| 10  | **Attachments**   | `ref[] → Document` | No       | Related documents via DocumentAttachment pattern         |
+| 11  | **Updated at**    | `datetime`         | Auto     | Last modification timestamp                              |
+| 12  | **Updated by**    | `ref → User`       | Auto     | Last user who modified this record                       |
 
 > **All fields are searchable and filterable.**
 
@@ -86,11 +97,14 @@ A lightweight organizational hierarchy representing business units, departments,
 - Columns: Name, Code, Parent, Head, Status, Entity Count, Established
 - Bulk actions: update status
 
-**Create / Edit Form (dialog or side panel):**
+**Create / Edit Form (FormDialog — sticky header/footer, scrollable body):**
 
-- All fields from the field table above
-- Parent picker (searchable dropdown from active units)
-- Attachments section (upload / link documents)
+- Uses shared `FormDialog` component (see `docs/FE.md` §9.1)
+- Basic info section: Name, Code, Status, Parent (searchable Select), Description
+- Leader section: `ContactSearch` autocomplete with "Add new" option
+- Contact Point section: `ContactSearch` autocomplete with "Add new" option
+- "Add new" contact opens a separate `ContactForm` dialog — **no nested modals** (see `docs/FE.md` §9.2). Parent form is hidden while child form is open; state is preserved.
+- Attachments section (upload / link documents) — deferred to Document module
 - Validation: Name required, Code unique if provided
 
 **Unit Detail Panel (side panel on click from tree/list):**
@@ -170,12 +184,55 @@ Configures how numeric risk scores (1–25) map to risk levels. Stored as a look
 
 ### Lookup Management UI
 
-All lookups share a single admin page pattern:
+Settings pages use a **Card → Sheet** pattern for managing reference data:
 
-- Tab per lookup table (EntityType, AuditArea, AuditCycle, Tag, etc.)
-- Inline add/edit/reorder (drag-and-drop sort)
-- Toggle active/inactive (not hard delete — preserves references)
-- Validation: prevent deactivating a value that is the only option in its table
+**Page Layout:**
+
+- Page header with title and description
+- List of `SettingsCard` components — one per lookup table
+- Each card shows: icon, title, description, chevron indicator
+- Clicking a card opens a `SettingsSheet` (50% viewport width) containing the DataTable
+
+**SettingsCard (`src/components/shared/SettingsCard.tsx`):**
+
+```tsx
+<SettingsCard
+  icon={Layers}
+  title="Loại đối tượng kiểm toán"
+  description="Phân loại đối tượng kiểm toán theo bản chất..."
+  onClick={() => setOpenSheet("entityType")}
+  badge={<Badge>Mới</Badge>} // optional
+/>
+```
+
+**SettingsSheet (`src/components/shared/SettingsSheet.tsx`):**
+
+```tsx
+<SettingsSheet
+  open={openSheet === "entityType"}
+  onOpenChange={(open) => !open && setOpenSheet(null)}
+  title="Loại đối tượng kiểm toán"
+  description="Phân loại đối tượng kiểm toán theo bản chất..."
+>
+  <EntityTypeList />
+</SettingsSheet>
+```
+
+**Sheet Content:**
+
+- Uses standard `DataTable` component with CRUD actions
+- "Thêm mới" button in table toolbar
+- Edit/Delete actions per row
+- Create/Edit forms open as nested `FormDialog`
+
+**Benefits:**
+
+- Clean, scannable settings page (cards only)
+- Full-width DataTable in sheet for better data visibility
+- Consistent pattern across all lookup management
+- No page navigation — all CRUD happens in sheets/dialogs
+
+**Example implementation:** See `src/app/(main)/settings/universe/page.tsx`
 
 ---
 

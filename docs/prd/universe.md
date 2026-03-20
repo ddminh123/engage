@@ -16,19 +16,19 @@ An auditable entity is any unit, process, system, or activity that could be the 
 
 ### Fields
 
-| #   | Field                   | Type               | Required | Notes                                                                                                                                                                                  |
-| --- | ----------------------- | ------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Name**                | `string`           | Yes      | Short identifying name (e.g., "Procurement Process", "Core Banking System")                                                                                                            |
-| 2   | **Code**                | `string`           | No       | Optional short code for reference (e.g., "PROC-001")                                                                                                                                   |
-| 3   | **Description**         | `text`             | No       | Scope, boundaries, key activities                                                                                                                                                      |
-| 4   | **Type**                | `ref → EntityType` | Yes      | Configurable. Default values: `Process`, `System`, `Business Unit`, `Product`, `Project`, `Function`, `Third Party`                                                                    |
-| 5   | **Area**                | `ref → AuditArea`  | Yes      | IIA audit subject category. Default values: `Financial`, `Operational`, `IT / Technology`, `Compliance / Regulatory`, `Strategic`, `Governance`, `Legal`, `HR / People`. Configurable. |
-| 6   | **Owner Unit**          | `ref → OrgUnit`    | Yes      | Primary unit responsible for this entity                                                                                                                                               |
-| 7   | **Participating Units** | `ref[] → OrgUnit`  | No       | Other units involved (e.g., IT participates in ERP owned by Accounting)                                                                                                                |
-| 8   | **Status**              | `enum`             | Yes      | `active` · `inactive` · `archived`                                                                                                                                                     |
-| 9   | **Audit Cycle**         | `ref → AuditCycle` | No       | Recommended audit frequency. Configurable values: `Annual`, `Biennial`, `Triennial`, `Ad-hoc`, `Continuous`.                                                                           |
-| 10  | **Tags**                | `ref[] → Tag`      | No       | Centrally managed in Settings. Reusable across entities for consistent categorization.                                                                                                 |
-| 11  | **Attachments**         | `ref[] → Document` | No       | Via Document module (DocumentAttachment pattern)                                                                                                                                       |
+| #   | Field                   | Type                | Required | Notes                                                                                                                                                                                                                                                           |
+| --- | ----------------------- | ------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Name**                | `string`            | Yes      | Short identifying name (e.g., "Procurement Process", "Core Banking System")                                                                                                                                                                                     |
+| 2   | **Code**                | `string`            | No       | Optional short code for reference (e.g., "PROC-001")                                                                                                                                                                                                            |
+| 3   | **Description**         | `text`              | No       | Scope, boundaries, key activities                                                                                                                                                                                                                               |
+| 4   | **Type**                | `ref → EntityType`  | Yes      | Configurable in Settings. Default values: `Process`, `System`, `Business Unit`, `Product`, `Project`, `Function`, `Third Party`                                                                                                                                 |
+| 5   | **Areas**               | `ref[] → AuditArea` | Yes      | IIA audit subject categories. **Multi-select** — an entity can belong to multiple areas. Default values: `Financial`, `Operational`, `IT / Technology`, `Compliance / Regulatory`, `Strategic`, `Governance`, `Legal`, `HR / People`. Configurable in Settings. |
+| 6   | **Owner Unit**          | `ref → OrgUnit`     | Yes      | Primary unit responsible for this entity                                                                                                                                                                                                                        |
+| 7   | **Participating Units** | `ref[] → OrgUnit`   | No       | Other units involved (e.g., IT participates in ERP owned by Accounting)                                                                                                                                                                                         |
+| 8   | **Status**              | `enum`              | Yes      | `active` · `inactive` · `archived`                                                                                                                                                                                                                              |
+| 9   | **Audit Cycle**         | `ref → AuditCycle`  | No       | Recommended audit frequency. Configurable values: `Annual`, `Biennial`, `Triennial`, `Ad-hoc`, `Continuous`.                                                                                                                                                    |
+| 10  | **Tags**                | `ref[] → Tag`       | No       | Centrally managed in Settings. Reusable across entities for consistent categorization.                                                                                                                                                                          |
+| 11  | **Attachments**         | `ref[] → Document`  | No       | Via Document module (DocumentAttachment pattern)                                                                                                                                                                                                                |
 
 > **All fields are searchable and filterable.** List views support search by text fields (Name, Code, Description) and filter by reference/enum fields (Type, Area, Owner Unit, Participating Units, Status, Audit Cycle, Tags, Risk Level).
 
@@ -83,19 +83,19 @@ Chronological journal of observations, planning notes, and institutional knowled
 - Displayed newest-first
 - Useful for: pre-audit observations, planning context, management intel, handover notes
 
-### Inherent Risk Rating
+### Risk Assessment
 
-Each entity carries a risk rating that drives audit planning priority. The approach follows IIA's risk-based methodology while keeping it lightweight.
+Each entity carries a risk assessment that drives audit planning priority. The approach follows IIA's risk-based methodology: assess **inherent risk**, evaluate **control effectiveness**, derive **residual risk**.
 
-**Rating method:** Impact × Likelihood = Risk Score
+#### Score & Level Mapping
+
+**Rating method:** Impact × Likelihood = Score
 
 | Factor         | Scale | Values                                                               |
 | -------------- | ----- | -------------------------------------------------------------------- |
 | **Impact**     | 1–5   | 1 = Negligible, 2 = Low, 3 = Moderate, 4 = High, 5 = Critical        |
 | **Likelihood** | 1–5   | 1 = Rare, 2 = Unlikely, 3 = Possible, 4 = Likely, 5 = Almost Certain |
-| **Risk Score** | 1–25  | Computed: Impact × Likelihood                                        |
-
-**Risk level mapping (derived from score):**
+| **Score**      | 1–25  | Computed: Impact × Likelihood                                        |
 
 | Score Range | Level    | Color  |
 | ----------- | -------- | ------ |
@@ -104,25 +104,64 @@ Each entity carries a risk rating that drives audit planning priority. The appro
 | 10–15       | High     | Orange |
 | 16–25       | Critical | Red    |
 
-> The score ranges and level labels are configurable in Settings.
+> Score ranges and level labels are configurable in Settings.
 
-**Risk Rating record fields:**
+#### Section 1 — Rủi ro tiềm tàng (Inherent Risk)
 
-| Field       | Type         | Required | Notes                                          |
-| ----------- | ------------ | -------- | ---------------------------------------------- |
-| Impact      | `int (1-5)`  | Yes      | Business impact if risk materializes           |
-| Likelihood  | `int (1-5)`  | Yes      | Probability of occurrence                      |
-| Score       | `int`        | Computed | Impact × Likelihood                            |
-| Level       | `enum`       | Computed | Derived from score range                       |
-| Rationale   | `text`       | Yes      | Justification for the rating                   |
-| Assessed by | `ref → User` | Auto     | Current user                                   |
-| Assessed at | `datetime`   | Auto     | Timestamp                                      |
-| Approved by | `ref → User` | No       | Optional approval (lightweight: not mandatory) |
-| Approved at | `datetime`   | No       | Approval timestamp                             |
+| Field                 | Type        | Required | Notes                                     |
+| --------------------- | ----------- | -------- | ----------------------------------------- |
+| `inherent_impact`     | `int (1-5)` | Yes      | Business impact if risk materializes      |
+| `inherent_likelihood` | `int (1-5)` | Yes      | Probability of occurrence before controls |
+| `inherent_score`      | `int`       | Computed | `inherent_impact × inherent_likelihood`   |
+| `inherent_level`      | `enum`      | Computed | Derived from `inherent_score` range       |
 
-**Risk rating history:** Every rating change creates a new record. Previous ratings are preserved as history. The current rating is the most recent record.
+#### Section 2 — Hiệu quả kiểm soát (Control Effectiveness)
 
-> **IIA alignment:** Standard 9.4 requires documented risk assessment. This design captures the assessment, rationale, and assessor — sufficient for audit committee reporting without heavy workflow overhead. Approval is optional for lightweight use but available when needed.
+| Field                   | Type   | Required | Notes                                                        |
+| ----------------------- | ------ | -------- | ------------------------------------------------------------ |
+| `control_effectiveness` | `enum` | No       | `Strong` · `Medium` · `Weak` — qualitative control indicator |
+
+#### Section 3 — Rủi ro còn lại (Residual Risk)
+
+| Field            | Type   | Required | Notes                                                                           |
+| ---------------- | ------ | -------- | ------------------------------------------------------------------------------- |
+| `residual_score` | `int`  | No       | Auto-calculated from inherent score + control effectiveness. User can override. |
+| `residual_level` | `enum` | Computed | Derived from `residual_score` range                                             |
+
+**Auto-calculation rules for `residual_score`:**
+
+| Control Effectiveness | Multiplier | Example (inherent = 20) |
+| --------------------- | ---------- | ----------------------- |
+| Strong                | × 0.4      | 8 (Medium)              |
+| Medium                | × 0.7      | 14 (High)               |
+| Weak / None           | × 1.0      | 20 (Critical)           |
+
+> `residual_score` is editable — auditor can override the auto-calculation. `residual_level` is always derived from the final `residual_score`.
+
+#### Assessment Context
+
+| Field               | Type       | Required | Notes                                                                                           |
+| ------------------- | ---------- | -------- | ----------------------------------------------------------------------------------------------- |
+| `risk_factors`      | `string[]` | No       | Multi-select tags: `high_volume` · `complexity` · `regulatory` · `fraud_risk` · `recent_change` |
+| `assessment_source` | `enum`     | No       | `previous_audit` · `management_input` · `incident` · `analytics` · `regulatory`                 |
+| `note`              | `text`     | No       | Optional free-text justification (replaces mandatory rationale)                                 |
+
+#### Metadata (Placeholders)
+
+| Field             | Type       | Required | Notes                                                            |
+| ----------------- | ---------- | -------- | ---------------------------------------------------------------- |
+| `evaluated_by`    | `string`   | No       | Placeholder — will link to User when Teams module is implemented |
+| `approved_by`     | `string`   | No       | Placeholder — for future sitewide approval workflow              |
+| `evaluation_date` | `datetime` | No       | Date of assessment; defaults to now but user-editable            |
+
+**Risk assessment history:** Every assessment creates a new record. Previous assessments are preserved as history. The current assessment is the most recent.
+
+**Denormalized on `AuditableEntity`:**
+
+- `risk_score` / `risk_level` — effective (residual) risk for the entity
+- `inherent_risk_score` / `inherent_risk_level` — inherent risk before controls
+
+> **IIA alignment (Standard 9.4):** Captures inherent risk, control quality, and residual risk — sufficient for audit committee reporting. Approval is a placeholder for future workflow.
 
 ### Audit History
 
