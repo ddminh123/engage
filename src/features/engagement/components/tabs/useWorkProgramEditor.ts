@@ -110,7 +110,7 @@ export function useWorkProgramEditor(
   const handleAddSection = useCallback(
     (title: string) => {
       const t = title.trim();
-      if (!t) return;
+      if (!t || createSection.isPending) return;
       createSection.mutate(
         { engagementId, data: { title: t } },
         { onSuccess: () => dispatch({ type: "CANCEL_ADD_TOP" }) },
@@ -146,7 +146,7 @@ export function useWorkProgramEditor(
   const handleAddObjective = useCallback(
     (title: string, sectionId?: string) => {
       const t = title.trim();
-      if (!t) return;
+      if (!t || createObjective.isPending || createStandaloneObjective.isPending) return;
       if (sectionId) {
         // Objective inside a section
         createObjective.mutate(
@@ -203,7 +203,7 @@ export function useWorkProgramEditor(
   const handleAddProcedure = useCallback(
     (title: string, parentId: string) => {
       const t = title.trim();
-      if (!t) return;
+      if (!t || createProcedure.isPending) return;
 
       // parentId can be "sec:{sectionId}" or an objectiveId
       let sectionId: string | null = null;

@@ -80,10 +80,12 @@ export const ENGAGEMENT_LABELS = {
     field: {
       title: 'Tên thủ tục',
       description: 'Mô tả chi tiết',
+      procedures: 'Thủ tục thực hiện',
       procedureType: 'Loại thủ tục',
       status: 'Trạng thái',
       observations: 'Quan sát / Kết quả',
       conclusion: 'Kết luận',
+      effectiveness: 'Kết quả đánh giá',
       sampleSize: 'Cỡ mẫu',
       exceptions: 'Số ngoại lệ',
       priority: 'Ưu tiên',

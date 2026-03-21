@@ -1,20 +1,11 @@
 "use client";
 
-import {
-  ClipboardList,
-  Pencil,
-  Trash2,
-  Check,
-  X,
-  Maximize2,
-} from "lucide-react";
+import { useState } from "react";
+import { ClipboardList, Check, X, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InlineTableInput } from "@/components/shared/InlineTableInput";
 import { LabeledSelect } from "@/components/shared/LabeledSelect";
-import {
-  DragHandle,
-  type DragHandleRenderProps,
-} from "@/components/shared/SortableList";
+import { type DragHandleRenderProps } from "@/components/shared/SortableList";
 import { cn } from "@/lib/utils";
 import type {
   EngagementProcedure,
@@ -25,6 +16,8 @@ import type { WpEditor } from "../tabs/useWorkProgramEditor";
 import { PROCEDURE_STATUS_OPTIONS } from "../tabs/workProgramTypes";
 import { WpStatusBadge } from "./WpStatusBadge";
 import { MoveProcedureMenu } from "./WpMoveMenu";
+import { WpContextMenu } from "./WpContextMenu";
+import { useBatchAction } from "../../hooks/useEngagements";
 
 interface WpProcedureItemProps {
   procedure: EngagementProcedure;
@@ -58,11 +51,26 @@ export function WpProcedureItem({
     state,
     dispatch,
     mode,
+    engagementId,
     textRef,
     handleTextChange,
     handleUpdateProcedure,
+    handleUpdateProcedureStatus,
     isUpdatingProcedure,
   } = editor;
+
+  const batchAction = useBatchAction();
+
+  const handleDuplicate = () => {
+    batchAction.mutate({
+      engagementId,
+      action: "duplicate",
+      entityType: "procedure",
+      ids: [procedure.id],
+    });
+  };
+
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
   const isEditing =
     state.editingId === procedure.id && state.editingType === "procedure";
 
@@ -116,10 +124,12 @@ export function WpProcedureItem({
     );
   }
 
-  return (
-    <div className="group/row flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30">
-      <DragHandle {...dragHandleProps} />
-
+  const procedureRow = (
+    <div
+      className="group/row flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30"
+      {...dragHandleProps.attributes}
+      {...dragHandleProps.listeners}
+    >
       {/* Checkbox */}
       <button
         type="button"
@@ -158,13 +168,16 @@ export function WpProcedureItem({
           <WpStatusBadge status={procedure.status} />
         )}
       </span>
+    </div>
+  );
 
-      {/* Actions — hover only */}
-      <span className="flex items-center gap-0 opacity-0 group-hover/row:opacity-100 transition-opacity">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() =>
+  return (
+    <>
+      {isEditing ? (
+        procedureRow
+      ) : (
+        <WpContextMenu
+          onEdit={() =>
             dispatch({
               type: "START_EDIT_PROCEDURE",
               id: procedure.id,
@@ -172,14 +185,7 @@ export function WpProcedureItem({
               status: procedure.status ?? "not_started",
             })
           }
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="text-destructive hover:text-destructive"
-          onClick={() =>
+          onDelete={() =>
             dispatch({
               type: "SET_DELETE",
               target: {
@@ -189,18 +195,22 @@ export function WpProcedureItem({
               },
             })
           }
+          onDuplicate={handleDuplicate}
+          onMove={() => setShowMoveMenu(true)}
         >
-          <Trash2 className="h-3 w-3" />
-        </Button>
-        <MoveProcedureMenu
-          procedureId={procedure.id}
-          currentObjectiveId={procedure.objectiveId}
-          currentSectionId={procedure.sectionId}
-          sections={allSections}
-          standaloneObjectives={allStandaloneObjectives}
-          onMove={onMoveProcedure}
-        />
-      </span>
-    </div>
+          {procedureRow}
+        </WpContextMenu>
+      )}
+      <MoveProcedureMenu
+        procedureId={procedure.id}
+        currentObjectiveId={procedure.objectiveId}
+        currentSectionId={procedure.sectionId}
+        sections={allSections}
+        standaloneObjectives={allStandaloneObjectives}
+        onMove={onMoveProcedure}
+        open={showMoveMenu}
+        onOpenChange={setShowMoveMenu}
+      />
+    </>
   );
 }

@@ -1,24 +1,12 @@
 "use client";
 
-import {
-  Target,
-  Pencil,
-  Trash2,
-  Check,
-  X,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
+import { useState } from "react";
+import { Target, Check, X, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { InlineTableInput } from "@/components/shared/InlineTableInput";
 import {
   SortableList,
-  DragHandle,
   type DragHandleRenderProps,
 } from "@/components/shared/SortableList";
 import { cn } from "@/lib/utils";
@@ -28,6 +16,8 @@ import { WpProcedureItem } from "./WpProcedureItem";
 import { WpAddButton } from "./WpAddButton";
 import { WpInlineAdd } from "./WpInlineAdd";
 import { MoveObjectiveMenu } from "./WpMoveMenu";
+import { WpContextMenu } from "./WpContextMenu";
+import { useBatchAction } from "../../hooks/useEngagements";
 
 interface WpObjectiveItemProps {
   objective: EngagementObjective;
@@ -78,7 +68,21 @@ export function WpObjectiveItem({
     handleReorderRows,
     isUpdatingObjective,
     isCreatingProcedure,
+    engagementId,
   } = editor;
+
+  const batchAction = useBatchAction();
+
+  const handleDuplicate = () => {
+    batchAction.mutate({
+      engagementId,
+      action: "duplicate",
+      entityType: "objective",
+      ids: [objective.id],
+    });
+  };
+
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
 
   const isEditing =
     state.editingId === objective.id && state.editingType === "objective";
@@ -116,93 +120,96 @@ export function WpObjectiveItem({
     );
   }
 
+  const objectiveRow = (
+    <div
+      className="group/row flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30 cursor-pointer"
+      onClick={() => onOpenChange(!open)}
+      {...dragHandleProps.attributes}
+      {...dragHandleProps.listeners}
+    >
+      {/* Checkbox */}
+      <button
+        type="button"
+        className={cn(
+          "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
+          isSelected
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-muted-foreground/30 hover:border-primary",
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleSelect(objective.id);
+        }}
+      >
+        {isSelected && <Check className="h-3 w-3" />}
+      </button>
+
+      {/* Expand chevron */}
+      {open ? (
+        <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+      ) : (
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+      )}
+
+      <Target className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+
+      <span
+        className="text-sm font-medium cursor-pointer hover:underline"
+        onClick={(e) => {
+          e.stopPropagation();
+          onViewItem?.("objective", objective.id);
+        }}
+      >
+        {objective.title}
+      </span>
+
+      {/* Procedure count badge */}
+      {objective.procedures.length > 0 && (
+        <span className="text-xs text-muted-foreground">
+          ({objective.procedures.length})
+        </span>
+      )}
+    </div>
+  );
+
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
       {/* ── Objective header row ── */}
-      <div className="group/row flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30">
-        <DragHandle {...dragHandleProps} />
-
-        {/* Checkbox */}
-        <button
-          type="button"
-          className={cn(
-            "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
-            isSelected
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-muted-foreground/30 hover:border-primary",
-          )}
-          onClick={() => onToggleSelect(objective.id)}
-        >
-          {isSelected && <Check className="h-3 w-3" />}
-        </button>
-
-        {/* Expand chevron */}
-        <CollapsibleTrigger
-          render={<Button variant="ghost" size="icon-sm" className="h-5 w-5" />}
-        >
-          {open ? (
-            <ChevronDown className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5" />
-          )}
-        </CollapsibleTrigger>
-
-        <Target className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-
-        <span
-          className="text-sm font-medium cursor-pointer hover:underline"
-          onClick={() => onViewItem?.("objective", objective.id)}
-        >
-          {objective.title}
-        </span>
-
-        {/* Procedure count badge */}
-        {objective.procedures.length > 0 && (
-          <span className="text-xs text-muted-foreground">
-            ({objective.procedures.length})
-          </span>
-        )}
-
-        {/* Actions — hover only */}
-        <span className="ml-auto flex items-center gap-0 opacity-0 group-hover/row:opacity-100 transition-opacity">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() =>
-              dispatch({
-                type: "START_EDIT_OBJECTIVE",
+      {isEditing ? (
+        objectiveRow
+      ) : (
+        <WpContextMenu
+          onEdit={() =>
+            dispatch({
+              type: "START_EDIT_OBJECTIVE",
+              id: objective.id,
+              title: objective.title,
+            })
+          }
+          onDelete={() =>
+            dispatch({
+              type: "SET_DELETE",
+              target: {
+                type: "objective",
                 id: objective.id,
-                title: objective.title,
-              })
-            }
-          >
-            <Pencil className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="text-destructive hover:text-destructive"
-            onClick={() =>
-              dispatch({
-                type: "SET_DELETE",
-                target: {
-                  type: "objective",
-                  id: objective.id,
-                  title: objective.title.slice(0, 40),
-                },
-              })
-            }
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-          <MoveObjectiveMenu
-            objectiveId={objective.id}
-            currentSectionId={objective.sectionId}
-            sections={allSections}
-            onMove={onMoveObjective}
-          />
-        </span>
-      </div>
+                title: objective.title.slice(0, 40),
+              },
+            })
+          }
+          onDuplicate={handleDuplicate}
+          onMove={() => setShowMoveMenu(true)}
+        >
+          {objectiveRow}
+        </WpContextMenu>
+      )}
+      <MoveObjectiveMenu
+        objectiveId={objective.id}
+        currentSectionId={objective.sectionId}
+        sections={allSections}
+        onMove={onMoveObjective}
+        open={showMoveMenu}
+        onOpenChange={setShowMoveMenu}
+      />
 
       {/* ── Collapsible content: procedures ── */}
       <CollapsibleContent>
@@ -237,6 +244,7 @@ export function WpObjectiveItem({
               onCancel={() => dispatch({ type: "CANCEL_ADD" })}
               textRef={textRef}
               isSaving={isCreatingProcedure}
+              onOpenForm={() => onOpenForm?.("procedure", objective.id)}
             />
           ) : (
             <WpAddButton

@@ -154,12 +154,14 @@ export interface EngagementProcedure {
   objectiveId: string | null;
   title: string;
   description: string | null;
+  procedures: string | null;
   procedureType: string | null;
   procedureCategory: string | null;
   status: string;
   addedFrom: string;
   observations: string | null;
   conclusion: string | null;
+  effectiveness: string | null;
   sampleSize: number | null;
   exceptions: number | null;
   sortOrder: number;
@@ -180,6 +182,7 @@ export interface EngagementProcedure {
 export interface ProcedureInput {
   title: string;
   description?: string | null;
+  procedures?: string | null;
   procedureType?: string | null;
   procedureCategory?: string | null;
   sectionId?: string | null;
@@ -195,6 +198,7 @@ export interface ProcedureInput {
 export interface ProcedureUpdateInput {
   title?: string;
   description?: string | null;
+  procedures?: string | null;
   procedureType?: string | null;
   procedureCategory?: string | null;
   priority?: string | null;
@@ -202,6 +206,7 @@ export interface ProcedureUpdateInput {
   status?: string;
   observations?: string | null;
   conclusion?: string | null;
+  effectiveness?: string | null;
   sampleSize?: number | null;
   exceptions?: number | null;
   reviewNotes?: string | null;

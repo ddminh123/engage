@@ -84,6 +84,7 @@ export const updateObjectiveSchema = createObjectiveSchema.partial().extend({
 export const createProcedureSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().nullable().optional(),
+  procedures: z.string().nullable().optional(),
   procedureType: z.enum(PROCEDURE_TYPES).nullable().optional(),
   procedureCategory: z.enum(PROCEDURE_CATEGORIES).nullable().optional(),
   sectionId: z.string().nullable().optional(),
@@ -102,6 +103,7 @@ export const updateProcedureSchema = createProcedureSchema
     status: z.enum(WORK_ITEM_STATUSES).optional(),
     observations: z.string().nullable().optional(),
     conclusion: z.string().nullable().optional(),
+    effectiveness: z.enum(['effective', 'ineffective']).nullable().optional(),
     sampleSize: z.number().int().nullable().optional(),
     exceptions: z.number().int().nullable().optional(),
     reviewNotes: z.string().nullable().optional(),
@@ -313,12 +315,14 @@ function mapProcedure(p: any) {
     objectiveId: p.objective_id as string | null,
     title: p.title as string,
     description: p.description as string | null,
+    procedures: p.procedures as string | null,
     procedureType: p.procedure_type as string | null,
     procedureCategory: p.procedure_category as string | null,
     status: p.status as string,
     addedFrom: (p.added_from as string) ?? 'execution',
     observations: p.observations as string | null,
     conclusion: p.conclusion as string | null,
+    effectiveness: p.effectiveness as string | null,
     sampleSize: p.sample_size as number | null,
     exceptions: p.exceptions as number | null,
     sortOrder: p.sort_order as number,
@@ -1075,6 +1079,7 @@ export async function createProcedure(
       objective_id: parsed.objectiveId ?? null,
       title: parsed.title,
       description: parsed.description ?? null,
+      procedures: parsed.procedures ?? null,
       procedure_type: parsed.procedureType ?? null,
       procedure_category: parsed.procedureCategory ?? null,
       priority: parsed.priority ?? null,
@@ -1119,12 +1124,14 @@ export async function updateProcedure(
 
   if (parsed.title !== undefined) data.title = parsed.title;
   if (parsed.description !== undefined) data.description = parsed.description ?? null;
+  if (parsed.procedures !== undefined) data.procedures = parsed.procedures ?? null;
   if (parsed.procedureType !== undefined) data.procedure_type = parsed.procedureType ?? null;
   if (parsed.procedureCategory !== undefined) data.procedure_category = parsed.procedureCategory ?? null;
   if (parsed.priority !== undefined) data.priority = parsed.priority ?? null;
   if (parsed.sortOrder !== undefined) data.sort_order = parsed.sortOrder;
   if (parsed.observations !== undefined) data.observations = parsed.observations ?? null;
   if (parsed.conclusion !== undefined) data.conclusion = parsed.conclusion ?? null;
+  if (parsed.effectiveness !== undefined) data.effectiveness = parsed.effectiveness ?? null;
   if (parsed.sampleSize !== undefined) data.sample_size = parsed.sampleSize ?? null;
   if (parsed.exceptions !== undefined) data.exceptions = parsed.exceptions ?? null;
   if (parsed.reviewNotes !== undefined) data.review_notes = parsed.reviewNotes ?? null;
@@ -2021,7 +2028,7 @@ async function duplicateEntity(
     case 'section': {
       const { objectives, procedures, ...sectionData } = rest;
       const dup = await prisma.engagementSection.create({
-        data: { ...sectionData, sort_order: sortOrder, title: `${sectionData.title} (bản sao)` },
+        data: { ...sectionData, sort_order: sortOrder, title: `Copy - ${sectionData.title}` },
       });
       // Duplicate nested objectives + their procedures
       for (const obj of (objectives || [])) {
@@ -2048,7 +2055,7 @@ async function duplicateEntity(
     case 'objective': {
       const { procedures, section_id, ...objData } = rest;
       const dup = await prisma.engagementObjective.create({
-        data: { ...objData, section_id, sort_order: sortOrder, title: `${objData.title} (bản sao)` },
+        data: { ...objData, section_id, sort_order: sortOrder, title: `Copy - ${objData.title}` },
       });
       for (const proc of (procedures || [])) {
         const { id: _pid, created_at: _pc, updated_at: _pu, findings: _f, section_id: _psid, objective_id: _poid, ...procData } = proc;
@@ -2061,14 +2068,14 @@ async function duplicateEntity(
     case 'procedure': {
       const { findings, ...procData } = rest;
       const dup = await prisma.engagementProcedure.create({
-        data: { ...procData, sort_order: sortOrder, title: `${procData.title} (bản sao)` },
+        data: { ...procData, sort_order: sortOrder, title: `Copy - ${procData.title}` },
       });
       return dup.id;
     }
     case 'rcm_objective': {
       const { risks, ...objData } = rest;
       const dup = await prisma.engagementRcmObjective.create({
-        data: { ...objData, sort_order: sortOrder, title: `${objData.title} (bản sao)` },
+        data: { ...objData, sort_order: sortOrder, title: `Copy - ${objData.title}` },
       });
       for (const risk of (risks || [])) {
         const { id: _rid, created_at: _rc, updated_at: _ru, controls, rcm_objective_id: _roid, ...riskData } = risk;
@@ -2087,7 +2094,7 @@ async function duplicateEntity(
     case 'risk': {
       const { controls, ...riskData } = rest;
       const dup = await prisma.engagementRisk.create({
-        data: { ...riskData, sort_order: sortOrder, risk_description: `${riskData.risk_description} (bản sao)` },
+        data: { ...riskData, sort_order: sortOrder, risk_description: `Copy - ${riskData.risk_description}` },
       });
       for (const ctrl of (controls || [])) {
         const { id: _cid, created_at: _cc, updated_at: _cu, risk_id: _crid, ...ctrlData } = ctrl;
@@ -2099,7 +2106,7 @@ async function duplicateEntity(
     }
     case 'control': {
       const dup = await prisma.engagementControl.create({
-        data: { ...rest, sort_order: sortOrder, description: `${rest.description} (bản sao)` },
+        data: { ...rest, sort_order: sortOrder, description: `Copy - ${rest.description}` },
       });
       return dup.id;
     }

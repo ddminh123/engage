@@ -656,12 +656,14 @@ model EngagementProcedure {
   objective_id   String?   // nullable — if null, procedure is under section or engagement
   title          String
   description    String?   @db.Text
+  procedures     String?   @db.Text  // detailed testing steps / methodology
   procedure_type     String?   // inquiry | observation | inspection | re_performance | analytical | walkthrough | other
   procedure_category String?   // toc | substantive
   status         String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
   added_from     String    @default("execution") // planning | execution
   observations   String?   @db.Text  // what was found during testing
   conclusion     String?   @db.Text  // auditor's conclusion
+  effectiveness  String?   // effective | ineffective
   sample_size    Int?      // number of items tested
   exceptions     Int?      // number of exceptions found
   sort_order     Int       @default(0)

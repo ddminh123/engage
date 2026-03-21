@@ -1,16 +1,20 @@
 "use client";
 
-import { ArrowRightLeft, Layers, Target } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Layers, Target } from "lucide-react";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import type { EngagementSection, EngagementObjective } from "../../types";
 
 // ── Move objective menu ──
@@ -20,7 +24,8 @@ interface MoveObjectiveMenuProps {
   currentSectionId: string | null;
   sections: EngagementSection[];
   onMove: (objectiveId: string, targetSectionId: string | null) => void;
-  disabled?: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function MoveObjectiveMenu({
@@ -28,7 +33,8 @@ export function MoveObjectiveMenu({
   currentSectionId,
   sections,
   onMove,
-  disabled,
+  open,
+  onOpenChange,
 }: MoveObjectiveMenuProps) {
   const destinations = [
     {
@@ -44,47 +50,45 @@ export function MoveObjectiveMenu({
   ];
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            title="Chuyển đến..."
-            disabled={disabled}
-          />
-        }
-      >
-        <ArrowRightLeft className="h-3.5 w-3.5" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Chuyển mục tiêu đến</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          {destinations.map((d) => (
-            <DropdownMenuItem
-              key={d.id ?? "__standalone__"}
-              disabled={d.isCurrent}
-              onClick={() => {
-                if (!d.isCurrent) onMove(objectiveId, d.id);
-              }}
-            >
-              {d.id === null ? (
-                <Target className="mr-2 h-3.5 w-3.5 text-emerald-600" />
-              ) : (
-                <Layers className="mr-2 h-3.5 w-3.5 text-blue-600" />
-              )}
-              <span className="truncate">{d.label}</span>
-              {d.isCurrent && (
-                <span className="ml-auto text-xs text-muted-foreground">
-                  (hiện tại)
-                </span>
-              )}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Chuyển mục tiêu đến</DialogTitle>
+        </DialogHeader>
+        <Command>
+          <CommandInput placeholder="Tìm kiếm..." />
+          <CommandList>
+            <CommandEmpty>Không tìm thấy kết quả</CommandEmpty>
+            <CommandGroup>
+              {destinations.map((d) => (
+                <CommandItem
+                  key={d.id ?? "__standalone__"}
+                  disabled={d.isCurrent}
+                  onSelect={() => {
+                    if (!d.isCurrent) {
+                      onMove(objectiveId, d.id);
+                      onOpenChange(false);
+                    }
+                  }}
+                >
+                  {d.id === null ? (
+                    <Target className="mr-2 h-4 w-4 text-emerald-600" />
+                  ) : (
+                    <Layers className="mr-2 h-4 w-4 text-blue-600" />
+                  )}
+                  <span className="flex-1">{d.label}</span>
+                  {d.isCurrent && (
+                    <span className="text-xs text-muted-foreground">
+                      (hiện tại)
+                    </span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -100,7 +104,8 @@ interface MoveProcedureMenuProps {
     procedureId: string,
     target: { sectionId: string | null; objectiveId: string | null },
   ) => void;
-  disabled?: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function MoveProcedureMenu({
@@ -110,7 +115,8 @@ export function MoveProcedureMenu({
   sections,
   standaloneObjectives,
   onMove,
-  disabled,
+  open,
+  onOpenChange,
 }: MoveProcedureMenuProps) {
   // Build destination list: sections (direct) + all objectives (in sections + standalone)
   type Dest = {
@@ -160,54 +166,48 @@ export function MoveProcedureMenu({
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            title="Chuyển đến..."
-            disabled={disabled}
-          />
-        }
-      >
-        <ArrowRightLeft className="h-3.5 w-3.5" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-60 max-h-64 overflow-y-auto"
-      >
-        <DropdownMenuLabel>Chuyển thủ tục đến</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          {destinations.map((d) => (
-            <DropdownMenuItem
-              key={d.id}
-              disabled={d.isCurrent}
-              className={d.icon === "objective" ? "pl-6" : ""}
-              onClick={() => {
-                if (!d.isCurrent)
-                  onMove(procedureId, {
-                    sectionId: d.sectionId,
-                    objectiveId: d.objectiveId,
-                  });
-              }}
-            >
-              {d.icon === "section" ? (
-                <Layers className="mr-2 h-3.5 w-3.5 shrink-0 text-blue-600" />
-              ) : (
-                <Target className="mr-2 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-              )}
-              <span className="truncate">{d.label}</span>
-              {d.isCurrent && (
-                <span className="ml-auto text-xs text-muted-foreground shrink-0">
-                  (hiện tại)
-                </span>
-              )}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Chuyển thủ tục đến</DialogTitle>
+        </DialogHeader>
+        <Command>
+          <CommandInput placeholder="Tìm kiếm..." />
+          <CommandList>
+            <CommandEmpty>Không tìm thấy kết quả</CommandEmpty>
+            <CommandGroup>
+              {destinations.map((d) => (
+                <CommandItem
+                  key={d.id}
+                  disabled={d.isCurrent}
+                  className={d.icon === "objective" ? "pl-8" : ""}
+                  onSelect={() => {
+                    if (!d.isCurrent) {
+                      onMove(procedureId, {
+                        sectionId: d.sectionId,
+                        objectiveId: d.objectiveId,
+                      });
+                      onOpenChange(false);
+                    }
+                  }}
+                >
+                  {d.icon === "section" ? (
+                    <Layers className="mr-2 h-4 w-4 shrink-0 text-blue-600" />
+                  ) : (
+                    <Target className="mr-2 h-4 w-4 shrink-0 text-emerald-600" />
+                  )}
+                  <span className="flex-1">{d.label}</span>
+                  {d.isCurrent && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      (hiện tại)
+                    </span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -26,6 +27,8 @@ interface RichTextEditorProps {
   editable?: boolean;
   /** Compact mode — hides toolbar, minimal height */
   slim?: boolean;
+  /** Auto-focus the editor on mount */
+  autoFocus?: boolean;
 }
 
 export function RichTextEditor({
@@ -35,6 +38,7 @@ export function RichTextEditor({
   className,
   editable = true,
   slim = false,
+  autoFocus = false,
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -57,6 +61,13 @@ export function RichTextEditor({
       },
     },
   });
+
+  // Auto-focus the editor on mount when requested
+  useEffect(() => {
+    if (autoFocus && editor && editable) {
+      editor.commands.focus("end");
+    }
+  }, [autoFocus, editor, editable]);
 
   if (!editor) return null;
 

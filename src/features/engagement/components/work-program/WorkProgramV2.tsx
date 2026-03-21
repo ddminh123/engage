@@ -12,17 +12,15 @@ import type {
   EngagementSection,
   EngagementObjective,
   EngagementProcedure,
-  ProcedureUpdateInput,
 } from "../../types";
 import { WP_LABELS } from "../tabs/workProgramTypes";
 import {
   useWorkProgramEditor,
   type WpMode,
 } from "../tabs/useWorkProgramEditor";
-import { ProcedureDetailSheet } from "../tabs/ProcedureDetailSheet";
 import { ObjectiveDetailSheet } from "../tabs/ObjectiveDetailSheet";
 import { SectionDetailSheet } from "../tabs/SectionDetailSheet";
-import { ProcedureFormSheet } from "../tabs/ProcedureFormSheet";
+import { ProcedureFullForm } from "./ProcedureFullForm";
 import {
   useUpdateProcedure,
   useUpdateObjective,
@@ -137,10 +135,46 @@ export function WorkProgramV2({
   // Batch delete confirmation
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
 
+  // Build child→parent lookup for dedup during batch duplicate
+  const parentMap = useMemo(() => {
+    const map = new Map<string, string>(); // childId → parentId
+    for (const sec of sections) {
+      for (const obj of sec.objectives) {
+        map.set(obj.id, sec.id); // objective → section
+        for (const proc of obj.procedures) map.set(proc.id, obj.id); // procedure → objective
+      }
+      for (const proc of sec.procedures) map.set(proc.id, sec.id); // direct procedure → section
+    }
+    for (const obj of standaloneObjectives) {
+      for (const proc of obj.procedures) map.set(proc.id, obj.id);
+    }
+    return map;
+  }, [sections, standaloneObjectives]);
+
   const executeBatchAction = useCallback(
     (action: "delete" | "duplicate") => {
+      // For duplicate: filter out children whose ancestor is also selected
+      // (parent duplication already recursively clones children)
+      let idsToProcess = validSelectedIds;
+      if (action === "duplicate") {
+        const filtered = new Set<string>();
+        for (const id of validSelectedIds) {
+          let ancestorSelected = false;
+          let cur = parentMap.get(id);
+          while (cur) {
+            if (validSelectedIds.has(cur)) {
+              ancestorSelected = true;
+              break;
+            }
+            cur = parentMap.get(cur);
+          }
+          if (!ancestorSelected) filtered.add(id);
+        }
+        idsToProcess = filtered;
+      }
+
       const groups = new Map<BatchEntityType, string[]>();
-      for (const id of validSelectedIds) {
+      for (const id of idsToProcess) {
         const entityType = entityTypeMap.get(id);
         if (!entityType) continue;
         const arr = groups.get(entityType) ?? [];
@@ -155,6 +189,7 @@ export function WorkProgramV2({
     [
       validSelectedIds,
       entityTypeMap,
+      parentMap,
       engagementId,
       batchAction,
       clearSelection,
@@ -225,8 +260,10 @@ export function WorkProgramV2({
   );
   const [viewObjective, setViewObjective] =
     useState<EngagementObjective | null>(null);
-  const [viewProcedure, setViewProcedure] =
+  // Procedure fullscreen form state (used by both title click and inline maximize)
+  const [editProcedure, setEditProcedure] =
     useState<EngagementProcedure | null>(null);
+  const updateProcMutation = useUpdateProcedure();
 
   // Build lookup maps
   const entityMaps = useMemo(() => {
@@ -255,7 +292,8 @@ export function WorkProgramV2({
       if (type === "objective") {
         setViewObjective(entityMaps.objectiveMap.get(id) ?? null);
       } else {
-        setViewProcedure(entityMaps.procedureMap.get(id) ?? null);
+        // Open procedure in fullscreen form
+        setEditProcedure(entityMaps.procedureMap.get(id) ?? null);
       }
     },
     [entityMaps],
@@ -268,11 +306,6 @@ export function WorkProgramV2({
     [entityMaps],
   );
 
-  // ── Open full form from inline edit ──
-  const [editProcedure, setEditProcedure] =
-    useState<EngagementProcedure | null>(null);
-  const updateProcMutation = useUpdateProcedure();
-
   const handleOpenForm = useCallback(
     (type: "objective" | "procedure", id: string) => {
       if (type === "procedure") {
@@ -280,17 +313,6 @@ export function WorkProgramV2({
       }
     },
     [entityMaps],
-  );
-
-  const handleFormSubmit = useCallback(
-    (data: ProcedureUpdateInput) => {
-      if (!editProcedure) return;
-      updateProcMutation.mutate(
-        { engagementId, procedureId: editProcedure.id, data },
-        { onSuccess: () => setEditProcedure(null) },
-      );
-    },
-    [editProcedure, engagementId, updateProcMutation],
   );
 
   // ── Cross-parent move handlers ──
@@ -610,24 +632,14 @@ export function WorkProgramV2({
           }
         }}
       />
-      <ProcedureDetailSheet
-        procedure={viewProcedure}
-        open={!!viewProcedure}
-        onOpenChange={(open) => {
-          if (!open) setViewProcedure(null);
-        }}
-        engagementId={engagementId}
-      />
-
-      {/* ── Full form sheet (opened from inline edit) ── */}
-      <ProcedureFormSheet
+      {/* ── Procedure fullscreen form ── */}
+      <ProcedureFullForm
+        procedure={editProcedure}
         open={!!editProcedure}
         onOpenChange={(open) => {
           if (!open) setEditProcedure(null);
         }}
-        initialData={editProcedure}
-        onSubmit={handleFormSubmit}
-        isLoading={updateProcMutation.isPending}
+        engagementId={engagementId}
       />
     </div>
   );
