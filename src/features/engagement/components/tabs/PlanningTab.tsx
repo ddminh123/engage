@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Plus,
   Pencil,
@@ -104,6 +104,10 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
   } = usePlanningEditor(engagement);
 
   const syncRcmToWp = useSyncRcmToWorkProgram();
+  const [syncResult, setSyncResult] = React.useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   const isCollapsed = (key: string) => collapsed.has(key);
 
@@ -325,12 +329,16 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
               e.stopPropagation();
               syncRcmToWp.mutate(engagement.id, {
                 onSuccess: (data) => {
-                  alert(
-                    `Đã tạo ${data.createdObjectives} mục tiêu và ${data.createdProcedures} thủ tục từ RCM`,
-                  );
+                  setSyncResult({
+                    success: true,
+                    message: `Đã tạo ${data.createdObjectives} mục tiêu và ${data.createdProcedures} thủ tục từ RCM`,
+                  });
                 },
                 onError: () => {
-                  alert("Lỗi khi đồng bộ RCM sang Work Program");
+                  setSyncResult({
+                    success: false,
+                    message: "Lỗi khi đồng bộ RCM sang Work Program",
+                  });
                 },
               });
             }}
@@ -346,6 +354,8 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
           standaloneObjectives={engagement.standaloneObjectives}
           findingCount={engagement.findings?.length ?? 0}
           mode="planning"
+          rcmObjectives={engagement.rcmObjectives}
+          members={engagement.members}
         />
       </CollapsibleCard>
 
@@ -382,6 +392,18 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
                     : LPROC.deleteDescription(state.deleteTarget?.title ?? "")
         }
         onConfirm={handleConfirmDelete}
+      />
+
+      {/* ── Sync RCM to WP result ── */}
+      <ConfirmDialog
+        open={!!syncResult}
+        onOpenChange={(open) => {
+          if (!open) setSyncResult(null);
+        }}
+        title={syncResult?.success ? "Thành công" : "Lỗi"}
+        description={syncResult?.message ?? ""}
+        onConfirm={() => setSyncResult(null)}
+        variant={syncResult?.success ? "info" : "destructive"}
       />
     </div>
   );
@@ -439,197 +461,198 @@ function CollapsibleCard({
 
 function ScopeSection({ engagement }: { engagement: EngagementDetail }) {
   return (
-    <div className="space-y-3 text-sm">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <div className="text-muted-foreground">{L.field.entity}</div>
-          <div className="font-medium">
+    <div className="text-sm">
+      {/* 2-column grid for all fields */}
+      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+        {/* Row 1 */}
+        <ScopeField label={L.field.entity}>
+          <span className="font-medium">
             {engagement.entity?.name ?? "—"}
             {engagement.entity?.entityType && (
               <span className="ml-1 text-xs text-muted-foreground">
                 ({engagement.entity.entityType.name})
               </span>
             )}
-          </div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">{L.field.schedule}</div>
-          <div className="font-medium">
+          </span>
+        </ScopeField>
+        <ScopeField label={L.field.schedule}>
+          <span className="font-medium">
             {new Date(engagement.startDate).toLocaleDateString("vi-VN")} —{" "}
             {new Date(engagement.endDate).toLocaleDateString("vi-VN")}
-          </div>
-        </div>
+          </span>
+        </ScopeField>
+
+        {/* Row 2 */}
         {engagement.estimatedDays != null && (
-          <div>
-            <div className="text-muted-foreground">{L.field.estimatedDays}</div>
-            <div className="font-medium">{engagement.estimatedDays} ngày</div>
-          </div>
+          <ScopeField label={L.field.estimatedDays}>
+            <span className="font-medium">{engagement.estimatedDays} ngày</span>
+          </ScopeField>
         )}
         {engagement.priority && (
-          <div>
-            <div className="text-muted-foreground">{L.field.priority}</div>
-            <div className="font-medium">
+          <ScopeField label={L.field.priority}>
+            <span className="font-medium">
               {L.priority[engagement.priority] ?? engagement.priority}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Areas (Lĩnh vực) */}
-      <div>
-        <div className="text-muted-foreground">{LP.areas}</div>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {engagement.entity?.areas && engagement.entity.areas.length > 0 ? (
-            engagement.entity.areas.map((a) => (
-              <Badge key={a.id} variant="secondary">
-                {a.name}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-muted-foreground">{LP.noAreas}</span>
-          )}
-        </div>
-      </div>
-
-      {/* Linked plan */}
-      {engagement.plannedAudit?.plan && (
-        <div>
-          <div className="text-muted-foreground">{L.field.linkedPlan}</div>
-          <div className="mt-1 font-medium">
-            {engagement.plannedAudit.plan.title}
-          </div>
-        </div>
-      )}
-
-      {/* Entity risk */}
-      {engagement.entity &&
-        (engagement.entity.riskLevel ||
-          engagement.entity.inherentRiskLevel) && (
-          <div className="grid grid-cols-2 gap-4">
-            {engagement.entity.inherentRiskLevel && (
-              <div>
-                <div className="text-muted-foreground">Rủi ro vốn có</div>
-                <div className="font-medium">
-                  {engagement.entity.inherentRiskLevel}
-                </div>
-              </div>
-            )}
-            {engagement.entity.riskLevel && (
-              <div>
-                <div className="text-muted-foreground">Mức rủi ro tổng hợp</div>
-                <div className="font-medium">{engagement.entity.riskLevel}</div>
-              </div>
-            )}
-          </div>
+            </span>
+          </ScopeField>
         )}
 
+        {/* Risk row */}
+        {engagement.entity?.inherentRiskLevel && (
+          <ScopeField label="Rủi ro vốn có">
+            <span className="font-medium">
+              {engagement.entity.inherentRiskLevel}
+            </span>
+          </ScopeField>
+        )}
+        {engagement.entity?.riskLevel && (
+          <ScopeField label="Mức rủi ro tổng hợp">
+            <span className="font-medium">{engagement.entity.riskLevel}</span>
+          </ScopeField>
+        )}
+
+        {/* Linked plan */}
+        {engagement.plannedAudit?.plan && (
+          <ScopeField label={L.field.linkedPlan}>
+            <span className="font-medium">
+              {engagement.plannedAudit.plan.title}
+            </span>
+          </ScopeField>
+        )}
+
+        {/* Areas */}
+        <ScopeField label={LP.areas}>
+          <div className="flex flex-wrap gap-1.5">
+            {engagement.entity?.areas && engagement.entity.areas.length > 0 ? (
+              engagement.entity.areas.map((a) => (
+                <Badge key={a.id} variant="secondary">
+                  {a.name}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-muted-foreground">{LP.noAreas}</span>
+            )}
+          </div>
+        </ScopeField>
+
+        {/* Owner units */}
+        <ScopeField label="Đơn vị chủ quản">
+          <div className="flex flex-wrap gap-1.5">
+            {engagement.ownerUnits.length > 0 ? (
+              engagement.ownerUnits.map((u) => (
+                <Badge
+                  key={u.id}
+                  variant="secondary"
+                  className="text-xs font-normal"
+                >
+                  <OrgUnitCardPopover id={u.id}>
+                    <Building2 className="inline h-3 w-3 mr-1" />
+                    {u.name}
+                  </OrgUnitCardPopover>
+                </Badge>
+              ))
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </div>
+        </ScopeField>
+
+        {/* Participating units */}
+        <ScopeField label="Đơn vị phối hợp">
+          <div className="flex flex-wrap gap-1.5">
+            {engagement.participatingUnits.length > 0 ? (
+              engagement.participatingUnits.map((u) => (
+                <Badge
+                  key={u.id}
+                  variant="secondary"
+                  className="text-xs font-normal"
+                >
+                  <OrgUnitCardPopover id={u.id}>
+                    <Building2 className="inline h-3 w-3 mr-1" />
+                    {u.name}
+                  </OrgUnitCardPopover>
+                </Badge>
+              ))
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </div>
+        </ScopeField>
+
+        {/* Auditee reps */}
+        <ScopeField label="Đại diện đơn vị kiểm toán">
+          <div className="flex flex-wrap gap-1.5">
+            {engagement.auditeeReps.length > 0 ? (
+              engagement.auditeeReps.map((c) => (
+                <Badge
+                  key={c.id}
+                  variant="secondary"
+                  className="text-xs font-normal"
+                >
+                  <ContactCardPopoverById id={c.id}>
+                    <User className="inline h-3 w-3 mr-1" />
+                    {c.name}
+                    {c.position && ` · ${c.position}`}
+                  </ContactCardPopoverById>
+                </Badge>
+              ))
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </div>
+        </ScopeField>
+
+        {/* Contact points */}
+        <ScopeField label="Đầu mối liên hệ">
+          <div className="flex flex-wrap gap-1.5">
+            {engagement.contactPoints.length > 0 ? (
+              engagement.contactPoints.map((c) => (
+                <Badge
+                  key={c.id}
+                  variant="secondary"
+                  className="text-xs font-normal"
+                >
+                  <ContactCardPopoverById id={c.id}>
+                    <User className="inline h-3 w-3 mr-1" />
+                    {c.name}
+                    {c.position && ` · ${c.position}`}
+                  </ContactCardPopoverById>
+                </Badge>
+              ))
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </div>
+        </ScopeField>
+      </div>
+
+      {/* Full-width fields below */}
       {engagement.objective && (
-        <div>
-          <div className="text-muted-foreground">{L.field.objective}</div>
-          <div className="mt-1 whitespace-pre-wrap">{engagement.objective}</div>
+        <div className="mt-3">
+          <div className="text-muted-foreground mb-1">{L.field.objective}</div>
+          <div className="whitespace-pre-wrap">{engagement.objective}</div>
         </div>
       )}
-
       {engagement.scope && (
-        <div>
-          <div className="text-muted-foreground">{L.field.scope}</div>
-          <div className="mt-1 whitespace-pre-wrap">{engagement.scope}</div>
+        <div className="mt-3">
+          <div className="text-muted-foreground mb-1">{L.field.scope}</div>
+          <div className="whitespace-pre-wrap">{engagement.scope}</div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Owner units */}
-      <div>
-        <div className="text-muted-foreground">Đơn vị chủ quản</div>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {engagement.ownerUnits.length > 0 ? (
-            engagement.ownerUnits.map((u) => (
-              <Badge
-                key={u.id}
-                variant="secondary"
-                className="text-xs font-normal"
-              >
-                <OrgUnitCardPopover id={u.id}>
-                  <Building2 className="inline h-3 w-3 mr-1" />
-                  {u.name}
-                </OrgUnitCardPopover>
-              </Badge>
-            ))
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )}
-        </div>
-      </div>
-
-      {/* Participating units */}
-      <div>
-        <div className="text-muted-foreground">Đơn vị phối hợp</div>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {engagement.participatingUnits.length > 0 ? (
-            engagement.participatingUnits.map((u) => (
-              <Badge
-                key={u.id}
-                variant="secondary"
-                className="text-xs font-normal"
-              >
-                <OrgUnitCardPopover id={u.id}>
-                  <Building2 className="inline h-3 w-3 mr-1" />
-                  {u.name}
-                </OrgUnitCardPopover>
-              </Badge>
-            ))
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )}
-        </div>
-      </div>
-
-      {/* Auditee reps */}
-      <div>
-        <div className="text-muted-foreground">Đại diện đơn vị kiểm toán</div>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {engagement.auditeeReps.length > 0 ? (
-            engagement.auditeeReps.map((c) => (
-              <Badge
-                key={c.id}
-                variant="secondary"
-                className="text-xs font-normal"
-              >
-                <ContactCardPopoverById id={c.id}>
-                  <User className="inline h-3 w-3 mr-1" />
-                  {c.name}
-                  {c.position && ` · ${c.position}`}
-                </ContactCardPopoverById>
-              </Badge>
-            ))
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )}
-        </div>
-      </div>
-
-      {/* Contact points */}
-      <div>
-        <div className="text-muted-foreground">Đầu mối liên hệ</div>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {engagement.contactPoints.length > 0 ? (
-            engagement.contactPoints.map((c) => (
-              <Badge
-                key={c.id}
-                variant="secondary"
-                className="text-xs font-normal"
-              >
-                <ContactCardPopoverById id={c.id}>
-                  <User className="inline h-3 w-3 mr-1" />
-                  {c.name}
-                  {c.position && ` · ${c.position}`}
-                </ContactCardPopoverById>
-              </Badge>
-            ))
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )}
-        </div>
-      </div>
+function ScopeField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="text-muted-foreground text-xs">{label}</div>
+      <div className="mt-0.5">{children}</div>
     </div>
   );
 }

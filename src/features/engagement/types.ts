@@ -1,4 +1,42 @@
 // =============================================================================
+// ENGAGEMENT MEMBER
+// =============================================================================
+
+export interface MemberUser {
+  id: string;
+  name: string;
+  email: string;
+  title: string | null;
+  avatarUrl: string | null;
+  role: string;
+}
+
+export interface EngagementMember {
+  userId: string;
+  role: string;
+  joinedAt: string;
+  user: MemberUser;
+}
+
+// =============================================================================
+// WP ASSIGNMENT (multi-assignee for work program items)
+// =============================================================================
+
+export interface WpAssignment {
+  id: string;
+  userId: string;
+  entityType: 'section' | 'objective' | 'procedure';
+  entityId: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    title: string | null;
+    avatarUrl: string | null;
+  };
+}
+
+// =============================================================================
 // ENGAGEMENT
 // =============================================================================
 
@@ -67,6 +105,7 @@ export interface EngagementDetail {
     plan: { id: string; title: string } | null;
   } | null;
   understanding: string | null;
+  members: EngagementMember[];
   ownerUnits: { id: string; name: string }[];
   participatingUnits: { id: string; name: string }[];
   contactPoints: ContactRef[];

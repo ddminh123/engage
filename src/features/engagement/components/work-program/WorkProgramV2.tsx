@@ -2,7 +2,12 @@
 
 import { useRef, useEffect, useMemo, useCallback, useState } from "react";
 import { Layers, Target, Plus, Check, X, ChevronsUpDown } from "lucide-react";
-import { useBatchAction } from "../../hooks/useEngagements";
+import {
+  useBatchAction,
+  useWpAssignments,
+  useAddWpAssignment,
+  useRemoveWpAssignment,
+} from "../../hooks/useEngagements";
 import type { BatchEntityType } from "../../api";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -12,6 +17,9 @@ import type {
   EngagementSection,
   EngagementObjective,
   EngagementProcedure,
+  EngagementMember,
+  WpAssignment,
+  RcmObjective,
 } from "../../types";
 import { WP_LABELS } from "../tabs/workProgramTypes";
 import {
@@ -37,6 +45,8 @@ interface WorkProgramV2Props {
   standaloneObjectives?: EngagementObjective[];
   findingCount?: number;
   mode: WpMode;
+  rcmObjectives?: RcmObjective[];
+  members?: EngagementMember[];
 }
 
 // ── Main Component ──
@@ -47,6 +57,8 @@ export function WorkProgramV2({
   standaloneObjectives = [],
   findingCount = 0,
   mode,
+  rcmObjectives = [],
+  members = [],
 }: WorkProgramV2Props) {
   const editor = useWorkProgramEditor(
     engagementId,
@@ -54,6 +66,75 @@ export function WorkProgramV2({
     standaloneObjectives,
     findingCount,
     mode,
+  );
+
+  // ── WP Assignments ──
+  const { data: wpAssignments = [] } = useWpAssignments(engagementId);
+  const addAssignment = useAddWpAssignment();
+  const removeAssignment = useRemoveWpAssignment();
+
+  // Cascade confirm dialog state
+  const [cascadeConfirm, setCascadeConfirm] = useState<{
+    entityType: "section" | "objective";
+    entityId: string;
+    userId: string;
+    entityTitle: string;
+  } | null>(null);
+
+  const handleAssignUser = useCallback(
+    (
+      entityType: "section" | "objective" | "procedure",
+      entityId: string,
+      userId: string,
+    ) => {
+      if (entityType === "procedure") {
+        addAssignment.mutate({
+          engagementId,
+          entityType,
+          entityId,
+          userIds: [userId],
+        });
+      } else {
+        // For section/objective, find the title and ask about cascade
+        let title = "";
+        if (entityType === "section") {
+          title = sections.find((s) => s.id === entityId)?.title ?? "";
+        } else {
+          for (const s of sections) {
+            const obj = s.objectives.find((o) => o.id === entityId);
+            if (obj) {
+              title = obj.title;
+              break;
+            }
+          }
+          if (!title) {
+            title =
+              standaloneObjectives.find((o) => o.id === entityId)?.title ?? "";
+          }
+        }
+        // First assign to the entity itself
+        addAssignment.mutate({
+          engagementId,
+          entityType,
+          entityId,
+          userIds: [userId],
+        });
+        // Then ask about cascading
+        setCascadeConfirm({ entityType, entityId, userId, entityTitle: title });
+      }
+    },
+    [engagementId, addAssignment, sections, standaloneObjectives],
+  );
+
+  const handleUnassignUser = useCallback(
+    (
+      entityType: "section" | "objective" | "procedure",
+      entityId: string,
+      userId: string,
+    ) => {
+      removeAssignment.mutate({ engagementId, entityType, entityId, userId });
+    },
+    [engagementId, removeAssignment],
   );
 
   const {
@@ -76,6 +157,22 @@ export function WorkProgramV2({
 
   // ── Selection state ──
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // ── Extract control options from RCM objectives ──
+  const controlOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+    for (const obj of rcmObjectives) {
+      for (const risk of obj.risks) {
+        for (const control of risk.controls) {
+          options.push({
+            value: control.id,
+            label: control.description,
+          });
+        }
+      }
+    }
+    return options;
+  }, [rcmObjectives]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -457,6 +554,10 @@ export function WorkProgramV2({
                   allStandaloneObjectives={standaloneObjectives}
                   onMoveObjective={handleMoveObjective}
                   onMoveProcedure={handleMoveProcedure}
+                  wpAssignments={wpAssignments}
+                  members={members}
+                  onAssign={handleAssignUser}
+                  onUnassign={handleUnassignUser}
                 />
               );
             }
@@ -478,6 +579,10 @@ export function WorkProgramV2({
                   allStandaloneObjectives={standaloneObjectives}
                   onMoveObjective={handleMoveObjective}
                   onMoveProcedure={handleMoveProcedure}
+                  wpAssignments={wpAssignments}
+                  members={members}
+                  onAssign={handleAssignUser}
+                  onUnassign={handleUnassignUser}
                 />
               );
             }
@@ -634,6 +739,30 @@ export function WorkProgramV2({
           }
         }}
       />
+      {/* ── Cascade assignment confirm ── */}
+      <ConfirmDialog
+        open={!!cascadeConfirm}
+        onOpenChange={(open) => {
+          if (!open) setCascadeConfirm(null);
+        }}
+        title="Phân công cho các mục con?"
+        description={`Bạn có muốn phân công thành viên này cho tất cả các mục con của "${cascadeConfirm?.entityTitle ?? ""}" không?`}
+        onConfirm={() => {
+          if (cascadeConfirm) {
+            addAssignment.mutate({
+              engagementId,
+              entityType: cascadeConfirm.entityType,
+              entityId: cascadeConfirm.entityId,
+              userIds: [cascadeConfirm.userId],
+              cascade: true,
+            });
+          }
+          setCascadeConfirm(null);
+        }}
+        confirmLabel="Phân công tất cả"
+        cancelLabel="Không"
+      />
+
       {/* ── Procedure fullscreen form ── */}
       <ProcedureFullForm
         procedure={editProcedure}
@@ -642,6 +771,11 @@ export function WorkProgramV2({
           if (!open) setEditProcedure(null);
         }}
         engagementId={engagementId}
+        controlOptions={controlOptions}
+        members={members}
+        wpAssignments={wpAssignments}
+        onAssign={handleAssignUser}
+        onUnassign={handleUnassignUser}
       />
     </div>
   );

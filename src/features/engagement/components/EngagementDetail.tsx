@@ -8,11 +8,15 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { LabeledSelect } from "@/components/shared/LabeledSelect";
+import { TeamAvatarManager } from "@/components/shared/TeamAvatarManager";
 import { COMMON_LABELS, ENGAGEMENT_LABELS } from "@/constants/labels";
 import {
   useEngagement,
   useUpdateEngagement,
   useDeleteEngagement,
+  useAddEngagementMember,
+  useUpdateEngagementMember,
+  useRemoveEngagementMember,
 } from "../hooks/useEngagements";
 import { EngagementForm } from "./EngagementForm";
 import { PlanningTab } from "./tabs/PlanningTab";
@@ -52,6 +56,9 @@ export function EngagementDetail({
   const { data: engagement, isLoading } = useEngagement(engagementId);
   const updateMutation = useUpdateEngagement();
   const deleteMutation = useDeleteEngagement();
+  const addMember = useAddEngagementMember();
+  const updateMemberRole = useUpdateEngagementMember();
+  const removeMember = useRemoveEngagementMember();
 
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -115,6 +122,38 @@ export function EngagementDetail({
             >
               {L.status[engagement.status] ?? engagement.status}
             </span>
+          </div>
+          {/* Team avatars — Jira-style overlapping */}
+          <div className="mt-2">
+            <TeamAvatarManager
+              members={(engagement.members ?? []).map((m) => ({
+                userId: m.userId,
+                role: m.role,
+                user: {
+                  id: m.user.id,
+                  name: m.user.name,
+                  avatarUrl: m.user.avatarUrl,
+                  email: m.user.email,
+                  title: m.user.title,
+                },
+              }))}
+              onAdd={(userId, role) =>
+                addMember.mutate({
+                  engagementId: engagement.id,
+                  data: { userId, role },
+                })
+              }
+              onUpdateRole={(userId, role) =>
+                updateMemberRole.mutate({
+                  engagementId: engagement.id,
+                  userId,
+                  data: { role },
+                })
+              }
+              onRemove={(userId) =>
+                removeMember.mutate({ engagementId: engagement.id, userId })
+              }
+            />
           </div>
           <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
             {engagement.entity && (

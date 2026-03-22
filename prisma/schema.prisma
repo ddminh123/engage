@@ -138,6 +138,8 @@ model User {
   expertises    UserExpertise[]
   owned_teams   Team[]    @relation("TeamOwner")
   team_memberships TeamMember[]
+  engagement_memberships EngagementMember[] @relation("EngagementMembers")
+  wp_assignments         WpAssignment[]    @relation("WpAssignments")
 
   @@index([status])
   @@index([role])
@@ -651,6 +653,8 @@ model Engagement {
   audit_objectives   AuditObjective[]
   rcm_objectives     EngagementRcmObjective[]
   risks              EngagementRisk[]
+  members             EngagementMember[]
+  wp_assignments      WpAssignment[]
   owner_units         EngagementOwner[]
   participating_units EngagementParticipant[]
   contact_points      EngagementContactPoint[]
@@ -704,6 +708,38 @@ model EngagementAuditeeRep {
 
   @@id([engagement_id, contact_id])
   @@map("engagement_auditee_rep")
+}
+
+model EngagementMember {
+  engagement_id String
+  user_id       String
+  role          String    @default("member") // lead | member | reviewer | observer
+  joined_at     DateTime  @default(now())
+
+  engagement Engagement @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  user       User       @relation("EngagementMembers", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([engagement_id, user_id])
+  @@index([user_id])
+  @@map("engagement_member")
+}
+
+// Polymorphic work-program assignment: assigns a user to a section, objective, or procedure
+model WpAssignment {
+  id            String   @id @default(cuid())
+  engagement_id String
+  user_id       String
+  entity_type   String   // 'section' | 'objective' | 'procedure'
+  entity_id     String
+  created_at    DateTime @default(now())
+
+  engagement Engagement @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  user       User       @relation("WpAssignments", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, entity_type, entity_id])
+  @@index([engagement_id])
+  @@index([entity_type, entity_id])
+  @@map("wp_assignment")
 }
 
 // Planning-level audit objectives (distinct from execution EngagementObjective)

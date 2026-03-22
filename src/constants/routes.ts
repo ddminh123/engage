@@ -44,6 +44,10 @@ export const API_ROUTES = {
   ENGAGEMENT_REORDER: (id: string) => `/api/engagement/${id}/reorder`,
   ENGAGEMENT_BATCH: (id: string) => `/api/engagement/${id}/batch`,
   ENGAGEMENT_SYNC_RCM_TO_WP: (id: string) => `/api/engagement/${id}/sync-rcm-to-wp`,
+  ENGAGEMENT_MEMBERS: (id: string) => `/api/engagement/${id}/members`,
+  ENGAGEMENT_MEMBER_BY_ID: (id: string, userId: string) => `/api/engagement/${id}/members/${userId}`,
+  ENGAGEMENT_PROCEDURE_ASSIGNEE: (id: string, pId: string) => `/api/engagement/${id}/procedures/${pId}/assignee`,
+  ENGAGEMENT_WP_ASSIGNMENTS: (id: string) => `/api/engagement/${id}/wp-assignments`,
 
   // Finding module
   FINDING: "/api/finding",

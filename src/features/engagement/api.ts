@@ -6,6 +6,8 @@ import type {
   EngagementUpdateInput,
   EngagementSection,
   EngagementProcedure,
+  EngagementMember,
+  WpAssignment,
   DraftFinding,
   SectionInput,
   SectionUpdateInput,
@@ -452,4 +454,95 @@ export async function reorderItemsApi(
     body: JSON.stringify({ entityType, items }),
   });
   return handleResponse<{ reordered: number }>(response);
+}
+
+// ── Engagement Members ──
+
+export async function fetchEngagementMembersApi(
+  engagementId: string,
+): Promise<EngagementMember[]> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_MEMBERS(engagementId));
+  return handleResponse<EngagementMember[]>(response);
+}
+
+export async function addEngagementMemberApi(
+  engagementId: string,
+  data: { userId: string; role?: string },
+): Promise<EngagementMember> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_MEMBERS(engagementId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<EngagementMember>(response);
+}
+
+export async function updateEngagementMemberApi(
+  engagementId: string,
+  userId: string,
+  data: { role: string },
+): Promise<EngagementMember> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_MEMBER_BY_ID(engagementId, userId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<EngagementMember>(response);
+}
+
+export async function removeEngagementMemberApi(
+  engagementId: string,
+  userId: string,
+): Promise<{ success: boolean }> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_MEMBER_BY_ID(engagementId, userId), {
+    method: 'DELETE',
+  });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+// ── Procedure Assignee ──
+
+export async function updateProcedureAssigneeApi(
+  engagementId: string,
+  procedureId: string,
+  field: 'performed_by' | 'reviewed_by',
+  assigneeId: string | null,
+): Promise<void> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_PROCEDURE_ASSIGNEE(engagementId, procedureId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ field, assigneeId }),
+  });
+  return handleResponse<void>(response);
+}
+
+// ── WP Assignments (multi-assignee) ──
+
+export async function fetchWpAssignments(engagementId: string): Promise<WpAssignment[]> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_WP_ASSIGNMENTS(engagementId));
+  return handleResponse<WpAssignment[]>(response);
+}
+
+export async function addWpAssignmentApi(
+  engagementId: string,
+  data: { entityType: string; entityId: string; userIds: string[]; cascade?: boolean },
+): Promise<WpAssignment[]> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_WP_ASSIGNMENTS(engagementId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<WpAssignment[]>(response);
+}
+
+export async function removeWpAssignmentApi(
+  engagementId: string,
+  data: { entityType: string; entityId: string; userId: string },
+): Promise<WpAssignment[]> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_WP_ASSIGNMENTS(engagementId), {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<WpAssignment[]>(response);
 }

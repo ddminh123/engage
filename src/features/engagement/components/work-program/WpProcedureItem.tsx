@@ -11,7 +11,10 @@ import type {
   EngagementProcedure,
   EngagementSection,
   EngagementObjective,
+  EngagementMember,
+  WpAssignment,
 } from "../../types";
+import { WpAssigneePicker } from "./WpAssigneePicker";
 import type { WpEditor } from "../tabs/useWorkProgramEditor";
 import { PROCEDURE_STATUS_OPTIONS } from "../tabs/workProgramTypes";
 import { WpStatusBadge } from "./WpStatusBadge";
@@ -33,6 +36,18 @@ interface WpProcedureItemProps {
     procedureId: string,
     target: { sectionId: string | null; objectiveId: string | null },
   ) => void;
+  wpAssignments?: WpAssignment[];
+  members?: EngagementMember[];
+  onAssign?: (
+    entityType: "section" | "objective" | "procedure",
+    entityId: string,
+    userId: string,
+  ) => void;
+  onUnassign?: (
+    entityType: "section" | "objective" | "procedure",
+    entityId: string,
+    userId: string,
+  ) => void;
 }
 
 export function WpProcedureItem({
@@ -46,6 +61,10 @@ export function WpProcedureItem({
   allSections,
   allStandaloneObjectives,
   onMoveProcedure,
+  wpAssignments = [],
+  members = [],
+  onAssign,
+  onUnassign,
 }: WpProcedureItemProps) {
   const {
     state,
@@ -153,8 +172,22 @@ export function WpProcedureItem({
         {procedure.title}
       </span>
 
+      {/* Assignees */}
+      {onAssign && onUnassign && (
+        <span className="ml-auto" onClick={(e) => e.stopPropagation()}>
+          <WpAssigneePicker
+            entityType="procedure"
+            entityId={procedure.id}
+            assignments={wpAssignments}
+            members={members}
+            onAdd={(userId) => onAssign("procedure", procedure.id, userId)}
+            onRemove={(userId) => onUnassign("procedure", procedure.id, userId)}
+          />
+        </span>
+      )}
+
       {/* Status — always visible */}
-      <span className="ml-auto shrink-0">
+      <span className={cn("shrink-0", !onAssign && "ml-auto")}>
         {mode === "execution" ? (
           <LabeledSelect
             value={procedure.status ?? "not_started"}

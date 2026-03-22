@@ -15,6 +15,7 @@ export function ExecutionTab({ engagement }: ExecutionTabProps) {
       standaloneObjectives={engagement.standaloneObjectives}
       findingCount={engagement.findings?.length ?? 0}
       mode="execution"
+      members={engagement.members}
     />
   );
 }

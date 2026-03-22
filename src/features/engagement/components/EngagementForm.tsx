@@ -428,7 +428,7 @@ export function EngagementForm({
 
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none">
-                Đại diện đơn vị kiểm toán
+                Đại diện đơn vị được kiểm toán
               </label>
               <ContactSelectorMulti
                 value={auditeeReps}

@@ -86,6 +86,8 @@ export const ENGAGEMENT_LABELS = {
       observations: 'Quan sát / Kết quả',
       conclusion: 'Kết luận',
       effectiveness: 'Kết quả đánh giá',
+      evidences: 'Bằng chứng',
+      workpaper: 'Work Papers',
       sampleSize: 'Cỡ mẫu',
       exceptions: 'Số ngoại lệ',
       priority: 'Ưu tiên',

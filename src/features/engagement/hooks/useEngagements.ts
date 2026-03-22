@@ -37,6 +37,14 @@ import {
   batchActionApi,
   type BatchEntityType,
   type BatchActionType,
+  fetchEngagementMembersApi,
+  addEngagementMemberApi,
+  updateEngagementMemberApi,
+  removeEngagementMemberApi,
+  updateProcedureAssigneeApi,
+  fetchWpAssignments,
+  addWpAssignmentApi,
+  removeWpAssignmentApi,
 } from '../api';
 import type {
   EngagementDetail,
@@ -666,6 +674,130 @@ export function useSyncRcmToWorkProgram() {
     mutationFn: (engagementId: string) => syncRcmToWorkProgramApi(engagementId),
     onSuccess: (_, engagementId) => {
       qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+    },
+  });
+}
+
+// ── Engagement Members ──
+
+const membersKey = (engagementId: string) => ['engagement-members', engagementId];
+
+export function useEngagementMembers(engagementId: string) {
+  return useQuery({
+    queryKey: membersKey(engagementId),
+    queryFn: () => fetchEngagementMembersApi(engagementId),
+    enabled: !!engagementId,
+  });
+}
+
+export function useAddEngagementMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ engagementId, data }: { engagementId: string; data: { userId: string; role?: string } }) =>
+      addEngagementMemberApi(engagementId, data),
+    onSuccess: (_, { engagementId }) => {
+      qc.invalidateQueries({ queryKey: membersKey(engagementId) });
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+    },
+  });
+}
+
+export function useUpdateEngagementMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ engagementId, userId, data }: { engagementId: string; userId: string; data: { role: string } }) =>
+      updateEngagementMemberApi(engagementId, userId, data),
+    onSuccess: (_, { engagementId }) => {
+      qc.invalidateQueries({ queryKey: membersKey(engagementId) });
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+    },
+  });
+}
+
+export function useRemoveEngagementMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ engagementId, userId }: { engagementId: string; userId: string }) =>
+      removeEngagementMemberApi(engagementId, userId),
+    onSuccess: (_, { engagementId }) => {
+      qc.invalidateQueries({ queryKey: membersKey(engagementId) });
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+    },
+  });
+}
+
+// ── Procedure Assignee ──
+
+export function useUpdateProcedureAssignee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      procedureId,
+      field,
+      assigneeId,
+    }: {
+      engagementId: string;
+      procedureId: string;
+      field: 'performed_by' | 'reviewed_by';
+      assigneeId: string | null;
+    }) => updateProcedureAssigneeApi(engagementId, procedureId, field, assigneeId),
+    onSuccess: (_, { engagementId }) => {
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+    },
+  });
+}
+
+// ── WP Assignments (multi-assignee) ──
+
+const wpAssignmentsKey = (engagementId: string) => ['wp-assignments', engagementId] as const;
+
+export function useWpAssignments(engagementId: string) {
+  return useQuery({
+    queryKey: wpAssignmentsKey(engagementId),
+    queryFn: () => fetchWpAssignments(engagementId),
+    enabled: !!engagementId,
+  });
+}
+
+export function useAddWpAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      entityType,
+      entityId,
+      userIds,
+      cascade,
+    }: {
+      engagementId: string;
+      entityType: string;
+      entityId: string;
+      userIds: string[];
+      cascade?: boolean;
+    }) => addWpAssignmentApi(engagementId, { entityType, entityId, userIds, cascade }),
+    onSuccess: (data, { engagementId }) => {
+      qc.setQueryData(wpAssignmentsKey(engagementId), data);
+    },
+  });
+}
+
+export function useRemoveWpAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      entityType,
+      entityId,
+      userId,
+    }: {
+      engagementId: string;
+      entityType: string;
+      entityId: string;
+      userId: string;
+    }) => removeWpAssignmentApi(engagementId, { entityType, entityId, userId }),
+    onSuccess: (data, { engagementId }) => {
+      qc.setQueryData(wpAssignmentsKey(engagementId), data);
     },
   });
 }

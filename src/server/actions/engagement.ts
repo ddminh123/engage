@@ -251,6 +251,21 @@ const engagementDetailInclude = {
     },
     orderBy: { sort_order: 'asc' as const },
   },
+  members: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          title: true,
+          avatar_url: true,
+          role: true,
+        },
+      },
+    },
+    orderBy: { joined_at: 'asc' as const },
+  },
   owner_units: {
     include: { unit: { select: { id: true, name: true } } },
   },
@@ -518,6 +533,19 @@ function mapEngagementDetail(e: any) {
         id: r.contact.id, name: r.contact.name, position: r.contact.position,
       }),
     ),
+    members: (e.members ?? []).map((m: { user_id: string; role: string; joined_at: Date; user: { id: string; name: string; email: string; title: string | null; avatar_url: string | null; role: string } }) => ({
+      userId: m.user_id,
+      role: m.role,
+      joinedAt: m.joined_at.toISOString(),
+      user: {
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        title: m.user.title,
+        avatarUrl: m.user.avatar_url,
+        role: m.user.role,
+      },
+    })),
     sections: (e.sections ?? []).map(mapSection),
     standaloneObjectives: (e.objectives ?? []).map(mapObjective),
     ungroupedProcedures: (e.procedures ?? []).map(mapProcedure),
@@ -2233,4 +2261,367 @@ export async function syncRcmToWorkProgram(
     createdObjectives,
     createdProcedures,
   };
+}
+
+// =============================================================================
+// ENGAGEMENT MEMBERS
+// =============================================================================
+
+const MEMBER_ROLES = ['lead', 'member', 'reviewer', 'observer'] as const;
+
+export const addMemberSchema = z.object({
+  userId: z.string().min(1),
+  role: z.enum(MEMBER_ROLES).optional().default('member'),
+});
+
+export const updateMemberSchema = z.object({
+  role: z.enum(MEMBER_ROLES),
+});
+
+export async function getEngagementMembers(engagementId: string) {
+  const members = await prisma.engagementMember.findMany({
+    where: { engagement_id: engagementId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          title: true,
+          avatar_url: true,
+          role: true,
+        },
+      },
+    },
+    orderBy: { joined_at: 'asc' },
+  });
+
+  return members.map((m) => ({
+    userId: m.user_id,
+    role: m.role,
+    joinedAt: m.joined_at.toISOString(),
+    user: {
+      id: m.user.id,
+      name: m.user.name,
+      email: m.user.email,
+      title: m.user.title,
+      avatarUrl: m.user.avatar_url,
+      role: m.user.role,
+    },
+  }));
+}
+
+export async function addEngagementMember(
+  engagementId: string,
+  data: z.infer<typeof addMemberSchema>,
+  userId: string,
+  userName: string,
+) {
+  const parsed = addMemberSchema.parse(data);
+
+  // Check engagement exists
+  const engagement = await prisma.engagement.findUnique({ where: { id: engagementId } });
+  if (!engagement) throw new Error('Engagement not found');
+
+  // Check user exists
+  const user = await prisma.user.findUnique({ where: { id: parsed.userId } });
+  if (!user) throw new Error('User not found');
+
+  // Upsert — if already member, update role
+  const member = await prisma.engagementMember.upsert({
+    where: {
+      engagement_id_user_id: {
+        engagement_id: engagementId,
+        user_id: parsed.userId,
+      },
+    },
+    create: {
+      engagement_id: engagementId,
+      user_id: parsed.userId,
+      role: parsed.role,
+    },
+    update: {
+      role: parsed.role,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          title: true,
+          avatar_url: true,
+          role: true,
+        },
+      },
+    },
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'create',
+    entityType: 'engagement_member',
+    entityId: `${engagementId}:${parsed.userId}`,
+  });
+
+  return {
+    userId: member.user_id,
+    role: member.role,
+    joinedAt: member.joined_at.toISOString(),
+    user: {
+      id: member.user.id,
+      name: member.user.name,
+      email: member.user.email,
+      title: member.user.title,
+      avatarUrl: member.user.avatar_url,
+      role: member.user.role,
+    },
+  };
+}
+
+export async function updateEngagementMember(
+  engagementId: string,
+  memberId: string,
+  data: z.infer<typeof updateMemberSchema>,
+  userId: string,
+  userName: string,
+) {
+  const parsed = updateMemberSchema.parse(data);
+
+  const member = await prisma.engagementMember.update({
+    where: {
+      engagement_id_user_id: {
+        engagement_id: engagementId,
+        user_id: memberId,
+      },
+    },
+    data: { role: parsed.role },
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'update',
+    entityType: 'engagement_member',
+    entityId: `${engagementId}:${memberId}`,
+    changes: { role: { old: null, new: parsed.role } },
+  });
+
+  return member;
+}
+
+export async function removeEngagementMember(
+  engagementId: string,
+  memberId: string,
+  userId: string,
+  userName: string,
+) {
+  await prisma.engagementMember.delete({
+    where: {
+      engagement_id_user_id: {
+        engagement_id: engagementId,
+        user_id: memberId,
+      },
+    },
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'delete',
+    entityType: 'engagement_member',
+    entityId: `${engagementId}:${memberId}`,
+  });
+
+  return { success: true };
+}
+
+// =============================================================================
+// PROCEDURE ASSIGNEE (performed_by / reviewed_by)
+// =============================================================================
+
+export async function updateProcedureAssignee(
+  procedureId: string,
+  field: 'performed_by' | 'reviewed_by',
+  assigneeId: string | null,
+  userId: string,
+  userName: string,
+) {
+  const procedure = await prisma.engagementProcedure.findUnique({
+    where: { id: procedureId },
+    select: { performed_by: true, reviewed_by: true },
+  });
+  if (!procedure) throw new Error('Procedure not found');
+
+  const oldValue = procedure[field];
+  const dateField = field === 'performed_by' ? 'performed_at' : 'reviewed_at';
+
+  const updated = await prisma.engagementProcedure.update({
+    where: { id: procedureId },
+    data: {
+      [field]: assigneeId,
+      [dateField]: assigneeId ? new Date() : null,
+    },
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'update',
+    entityType: 'engagement_procedure',
+    entityId: procedureId,
+    changes: { [field]: { old: oldValue, new: assigneeId } },
+  });
+
+  return updated;
+}
+
+// =============================================================================
+// WP ASSIGNMENTS (multi-assignee for sections, objectives, procedures)
+// =============================================================================
+
+const WP_ENTITY_TYPES = ['section', 'objective', 'procedure'] as const;
+
+export async function getWpAssignments(engagementId: string) {
+  return prisma.wpAssignment.findMany({
+    where: { engagement_id: engagementId },
+    include: {
+      user: {
+        select: { id: true, name: true, email: true, title: true, avatar_url: true },
+      },
+    },
+    orderBy: { created_at: 'asc' },
+  });
+}
+
+export async function addWpAssignment(
+  engagementId: string,
+  entityType: string,
+  entityId: string,
+  userIds: string[],
+  userId: string,
+  userName: string,
+) {
+  if (!WP_ENTITY_TYPES.includes(entityType as typeof WP_ENTITY_TYPES[number])) {
+    throw new Error('Invalid entity type');
+  }
+
+  const created = await prisma.wpAssignment.createMany({
+    data: userIds.map((uid) => ({
+      engagement_id: engagementId,
+      user_id: uid,
+      entity_type: entityType,
+      entity_id: entityId,
+    })),
+    skipDuplicates: true,
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'create',
+    entityType: 'wp_assignment',
+    entityId: entityId,
+    changes: { assignees: { old: null, new: userIds } },
+  });
+
+  return created;
+}
+
+export async function removeWpAssignment(
+  engagementId: string,
+  entityType: string,
+  entityId: string,
+  targetUserId: string,
+  userId: string,
+  userName: string,
+) {
+  await prisma.wpAssignment.deleteMany({
+    where: {
+      engagement_id: engagementId,
+      entity_type: entityType,
+      entity_id: entityId,
+      user_id: targetUserId,
+    },
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'delete',
+    entityType: 'wp_assignment',
+    entityId: entityId,
+    changes: { assignee: { old: targetUserId, new: null } },
+  });
+}
+
+export async function bulkAssignChildren(
+  engagementId: string,
+  parentType: 'section' | 'objective',
+  parentId: string,
+  userIds: string[],
+  userId: string,
+  userName: string,
+) {
+  // Find all child entity IDs
+  const childIds: { type: string; id: string }[] = [];
+
+  if (parentType === 'section') {
+    const section = await prisma.engagementSection.findUnique({
+      where: { id: parentId },
+      include: {
+        objectives: { select: { id: true, procedures: { select: { id: true } } } },
+        procedures: { select: { id: true } },
+      },
+    });
+    if (section) {
+      for (const obj of section.objectives) {
+        childIds.push({ type: 'objective', id: obj.id });
+        for (const proc of obj.procedures) {
+          childIds.push({ type: 'procedure', id: proc.id });
+        }
+      }
+      for (const proc of section.procedures) {
+        childIds.push({ type: 'procedure', id: proc.id });
+      }
+    }
+  } else {
+    const objective = await prisma.engagementObjective.findUnique({
+      where: { id: parentId },
+      include: { procedures: { select: { id: true } } },
+    });
+    if (objective) {
+      for (const proc of objective.procedures) {
+        childIds.push({ type: 'procedure', id: proc.id });
+      }
+    }
+  }
+
+  if (childIds.length === 0) return { count: 0 };
+
+  const data = childIds.flatMap((child) =>
+    userIds.map((uid) => ({
+      engagement_id: engagementId,
+      user_id: uid,
+      entity_type: child.type,
+      entity_id: child.id,
+    })),
+  );
+
+  const result = await prisma.wpAssignment.createMany({
+    data,
+    skipDuplicates: true,
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'create',
+    entityType: 'wp_assignment',
+    entityId: parentId,
+    changes: { assignees: { old: null, new: userIds } },
+  });
+
+  return { count: result.count };
 }

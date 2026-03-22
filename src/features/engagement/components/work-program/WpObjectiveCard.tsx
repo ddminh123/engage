@@ -17,7 +17,13 @@ import {
   type DragHandleRenderProps,
 } from "@/components/shared/SortableList";
 import { cn } from "@/lib/utils";
-import type { EngagementObjective, EngagementSection } from "../../types";
+import type {
+  EngagementObjective,
+  EngagementSection,
+  EngagementMember,
+  WpAssignment,
+} from "../../types";
+import { WpAssigneePicker } from "./WpAssigneePicker";
 import type { WpEditor } from "../tabs/useWorkProgramEditor";
 import { WpProcedureItem } from "./WpProcedureItem";
 import { WpAddButton } from "./WpAddButton";
@@ -48,6 +54,18 @@ interface WpObjectiveCardProps {
     procedureId: string,
     target: { sectionId: string | null; objectiveId: string | null },
   ) => void;
+  wpAssignments?: WpAssignment[];
+  members?: EngagementMember[];
+  onAssign?: (
+    entityType: "section" | "objective" | "procedure",
+    entityId: string,
+    userId: string,
+  ) => void;
+  onUnassign?: (
+    entityType: "section" | "objective" | "procedure",
+    entityId: string,
+    userId: string,
+  ) => void;
 }
 
 export function WpObjectiveCard({
@@ -66,6 +84,10 @@ export function WpObjectiveCard({
   allStandaloneObjectives,
   onMoveObjective,
   onMoveProcedure,
+  wpAssignments = [],
+  members = [],
+  onAssign,
+  onUnassign,
 }: WpObjectiveCardProps) {
   const {
     state,
@@ -193,8 +215,27 @@ export function WpObjectiveCard({
             </span>
           )}
 
+          {/* Assignees */}
+          {onAssign && onUnassign && (
+            <span className="ml-auto" onClick={(e) => e.stopPropagation()}>
+              <WpAssigneePicker
+                entityType="objective"
+                entityId={objective.id}
+                assignments={wpAssignments}
+                members={members}
+                onAdd={(userId) => onAssign("objective", objective.id, userId)}
+                onRemove={(userId) =>
+                  onUnassign("objective", objective.id, userId)
+                }
+              />
+            </span>
+          )}
+
           {/* Expand/collapse — always visible */}
-          <span onClick={(e) => e.stopPropagation()} className="ml-auto">
+          <span
+            onClick={(e) => e.stopPropagation()}
+            className={!onAssign ? "ml-auto" : ""}
+          >
             <Button
               variant="ghost"
               size="icon-sm"
@@ -268,6 +309,10 @@ export function WpObjectiveCard({
                     allSections={allSections}
                     allStandaloneObjectives={allStandaloneObjectives}
                     onMoveProcedure={onMoveProcedure}
+                    wpAssignments={wpAssignments}
+                    members={members}
+                    onAssign={onAssign}
+                    onUnassign={onUnassign}
                   />
                 )}
               />

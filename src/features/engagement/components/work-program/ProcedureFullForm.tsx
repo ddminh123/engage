@@ -26,7 +26,15 @@ import { InlineRichText } from "@/components/shared/InlineRichText";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
 import { useProcedureForm } from "./useProcedureForm";
 import { cn } from "@/lib/utils";
-import type { EngagementProcedure } from "../../types";
+import type {
+  EngagementProcedure,
+  EngagementMember,
+  WpAssignment,
+} from "../../types";
+import { WpAssigneePicker } from "./WpAssigneePicker";
+import { FileInput } from "@/components/shared/FileInput";
+import { AssigneePicker } from "@/components/shared/AssigneePicker";
+import { useUpdateProcedureAssignee } from "../../hooks/useEngagements";
 
 const LP = ENGAGEMENT_LABELS.procedure;
 
@@ -66,6 +74,18 @@ interface ProcedureFullFormProps {
   controlOptions?: MultiSelectOption[];
   riskOptions?: MultiSelectOption[];
   objectiveOptions?: MultiSelectOption[];
+  members?: EngagementMember[];
+  wpAssignments?: WpAssignment[];
+  onAssign?: (
+    entityType: "section" | "objective" | "procedure",
+    entityId: string,
+    userId: string,
+  ) => void;
+  onUnassign?: (
+    entityType: "section" | "objective" | "procedure",
+    entityId: string,
+    userId: string,
+  ) => void;
 }
 
 export function ProcedureFullForm({
@@ -76,6 +96,10 @@ export function ProcedureFullForm({
   controlOptions = [],
   riskOptions = [],
   objectiveOptions = [],
+  members = [],
+  wpAssignments = [],
+  onAssign,
+  onUnassign,
 }: ProcedureFullFormProps) {
   // Keep local copy so closing animation doesn't blank out content
   const [local, setLocal] = React.useState<EngagementProcedure | null>(null);
@@ -86,6 +110,7 @@ export function ProcedureFullForm({
   const p = local;
   const form = useProcedureForm(engagementId, p);
   const { state, setField } = form;
+  const assigneeMutation = useUpdateProcedureAssignee();
 
   // Only one rich-text editor active at a time
   const [activeEditor, setActiveEditor] = React.useState<string | null>(null);
@@ -120,6 +145,85 @@ export function ProcedureFullForm({
                 options={STATUS_OPTIONS}
                 className="w-[160px] h-8"
               />
+
+              <Separator orientation="vertical" className="h-5" />
+
+              {/* Assignees in header */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    Thực hiện:
+                  </span>
+                  <AssigneePicker
+                    value={p.performedBy}
+                    onSelect={(userId) =>
+                      assigneeMutation.mutate({
+                        engagementId,
+                        procedureId: p.id,
+                        field: "performed_by",
+                        assigneeId: userId,
+                      })
+                    }
+                    members={members.map((m) => ({
+                      userId: m.userId,
+                      user: {
+                        id: m.user.id,
+                        name: m.user.name,
+                        email: m.user.email,
+                        avatarUrl: m.user.avatarUrl,
+                        title: m.user.title,
+                      },
+                    }))}
+                    placeholder="—"
+                    disabled={assigneeMutation.isPending}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    Soát xét:
+                  </span>
+                  <AssigneePicker
+                    value={p.reviewedBy}
+                    onSelect={(userId) =>
+                      assigneeMutation.mutate({
+                        engagementId,
+                        procedureId: p.id,
+                        field: "reviewed_by",
+                        assigneeId: userId,
+                      })
+                    }
+                    members={members.map((m) => ({
+                      userId: m.userId,
+                      user: {
+                        id: m.user.id,
+                        name: m.user.name,
+                        email: m.user.email,
+                        avatarUrl: m.user.avatarUrl,
+                        title: m.user.title,
+                      },
+                    }))}
+                    placeholder="—"
+                    disabled={assigneeMutation.isPending}
+                  />
+                </div>
+                {onAssign && onUnassign && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">
+                      Phân công:
+                    </span>
+                    <WpAssigneePicker
+                      entityType="procedure"
+                      entityId={p.id}
+                      assignments={wpAssignments}
+                      members={members}
+                      onAdd={(userId) => onAssign("procedure", p.id, userId)}
+                      onRemove={(userId) =>
+                        onUnassign("procedure", p.id, userId)
+                      }
+                    />
+                  </div>
+                )}
+              </div>
             </div>
             <DialogPrimitive.Close
               render={<Button variant="ghost" size="icon-sm" />}
@@ -189,7 +293,12 @@ export function ProcedureFullForm({
                       className="flex-1"
                     />
                   </LeftBodyRow>
-
+                  <LeftBodyRow label={LP.field.evidences} alignStart>
+                    <FileInput id="evidence-1" multiple />
+                  </LeftBodyRow>
+                  <LeftBodyRow label={LP.field.workpaper} alignStart>
+                    <FileInput id="workpaper-1" multiple />
+                  </LeftBodyRow>
                   <LeftBodyRow label={LP.field.conclusion} alignStart>
                     <InlineRichText
                       name="conclusion"
@@ -283,6 +392,8 @@ export function ProcedureFullForm({
                         placeholder="Chọn mức"
                       />
                     </div>
+
+                    <Separator className="my-2" />
 
                     {/* RCM References */}
                     {objectiveOptions.length > 0 && (
