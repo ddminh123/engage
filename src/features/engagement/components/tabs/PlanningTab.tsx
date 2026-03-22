@@ -42,7 +42,11 @@ import {
   RichTextDisplay,
 } from "@/components/shared/RichTextEditor";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
+import { Building2, User } from "lucide-react";
+import { OrgUnitCardPopover } from "@/features/settings/components/OrgUnitCard";
+import { ContactCardPopoverById } from "@/features/settings/components/ContactCard";
 import { usePlanningEditor } from "../../hooks/usePlanningEditor";
+import { useSyncRcmToWorkProgram } from "../../hooks/useEngagements";
 import type {
   PlanningState,
   PlanningAction,
@@ -98,6 +102,8 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
     handleReorderAuditObjectives,
     handleMoveToTopAuditObjective,
   } = usePlanningEditor(engagement);
+
+  const syncRcmToWp = useSyncRcmToWorkProgram();
 
   const isCollapsed = (key: string) => collapsed.has(key);
 
@@ -311,6 +317,28 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
         icon={<ClipboardList className="h-4 w-4" />}
         collapsed={isCollapsed("procedures")}
         onToggle={() => toggleCollapse("procedures")}
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              syncRcmToWp.mutate(engagement.id, {
+                onSuccess: (data) => {
+                  alert(
+                    `Đã tạo ${data.createdObjectives} mục tiêu và ${data.createdProcedures} thủ tục từ RCM`,
+                  );
+                },
+                onError: () => {
+                  alert("Lỗi khi đồng bộ RCM sang Work Program");
+                },
+              });
+            }}
+            disabled={syncRcmToWp.isPending}
+          >
+            {syncRcmToWp.isPending ? "Đang tạo..." : "Tạo từ RCM"}
+          </Button>
+        }
       >
         <WorkProgramV2
           engagementId={engagement.id}
@@ -515,8 +543,15 @@ function ScopeSection({ engagement }: { engagement: EngagementDetail }) {
         <div className="mt-1 flex flex-wrap gap-1.5">
           {engagement.ownerUnits.length > 0 ? (
             engagement.ownerUnits.map((u) => (
-              <Badge key={u.id} variant="secondary">
-                {u.name}
+              <Badge
+                key={u.id}
+                variant="secondary"
+                className="text-xs font-normal"
+              >
+                <OrgUnitCardPopover id={u.id}>
+                  <Building2 className="inline h-3 w-3 mr-1" />
+                  {u.name}
+                </OrgUnitCardPopover>
               </Badge>
             ))
           ) : (
@@ -531,8 +566,15 @@ function ScopeSection({ engagement }: { engagement: EngagementDetail }) {
         <div className="mt-1 flex flex-wrap gap-1.5">
           {engagement.participatingUnits.length > 0 ? (
             engagement.participatingUnits.map((u) => (
-              <Badge key={u.id} variant="outline">
-                {u.name}
+              <Badge
+                key={u.id}
+                variant="secondary"
+                className="text-xs font-normal"
+              >
+                <OrgUnitCardPopover id={u.id}>
+                  <Building2 className="inline h-3 w-3 mr-1" />
+                  {u.name}
+                </OrgUnitCardPopover>
               </Badge>
             ))
           ) : (
@@ -547,13 +589,16 @@ function ScopeSection({ engagement }: { engagement: EngagementDetail }) {
         <div className="mt-1 flex flex-wrap gap-1.5">
           {engagement.auditeeReps.length > 0 ? (
             engagement.auditeeReps.map((c) => (
-              <Badge key={c.id} variant="secondary">
-                {c.name}
-                {c.position && (
-                  <span className="ml-1 text-muted-foreground">
-                    — {c.position}
-                  </span>
-                )}
+              <Badge
+                key={c.id}
+                variant="secondary"
+                className="text-xs font-normal"
+              >
+                <ContactCardPopoverById id={c.id}>
+                  <User className="inline h-3 w-3 mr-1" />
+                  {c.name}
+                  {c.position && ` · ${c.position}`}
+                </ContactCardPopoverById>
               </Badge>
             ))
           ) : (
@@ -568,13 +613,16 @@ function ScopeSection({ engagement }: { engagement: EngagementDetail }) {
         <div className="mt-1 flex flex-wrap gap-1.5">
           {engagement.contactPoints.length > 0 ? (
             engagement.contactPoints.map((c) => (
-              <Badge key={c.id} variant="secondary">
-                {c.name}
-                {c.position && (
-                  <span className="ml-1 text-muted-foreground">
-                    — {c.position}
-                  </span>
-                )}
+              <Badge
+                key={c.id}
+                variant="secondary"
+                className="text-xs font-normal"
+              >
+                <ContactCardPopoverById id={c.id}>
+                  <User className="inline h-3 w-3 mr-1" />
+                  {c.name}
+                  {c.position && ` · ${c.position}`}
+                </ContactCardPopoverById>
               </Badge>
             ))
           ) : (

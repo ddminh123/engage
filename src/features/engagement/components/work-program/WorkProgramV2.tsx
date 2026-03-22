@@ -494,11 +494,11 @@ export function WorkProgramV2({
             <InlineTableInput
               placeholder="Tên phần hành..."
               onChange={handleTextChange}
-              onSubmit={(v) => handleAddSection(v)}
               onCancel={() => dispatch({ type: "CANCEL_ADD_TOP" })}
               autoFocus
             />
             <Button
+              type="button"
               variant="ghost"
               size="icon-sm"
               onClick={() => handleAddSection(textRef.current)}
@@ -507,6 +507,7 @@ export function WorkProgramV2({
               <Check className="h-3.5 w-3.5" />
             </Button>
             <Button
+              type="button"
               variant="ghost"
               size="icon-sm"
               onClick={() => dispatch({ type: "CANCEL_ADD_TOP" })}
@@ -525,11 +526,11 @@ export function WorkProgramV2({
             <InlineTableInput
               placeholder="Tên mục tiêu..."
               onChange={handleTextChange}
-              onSubmit={(v) => handleAddObjective(v)}
               onCancel={() => dispatch({ type: "CANCEL_ADD_TOP" })}
               autoFocus
             />
             <Button
+              type="button"
               variant="ghost"
               size="icon-sm"
               onClick={() => handleAddObjective(textRef.current)}
@@ -538,6 +539,7 @@ export function WorkProgramV2({
               <Check className="h-3.5 w-3.5" />
             </Button>
             <Button
+              type="button"
               variant="ghost"
               size="icon-sm"
               onClick={() => dispatch({ type: "CANCEL_ADD_TOP" })}

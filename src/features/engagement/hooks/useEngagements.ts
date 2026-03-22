@@ -31,6 +31,7 @@ import {
   updateRcmObjectiveApi,
   deleteRcmObjectiveApi,
   syncRcmObjectivesApi,
+  syncRcmToWorkProgramApi,
   reorderItemsApi,
   type ReorderEntityType,
   batchActionApi,
@@ -653,6 +654,18 @@ export function useBatchAction() {
     }) => batchActionApi(engagementId, action, entityType, ids),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: engagementKey(variables.engagementId) });
+    },
+  });
+}
+
+// ── Sync RCM to Work Program ──
+
+export function useSyncRcmToWorkProgram() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (engagementId: string) => syncRcmToWorkProgramApi(engagementId),
+    onSuccess: (_, engagementId) => {
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
     },
   });
 }

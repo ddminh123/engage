@@ -275,11 +275,11 @@ export function WorkProgramTable({
             <InlineTableInput
               placeholder="Tên phần hành..."
               onChange={handleTextChange}
-              onSubmit={(v) => handleAddSection(v)}
               onCancel={() => dispatch({ type: "CANCEL_ADD_TOP" })}
               autoFocus
             />
             <Button
+              type="button"
               variant="ghost"
               size="icon-sm"
               onClick={() => handleAddSection(textRef.current)}
@@ -288,6 +288,7 @@ export function WorkProgramTable({
               <Check className="h-3.5 w-3.5" />
             </Button>
             <Button
+              type="button"
               variant="ghost"
               size="icon-sm"
               onClick={() => dispatch({ type: "CANCEL_ADD_TOP" })}
@@ -306,11 +307,11 @@ export function WorkProgramTable({
             <InlineTableInput
               placeholder="Tên mục tiêu..."
               onChange={handleTextChange}
-              onSubmit={(v) => handleAddObjective(v)}
               onCancel={() => dispatch({ type: "CANCEL_ADD_TOP" })}
               autoFocus
             />
             <Button
+              type="button"
               variant="ghost"
               size="icon-sm"
               onClick={() => handleAddObjective(textRef.current)}
@@ -319,6 +320,7 @@ export function WorkProgramTable({
               <Check className="h-3.5 w-3.5" />
             </Button>
             <Button
+              type="button"
               variant="ghost"
               size="icon-sm"
               onClick={() => dispatch({ type: "CANCEL_ADD_TOP" })}
@@ -592,10 +594,6 @@ function TopNodeCard({
             <InlineTableInput
               initialValue={state.editingNodeTitle}
               onChange={handleTextChange}
-              onSubmit={(v) => {
-                if (node.type === "section") handleUpdateSection(node.id, v);
-                else handleUpdateTopObjective(node.id, v);
-              }}
               onCancel={() => dispatch({ type: "CANCEL_EDIT_NODE" })}
               autoFocus
             />

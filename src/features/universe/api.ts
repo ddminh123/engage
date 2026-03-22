@@ -1,5 +1,5 @@
 import { API_ROUTES } from '@/constants';
-import type { AuditableEntity, EntityInput, RiskAssessment, RiskAssessmentInput, RiskAssessmentFactor, RiskAssessmentFactorInput, AssessmentSource, AssessmentSourceInput } from './types';
+import type { AuditableEntity, EntityInput, RiskAssessment, RiskAssessmentInput, RiskAssessmentFactor, RiskAssessmentFactorInput, AssessmentSource, AssessmentSourceInput, RiskCatalogueItem, RiskCatalogueItemInput, EntityRisk, EntityRiskInput } from './types';
 
 interface ApiResponse<T> {
   data: T;
@@ -148,4 +148,76 @@ export async function updateAssessmentSourceApi(id: string, data: Partial<Assess
 export async function deleteAssessmentSourceApi(id: string): Promise<{ id: string }> {
   const response = await fetch(`/api/settings/assessment-sources/${id}`, { method: 'DELETE' });
   return handleResponse<{ id: string }>(response);
+}
+
+// ── Risk Catalogue (Settings) ──
+
+export async function fetchRiskCatalogueItems(includeInactive = false): Promise<RiskCatalogueItem[]> {
+  const params = includeInactive ? '?includeInactive=true' : '';
+  const response = await fetch(`/api/settings/risk-catalogue${params}`);
+  return handleResponse<RiskCatalogueItem[]>(response);
+}
+
+export async function createRiskCatalogueItemApi(data: RiskCatalogueItemInput): Promise<RiskCatalogueItem> {
+  const response = await fetch('/api/settings/risk-catalogue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<RiskCatalogueItem>(response);
+}
+
+export async function updateRiskCatalogueItemApi(id: string, data: Partial<RiskCatalogueItemInput> & { isActive?: boolean }): Promise<RiskCatalogueItem> {
+  const response = await fetch(`/api/settings/risk-catalogue/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<RiskCatalogueItem>(response);
+}
+
+export async function deleteRiskCatalogueItemApi(id: string): Promise<{ success: boolean }> {
+  const response = await fetch(`/api/settings/risk-catalogue/${id}`, { method: 'DELETE' });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+// ── Entity Risks (Universe) ──
+
+export async function fetchEntityRisks(entityId: string): Promise<EntityRisk[]> {
+  const response = await fetch(`${API_ROUTES.UNIVERSE_BY_ID(entityId)}/risks`);
+  return handleResponse<EntityRisk[]>(response);
+}
+
+export async function createEntityRiskApi(entityId: string, data: EntityRiskInput): Promise<EntityRisk> {
+  const response = await fetch(`${API_ROUTES.UNIVERSE_BY_ID(entityId)}/risks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<EntityRisk>(response);
+}
+
+export async function copyRisksFromCatalogueApi(entityId: string, catalogueItemIds: string[]): Promise<EntityRisk[]> {
+  const response = await fetch(`${API_ROUTES.UNIVERSE_BY_ID(entityId)}/risks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ catalogueItemIds }),
+  });
+  return handleResponse<EntityRisk[]>(response);
+}
+
+export async function updateEntityRiskApi(entityId: string, riskId: string, data: Partial<EntityRiskInput>): Promise<EntityRisk> {
+  const response = await fetch(`${API_ROUTES.UNIVERSE_BY_ID(entityId)}/risks/${riskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<EntityRisk>(response);
+}
+
+export async function deleteEntityRiskApi(entityId: string, riskId: string): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_ROUTES.UNIVERSE_BY_ID(entityId)}/risks/${riskId}`, {
+    method: 'DELETE',
+  });
+  return handleResponse<{ success: boolean }>(response);
 }

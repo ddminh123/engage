@@ -69,7 +69,6 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <InlineTableInput
                 onChange={handleTextChange}
-                onSubmit={handleAddObjective}
                 onCancel={() => dispatch({ type: "CANCEL_ADD" })}
                 placeholder="Tên mục tiêu..."
                 icon={<Target className="h-4 w-4 shrink-0 text-emerald-600" />}
@@ -83,7 +82,6 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
               <div style={{ paddingLeft: indent }}>
                 <InlineTableInput
                   onChange={handleTextChange}
-                  onSubmit={handleAddRisk}
                   onCancel={() => dispatch({ type: "CANCEL_ADD" })}
                   placeholder="Mô tả rủi ro..."
                   icon={
@@ -100,7 +98,6 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
               <div style={{ paddingLeft: indent }}>
                 <InlineTableInput
                   onChange={handleTextChange}
-                  onSubmit={handleAddControl}
                   onCancel={() => dispatch({ type: "CANCEL_ADD" })}
                   placeholder="Mô tả kiểm soát..."
                   icon={
@@ -171,7 +168,6 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
               <InlineTableInput
                 initialValue={r.description}
                 onChange={handleTextChange}
-                onSubmit={handleUpdateObjective}
                 onCancel={() => dispatch({ type: "CANCEL_EDIT" })}
                 icon={<Target className="h-4 w-4 shrink-0 text-emerald-600" />}
               />
@@ -185,7 +181,6 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                 <InlineTableInput
                   initialValue={r.description}
                   onChange={handleTextChange}
-                  onSubmit={handleUpdateRisk}
                   onCancel={() => dispatch({ type: "CANCEL_EDIT" })}
                   icon={
                     <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-orange-500" />
@@ -202,7 +197,6 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                 <InlineTableInput
                   initialValue={r.description}
                   onChange={handleTextChange}
-                  onSubmit={handleUpdateControl}
                   onCancel={() => dispatch({ type: "CANCEL_EDIT" })}
                   icon={
                     <Shield className="h-3.5 w-3.5 shrink-0 text-blue-400" />
@@ -425,6 +419,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-0.5">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => handleAddObjective(textRef.current)}
@@ -433,6 +428,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                   <Check className="h-3.5 w-3.5" />
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => dispatch({ type: "CANCEL_ADD" })}
@@ -449,6 +445,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-0.5">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => handleAddRisk(textRef.current)}
@@ -457,6 +454,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                   <Check className="h-3.5 w-3.5" />
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => dispatch({ type: "CANCEL_ADD" })}
@@ -473,6 +471,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-0.5">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => handleAddControl(textRef.current)}
@@ -481,6 +480,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                   <Check className="h-3.5 w-3.5" />
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => dispatch({ type: "CANCEL_ADD" })}
@@ -497,6 +497,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-0.5">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => handleUpdateObjective(textRef.current)}
@@ -505,6 +506,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                   <Check className="h-3.5 w-3.5" />
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => dispatch({ type: "CANCEL_EDIT" })}
@@ -521,6 +523,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-0.5">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => handleUpdateRisk(textRef.current)}
@@ -529,6 +532,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                   <Check className="h-3.5 w-3.5" />
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => dispatch({ type: "CANCEL_EDIT" })}
@@ -545,6 +549,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-0.5">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => handleUpdateControl(textRef.current)}
@@ -553,6 +558,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                   <Check className="h-3.5 w-3.5" />
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => dispatch({ type: "CANCEL_EDIT" })}
@@ -569,6 +575,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={(e) => {
@@ -583,6 +590,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                   <Pencil className="h-3 w-3" />
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   className="text-destructive hover:text-destructive"
@@ -609,6 +617,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={(e) => {
@@ -620,6 +629,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                   <Pencil className="h-3 w-3" />
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   className="text-destructive hover:text-destructive"
@@ -647,6 +657,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
             return (
               <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={(e) => {
@@ -662,6 +673,7 @@ export function useRcmColumns(editor: RcmEditor): ColumnDef<RcmRow>[] {
                   <Pencil className="h-3 w-3" />
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon-sm"
                   className="text-destructive hover:text-destructive"

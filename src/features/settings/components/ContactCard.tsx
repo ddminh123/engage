@@ -3,12 +3,14 @@
 import * as React from "react";
 import { Mail, Phone, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SETTINGS_LABELS } from "@/constants/labels";
+import { useContact } from "../hooks/useContacts";
 import type { Contact } from "../types";
 
 const LC = SETTINGS_LABELS.contact;
@@ -94,6 +96,58 @@ export function ContactCardPopover({
       </PopoverTrigger>
       <PopoverContent side="top" className="w-64 p-3">
         <ContactCardContent contact={contact} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// =============================================================================
+// Popover wrapper (by ID) — fetches contact lazily on open
+// =============================================================================
+
+interface ContactCardPopoverByIdProps {
+  id: string;
+  children: React.ReactNode;
+}
+
+function ContactCardContentById({ id }: { id: string }) {
+  const { data: contact, isLoading } = useContact(id);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-3 w-40" />
+      </div>
+    );
+  }
+
+  if (!contact) return null;
+  return <ContactCardContent contact={contact} />;
+}
+
+export function ContactCardPopoverById({
+  id,
+  children,
+}: ContactCardPopoverByIdProps) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="cursor-pointer hover:underline focus:outline-none focus-visible:underline"
+            onClick={(e) => e.stopPropagation()}
+          />
+        }
+      >
+        {children}
+      </PopoverTrigger>
+      <PopoverContent side="top" className="w-64 p-3">
+        {open && <ContactCardContentById id={id} />}
       </PopoverContent>
     </Popover>
   );

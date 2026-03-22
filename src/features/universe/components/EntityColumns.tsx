@@ -1,6 +1,7 @@
 "use client";
 
 import { ColumnDef, VisibilityState } from "@tanstack/react-table";
+import { Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTableColumnHeader } from "@/components/shared/DataTable";
@@ -130,10 +131,13 @@ export function getEntityColumns(
             {units.map((u) => (
               <Badge
                 key={u.id}
-                variant="outline"
+                variant="secondary"
                 className="text-xs font-normal px-1.5 py-0"
               >
-                <OrgUnitCardPopover id={u.id}>{u.name}</OrgUnitCardPopover>
+                <OrgUnitCardPopover id={u.id}>
+                  <Building2 className="inline h-3 w-3 mr-1" />
+                  {u.name}
+                </OrgUnitCardPopover>
               </Badge>
             ))}
           </div>

@@ -34,6 +34,7 @@ import { FactorPicker } from "@/components/shared/FactorPicker";
 import { RiskLevelBadge } from "@/components/shared/RiskLevelBadge";
 import { COMMON_LABELS, UNIVERSE_LABELS } from "@/constants/labels";
 import { useCreateRiskAssessment } from "../hooks/useEntities";
+import { EntityRiskPanel } from "./EntityRiskPanel";
 import { useRiskAssessmentFactors } from "../hooks/useRiskFactors";
 import { useAssessmentSources } from "../hooks/useAssessmentSources";
 import { CONTROL_EFFECTIVENESS } from "../constants";
@@ -326,8 +327,6 @@ export function RiskRatingForm({
     }
   };
 
-  const inherentLevel = inherentScore ? scoreToLevel(inherentScore) : null;
-
   return (
     <FormSheet
       open={open}
@@ -381,6 +380,11 @@ export function RiskRatingForm({
           onSubmit={form.handleSubmit(handleSubmit)}
           className="space-y-6"
         >
+          {/* ══════════════════════════════════════════════════════
+              Entity Risks (Managed here in the form)
+              ══════════════════════════════════════════════════════ */}
+          <EntityRiskPanel entityId={open ? (entity?.id ?? null) : null} />
+
           {/* ══════════════════════════════════════════════════════
               Section 1: RỦI RO TIỀM TÀNG
               ══════════════════════════════════════════════════════ */}

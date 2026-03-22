@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Bell } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { Search, Bell, LogOut, User, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,11 +13,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/constants";
 
 export function Navbar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const user = session?.user;
+  const userName = user?.name || "User";
+  const userEmail = user?.email || "";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background">
@@ -90,26 +96,39 @@ export function Navbar() {
                 />
               }
             >
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  AD
-                </AvatarFallback>
-              </Avatar>
+              {user?.id ? (
+                <UserAvatar
+                  user={{ id: user.id, name: userName, avatarUrl: null }}
+                  size="default"
+                />
+              ) : (
+                <User className="h-5 w-5" />
+              )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <div className="flex items-center gap-2 p-2">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">Admin User</p>
-                  <p className="text-xs text-muted-foreground">
-                    admin@company.com
-                  </p>
+                  <p className="text-sm font-medium">{userName}</p>
+                  <p className="text-xs text-muted-foreground">{userEmail}</p>
                 </div>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Hồ sơ</DropdownMenuItem>
-              <DropdownMenuItem>Cài đặt</DropdownMenuItem>
+              <DropdownMenuItem>
+                <Link
+                  href="/settings"
+                  className="flex items-center gap-2 w-full"
+                >
+                  <Settings className="h-4 w-4" />
+                  Cài đặt
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Đăng xuất</DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Đăng xuất
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

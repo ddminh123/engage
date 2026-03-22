@@ -46,6 +46,7 @@ export function WpInlineAdd({
         autoFocus
       />
       <Button
+        type="button"
         variant="ghost"
         size="icon-sm"
         onClick={() => onSubmit(textRef.current)}
@@ -54,6 +55,7 @@ export function WpInlineAdd({
         <Check className="h-3.5 w-3.5" />
       </Button>
       <Button
+        type="button"
         variant="ghost"
         size="icon-sm"
         onClick={onCancel}
@@ -63,6 +65,7 @@ export function WpInlineAdd({
       </Button>
       {onOpenForm && (
         <Button
+          type="button"
           variant="ghost"
           size="icon-sm"
           title="Mở form đầy đủ"

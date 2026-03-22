@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Building2, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DetailSection, DetailField } from "@/components/shared/DetailSheet";
 import { RiskLevelBadge } from "@/components/shared/RiskLevelBadge";
@@ -8,6 +9,7 @@ import { ControlEffectivenessBadge } from "@/components/shared/ControlEffectiven
 import { UNIVERSE_LABELS } from "@/constants/labels";
 import { PAGE_ROUTES } from "@/constants";
 import { OrgUnitCardPopover } from "@/features/settings/components/OrgUnitCard";
+import { ContactCardPopoverById } from "@/features/settings/components/ContactCard";
 import { useRiskAssessments } from "../hooks/useEntities";
 import type { AuditableEntity, RiskAssessment } from "../types";
 
@@ -150,9 +152,8 @@ export function EntityContent({ entity }: EntityContentProps) {
         </DetailField>
         <DetailField label={L.field.auditCycle}>
           {entity.auditCycle
-            ? (L.auditCycle[
-                entity.auditCycle as keyof typeof L.auditCycle
-              ] ?? entity.auditCycle)
+            ? (L.auditCycle[entity.auditCycle as keyof typeof L.auditCycle] ??
+              entity.auditCycle)
             : "—"}
         </DetailField>
         <DetailField label={L.field.status}>
@@ -165,8 +166,7 @@ export function EntityContent({ entity }: EntityContentProps) {
                   : "secondary"
             }
           >
-            {L.status[entity.status as keyof typeof L.status] ??
-              entity.status}
+            {L.status[entity.status as keyof typeof L.status] ?? entity.status}
           </Badge>
         </DetailField>
         <DetailField label={L.field.lastAuditedAt}>
@@ -176,9 +176,7 @@ export function EntityContent({ entity }: EntityContentProps) {
         </DetailField>
         {entity.description && (
           <DetailField label={L.field.description}>
-            <span className="whitespace-pre-wrap">
-              {entity.description}
-            </span>
+            <span className="whitespace-pre-wrap">{entity.description}</span>
           </DetailField>
         )}
       </DetailSection>
@@ -191,10 +189,11 @@ export function EntityContent({ entity }: EntityContentProps) {
               {entity.ownerUnits.map((u) => (
                 <Badge
                   key={u.id}
-                  variant="outline"
+                  variant="secondary"
                   className="text-xs font-normal"
                 >
                   <OrgUnitCardPopover id={u.id}>
+                    <Building2 className="inline h-3 w-3 mr-1" />
                     {u.name}
                   </OrgUnitCardPopover>
                 </Badge>
@@ -210,10 +209,11 @@ export function EntityContent({ entity }: EntityContentProps) {
               {entity.participatingUnits.map((u) => (
                 <Badge
                   key={u.id}
-                  variant="outline"
+                  variant="secondary"
                   className="text-xs font-normal"
                 >
                   <OrgUnitCardPopover id={u.id}>
+                    <Building2 className="inline h-3 w-3 mr-1" />
                     {u.name}
                   </OrgUnitCardPopover>
                 </Badge>
@@ -229,16 +229,19 @@ export function EntityContent({ entity }: EntityContentProps) {
       <DetailSection title={L.section.contacts} columns={2}>
         <DetailField label={L.field.auditeeRep}>
           {entity.auditeeReps.length > 0 ? (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {entity.auditeeReps.map((c) => (
-                <div key={c.id} className="leading-tight">
-                  <div>{c.name}</div>
-                  {c.position && (
-                    <div className="text-xs text-muted-foreground">
-                      {c.position}
-                    </div>
-                  )}
-                </div>
+                <Badge
+                  key={c.id}
+                  variant="secondary"
+                  className="text-xs font-normal"
+                >
+                  <ContactCardPopoverById id={c.id}>
+                    <User className="inline h-3 w-3 mr-1" />
+                    {c.name}
+                    {c.position && ` · ${c.position}`}
+                  </ContactCardPopoverById>
+                </Badge>
               ))}
             </div>
           ) : (
@@ -247,16 +250,19 @@ export function EntityContent({ entity }: EntityContentProps) {
         </DetailField>
         <DetailField label={L.field.contactPoint}>
           {entity.contactPoints.length > 0 ? (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {entity.contactPoints.map((c) => (
-                <div key={c.id} className="leading-tight">
-                  <div>{c.name}</div>
-                  {c.position && (
-                    <div className="text-xs text-muted-foreground">
-                      {c.position}
-                    </div>
-                  )}
-                </div>
+                <Badge
+                  key={c.id}
+                  variant="secondary"
+                  className="text-xs font-normal"
+                >
+                  <ContactCardPopoverById id={c.id}>
+                    <User className="inline h-3 w-3 mr-1" />
+                    {c.name}
+                    {c.position && ` · ${c.position}`}
+                  </ContactCardPopoverById>
+                </Badge>
               ))}
             </div>
           ) : (
@@ -265,16 +271,19 @@ export function EntityContent({ entity }: EntityContentProps) {
         </DetailField>
         <DetailField label={L.field.auditSponsor}>
           {entity.auditSponsors.length > 0 ? (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {entity.auditSponsors.map((c) => (
-                <div key={c.id} className="leading-tight">
-                  <div>{c.name}</div>
-                  {c.position && (
-                    <div className="text-xs text-muted-foreground">
-                      {c.position}
-                    </div>
-                  )}
-                </div>
+                <Badge
+                  key={c.id}
+                  variant="secondary"
+                  className="text-xs font-normal"
+                >
+                  <ContactCardPopoverById id={c.id}>
+                    <User className="inline h-3 w-3 mr-1" />
+                    {c.name}
+                    {c.position && ` · ${c.position}`}
+                  </ContactCardPopoverById>
+                </Badge>
               ))}
             </div>
           ) : (

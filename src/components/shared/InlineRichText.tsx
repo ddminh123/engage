@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { RichTextEditor, RichTextDisplay } from "./RichTextEditor";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface InlineRichTextProps {
@@ -15,6 +16,7 @@ interface InlineRichTextProps {
   onChange: (html: string) => void;
   /** Placeholder shown when content is empty and not editing */
   placeholder?: string;
+  hideLabel?: boolean;
   className?: string;
   /** Currently active editor name (controlled from parent) */
   activeEditor?: string | null;
@@ -36,47 +38,63 @@ export function InlineRichText({
   content,
   onChange,
   placeholder = "Nhập nội dung...",
+  hideLabel = false,
   className,
   activeEditor,
   onActivate,
 }: InlineRichTextProps) {
   const isEditing = activeEditor === name;
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [draftContent, setDraftContent] = React.useState(content ?? "");
 
   const isEmpty = !content || content === "<p></p>" || content.trim() === "";
 
-  // Click-outside listener to deactivate
+  // Sync draft with content when entering edit mode
   React.useEffect(() => {
-    if (!isEditing) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        onActivate?.(null);
-      }
+    if (isEditing) {
+      setDraftContent(content ?? "");
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isEditing, onActivate]);
+  }, [isEditing, content]);
+
+  const handleSave = () => {
+    onChange(draftContent);
+    onActivate?.(null);
+  };
+
+  const handleCancel = () => {
+    setDraftContent(content ?? "");
+    onActivate?.(null);
+  };
 
   return (
     <div className={cn("group", className)} ref={containerRef}>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
-        {label}
-      </p>
+      {!hideLabel && (
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+          {label}
+        </p>
+      )}
 
       {isEditing ? (
-        <RichTextEditor
-          content={content ?? ""}
-          onChange={onChange}
-          placeholder={placeholder}
-          editable
-          autoFocus
-        />
+        <div className="space-y-2">
+          <RichTextEditor
+            content={draftContent}
+            onChange={setDraftContent}
+            placeholder={placeholder}
+            editable
+            autoFocus
+          />
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" onClick={handleCancel} variant="ghost">
+              Hủy
+            </Button>
+            <Button size="sm" onClick={handleSave}>
+              Lưu
+            </Button>
+          </div>
+        </div>
       ) : (
         <div
-          className="cursor-text rounded-md px-4 py-3 min-h-[48px] transition-colors hover:bg-muted/50"
+          className="cursor-text rounded-md px-4 py-3 min-h-[48px] bg-muted/40 transition-colors hover:bg-muted/50"
           onClick={() => onActivate?.(name)}
         >
           {isEmpty ? (

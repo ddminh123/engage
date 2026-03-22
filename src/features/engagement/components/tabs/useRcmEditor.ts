@@ -65,7 +65,7 @@ export function useRcmEditor(
   const handleAddObjective = useCallback(
     (value: string) => {
       const title = value.trim();
-      if (!title) return;
+      if (!title || createObj.isPending) return;
       createObj.mutate(
         { engagementId, data: { title } },
         { onSuccess: () => dispatch({ type: "CANCEL_ADD" }) },
@@ -77,7 +77,7 @@ export function useRcmEditor(
   const handleUpdateObjective = useCallback(
     (value: string) => {
       const title = value.trim();
-      if (!title || !state.editingId) return;
+      if (!title || !state.editingId || updateObj.isPending) return;
       updateObj.mutate(
         { engagementId, objectiveId: state.editingId, data: { title } },
         { onSuccess: () => dispatch({ type: "CANCEL_EDIT" }) },
@@ -89,7 +89,7 @@ export function useRcmEditor(
   const handleAddRisk = useCallback(
     (value: string) => {
       const desc = value.trim();
-      if (!desc || !state.addingForId) return;
+      if (!desc || !state.addingForId || createRisk.isPending) return;
       createRisk.mutate(
         {
           engagementId,
@@ -108,7 +108,7 @@ export function useRcmEditor(
   const handleAddControl = useCallback(
     (value: string) => {
       const desc = value.trim();
-      if (!desc || !state.addingForId) return;
+      if (!desc || !state.addingForId || createControl.isPending) return;
       createControl.mutate(
         {
           engagementId,
@@ -127,7 +127,7 @@ export function useRcmEditor(
   const handleUpdateRisk = useCallback(
     (value: string) => {
       const desc = value.trim();
-      if (!desc || !state.editingId) return;
+      if (!desc || !state.editingId || updateRisk.isPending) return;
       updateRisk.mutate(
         {
           engagementId,
@@ -146,7 +146,7 @@ export function useRcmEditor(
   const handleUpdateControl = useCallback(
     (value: string) => {
       const desc = value.trim();
-      if (!desc || !state.editingId) return;
+      if (!desc || !state.editingId || updateControl.isPending) return;
       const lookup = controlMap.get(state.editingId);
       if (!lookup) return;
       updateControl.mutate(

@@ -327,6 +327,15 @@ export async function syncRcmObjectivesApi(
   return handleResponse<{ synced: number }>(response);
 }
 
+export async function syncRcmToWorkProgramApi(
+  engagementId: string,
+): Promise<{ createdObjectives: number; createdProcedures: number }> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_SYNC_RCM_TO_WP(engagementId), {
+    method: 'POST',
+  });
+  return handleResponse<{ createdObjectives: number; createdProcedures: number }>(response);
+}
+
 // ── Engagement Risk CRUD (RACM light) ──
 
 export async function createEngagementRiskApi(

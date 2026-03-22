@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
-import { checkAccess, DEV_USER } from '@/server/actions/teams';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { checkAccess } from '@/server/actions/teams';
 
 // =============================================================================
 // SESSION TYPE
@@ -10,6 +12,8 @@ export interface Session {
     id: string;
     name: string;
     email: string;
+    role: string;
+    title: string | null;
   };
 }
 
@@ -32,18 +36,24 @@ export function withAccess(permission: string, handler: RouteHandler) {
     req: NextRequest,
     context: { params: Promise<Record<string, string>> }
   ): Promise<Response> => {
-    // TODO: Replace with getServerSession(authOptions) when NextAuth is set up
-    // import { getServerSession } from 'next-auth';
-    // const session = await getServerSession(authOptions);
-    // if (!session?.user?.id) {
-    //   return Response.json(
-    //     { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-    //     { status: 401 }
-    //   );
-    // }
+    const nextAuthSession = await getServerSession(authOptions);
 
-    // DEV MODE: Use mock user
-    const session: Session = { user: DEV_USER };
+    if (!nextAuthSession?.user?.id) {
+      return Response.json(
+        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
+        { status: 401 }
+      );
+    }
+
+    const session: Session = {
+      user: {
+        id: nextAuthSession.user.id,
+        name: nextAuthSession.user.name || '',
+        email: nextAuthSession.user.email || '',
+        role: nextAuthSession.user.role,
+        title: nextAuthSession.user.title,
+      },
+    };
 
     const allowed = await checkAccess(session.user.id, permission);
     if (!allowed) {

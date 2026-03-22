@@ -113,6 +113,137 @@ model OrgUnit {
 }
 
 // =============================================================================
+// TEAMS MODULE — Users, Teams, Roles, Permissions
+// =============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password_hash String?   // null for SSO-only users
+  phone         String?
+  title         String?   // job title (free text, independent of system role)
+  role          String    @default("member") // cae | admin | team_owner | member
+  status        String    @default("active") // active | locked | inactive
+  provider      String    @default("credentials") // credentials | entra_id
+  supervisor_id String?   // self-ref FK — default reviewer
+  description   String?   @db.Text // personal note / self-description
+  avatar_url    String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  supervisor    User?     @relation("UserSupervisor", fields: [supervisor_id], references: [id])
+  subordinates  User[]    @relation("UserSupervisor")
+  user_roles    UserRole[]
+  expertises    UserExpertise[]
+  owned_teams   Team[]    @relation("TeamOwner")
+  team_memberships TeamMember[]
+
+  @@index([status])
+  @@index([role])
+  @@index([supervisor_id])
+  @@map("user")
+}
+
+model Team {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?   @db.Text
+  owner_id    String
+  status      String    @default("active") // active | inactive
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  owner   User         @relation("TeamOwner", fields: [owner_id], references: [id])
+  members TeamMember[]
+
+  @@index([owner_id])
+  @@index([status])
+  @@map("team")
+}
+
+model TeamMember {
+  team_id   String
+  user_id   String
+  role      String    @default("member") // owner | member
+  joined_at DateTime  @default(now())
+
+  team Team @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([team_id, user_id])
+  @@index([user_id])
+  @@map("team_member")
+}
+
+model Role {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  is_system   Boolean   @default(false)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  user_roles  UserRole[]
+  permissions Permission[]
+
+  @@map("role")
+}
+
+model UserRole {
+  user_id String
+  role_id String
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, role_id])
+  @@index([role_id])
+  @@map("user_role")
+}
+
+model Permission {
+  id      String @id @default(cuid())
+  role_id String
+  module  String // e.g., "engagement", "finding", "teams"
+  action  String // e.g., "create", "read", "update", "delete", "manage"
+
+  role Role @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@unique([role_id, module, action])
+  @@index([role_id])
+  @@map("permission")
+}
+
+model Expertise {
+  id          String   @id @default(cuid())
+  label       String
+  code        String?  @unique
+  description String?
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  users UserExpertise[]
+
+  @@index([is_active])
+  @@map("expertise")
+}
+
+model UserExpertise {
+  user_id      String
+  expertise_id String
+
+  user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  expertise Expertise @relation(fields: [expertise_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, expertise_id])
+  @@index([expertise_id])
+  @@map("user_expertise")
+}
+
+// =============================================================================
 // UNIVERSE MODULE — Reference Data
 // =============================================================================
 
@@ -179,6 +310,7 @@ model AuditableEntity {
   auditee_reps          AuditableEntityAuditeeRep[]
   contact_points        AuditableEntityContactPoint[]
   risk_assessments      RiskAssessment[]
+  entity_risks          EntityRisk[]
   planned_audits        PlannedAudit[]
   engagements           Engagement[]
 
@@ -330,6 +462,59 @@ model RiskAssessmentFactor {
   @@index([is_active])
   @@index([relates_to])
   @@map("risk_assessment_factor")
+}
+
+// =============================================================================
+// RISK CATALOGUE — Master risk library managed in Settings
+// =============================================================================
+
+model RiskCatalogueItem {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?  @unique
+  description String?  @db.Text
+  risk_type   String   // operational | technology | credit | compliance | market | liquidity | strategic | reputational
+  risk_domain String?  // ESG | financial_reporting | regulatory | IT | operations | fraud | other
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  entity_risks EntityRisk[] // entities referencing this catalogue item
+
+  @@index([risk_type])
+  @@index([risk_domain])
+  @@index([is_active])
+  @@map("risk_catalogue_item")
+}
+
+// =============================================================================
+// ENTITY RISK — Risks assigned to a specific auditable entity
+// Copied from catalogue or created ad-hoc; detached but referenceable
+// =============================================================================
+
+model EntityRisk {
+  id                  String   @id @default(cuid())
+  entity_id           String
+  catalogue_item_id   String?  // nullable FK — null means ad-hoc / custom risk
+  name                String
+  code                String?
+  description         String?  @db.Text
+  risk_type           String   // copied from catalogue or set manually
+  risk_domain         String?  // copied from catalogue or set manually
+  is_primary          Boolean  @default(false) // marks as primary risk for the entity
+  sort_order          Int      @default(0)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  entity         AuditableEntity   @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+  catalogue_item RiskCatalogueItem? @relation(fields: [catalogue_item_id], references: [id], onDelete: SetNull)
+
+  @@unique([entity_id, catalogue_item_id]) // prevent duplicate catalogue references per entity
+  @@index([entity_id])
+  @@index([catalogue_item_id])
+  @@index([is_primary])
+  @@map("entity_risk")
 }
 
 // =============================================================================

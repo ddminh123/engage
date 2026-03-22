@@ -43,6 +43,7 @@ export const API_ROUTES = {
   ENGAGEMENT_CONTROL_BY_ID: (id: string, rId: string, cId: string) => `/api/engagement/${id}/risks/${rId}/controls/${cId}`,
   ENGAGEMENT_REORDER: (id: string) => `/api/engagement/${id}/reorder`,
   ENGAGEMENT_BATCH: (id: string) => `/api/engagement/${id}/batch`,
+  ENGAGEMENT_SYNC_RCM_TO_WP: (id: string) => `/api/engagement/${id}/sync-rcm-to-wp`,
 
   // Finding module
   FINDING: "/api/finding",
@@ -51,6 +52,18 @@ export const API_ROUTES = {
   // Teams module
   TEAMS: "/api/teams",
   TEAMS_BY_ID: (id: string) => `/api/teams/${id}`,
+  TEAM_MEMBERS: (id: string) => `/api/teams/${id}/members`,
+  TEAM_MEMBER_BY_ID: (teamId: string, userId: string) => `/api/teams/${teamId}/members/${userId}`,
+
+  // Users (Settings)
+  SETTINGS_USERS: "/api/settings/users",
+  SETTINGS_USERS_BY_ID: (id: string) => `/api/settings/users/${id}`,
+  SETTINGS_USER_LOCK: (id: string) => `/api/settings/users/${id}/lock`,
+  SETTINGS_USER_UNLOCK: (id: string) => `/api/settings/users/${id}/unlock`,
+
+  // Expertise (Settings)
+  SETTINGS_EXPERTISE: "/api/settings/expertise",
+  SETTINGS_EXPERTISE_BY_ID: (id: string) => `/api/settings/expertise/${id}`,
 
   // Document module
   DOCUMENT: "/api/document",
@@ -66,6 +79,7 @@ export const PAGE_ROUTES = {
   ENGAGEMENT: "/engagement",
   FINDING: "/finding",
   TEAMS: "/teams",
+  SETTINGS_USERS: "/settings/users",
   SETTINGS: "/settings",
   CONTACT_DETAIL: (id: string) => `/settings/contacts/${id}`,
   ORG_UNIT_DETAIL: (id: string) => `/settings/org-chart/${id}`,

@@ -2114,3 +2114,123 @@ async function duplicateEntity(
       throw new Error(`Unknown entity type: ${entityType}`);
   }
 }
+
+// =============================================================================
+// SYNC RCM TO WORK PROGRAM
+// =============================================================================
+
+/**
+ * Sync RCM objectives and controls to Work Program.
+ * Creates WP objectives from RCM objectives and procedures from RCM controls.
+ */
+export async function syncRcmToWorkProgram(
+  engagementId: string,
+  userId: string,
+  userName: string,
+) {
+  await verifyEngagement(engagementId);
+
+  // Fetch RCM objectives with risks and controls
+  const rcmObjectives = await prisma.engagementRcmObjective.findMany({
+    where: { engagement_id: engagementId },
+    include: {
+      risks: {
+        include: {
+          controls: true,
+        },
+        orderBy: { sort_order: 'asc' },
+      },
+    },
+    orderBy: { sort_order: 'asc' },
+  });
+
+  let createdObjectives = 0;
+  let createdProcedures = 0;
+  const objectiveIds: string[] = [];
+  const procedureIds: string[] = [];
+
+  // Get max sort order for objectives
+  const maxObjOrder = await prisma.engagementObjective.aggregate({
+    where: { engagement_id: engagementId, section_id: null },
+    _max: { sort_order: true },
+  });
+  let nextObjOrder = (maxObjOrder._max.sort_order ?? 0) + 1;
+
+  // Process each RCM objective
+  for (const rcmObj of rcmObjectives) {
+    // Create WP Objective (standalone) from RCM Objective
+    const wpObjective = await prisma.engagementObjective.create({
+      data: {
+        engagement_id: engagementId,
+        title: rcmObj.title,
+        description: rcmObj.description,
+        status: 'not_started',
+        added_from: 'manual',
+        sort_order: nextObjOrder++,
+      },
+    });
+    createdObjectives++;
+    objectiveIds.push(wpObjective.id);
+
+    // Get max sort order for procedures under this objective
+    const maxProcOrder = await prisma.engagementProcedure.aggregate({
+      where: { engagement_id: engagementId, objective_id: wpObjective.id },
+      _max: { sort_order: true },
+    });
+    let nextProcOrder = (maxProcOrder._max.sort_order ?? 0) + 1;
+
+    // Process each control under this objective's risks
+    for (const risk of rcmObj.risks) {
+      for (const control of risk.controls) {
+        // Create WP Procedure from RCM Control with prefix
+        const procedure = await prisma.engagementProcedure.create({
+          data: {
+            engagement_id: engagementId,
+            objective_id: wpObjective.id,
+            title: `Kiểm thử ${control.description}`,
+            status: 'not_started',
+            added_from: 'manual',
+            sort_order: nextProcOrder++,
+          },
+        });
+        procedureIds.push(procedure.id);
+        createdProcedures++;
+
+        // Link procedure to control
+        await prisma.procedureControlRef.create({
+          data: {
+            procedure_id: procedure.id,
+            control_id: control.id,
+          },
+        });
+      }
+    }
+  }
+
+  // Audit log for objectives
+  if (objectiveIds.length > 0) {
+    await logAudit({
+      userId,
+      userName,
+      action: 'create',
+      entityType: 'engagement_objective',
+      entityId: objectiveIds.join(','),
+    });
+  }
+
+  // Audit log for procedures
+  if (procedureIds.length > 0) {
+    await logAudit({
+      userId,
+      userName,
+      action: 'create',
+      entityType: 'engagement_procedure',
+      entityId: procedureIds.join(','),
+    });
+  }
+
+  return {
+    createdObjectives,
+    createdProcedures,
+  };
+}

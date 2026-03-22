@@ -117,6 +117,42 @@ src/
 | Nav      | Tabs, Breadcrumb, DropdownMenu |
 | Feedback | Toast, Skeleton, Progress      |
 
+### Org Unit & Contact Badge Standard
+
+All org unit and contact references across the application (universe, plan, engagement) **must** use the following pattern:
+
+```tsx
+{
+  /* Org unit */
+}
+<Badge variant="secondary" className="text-xs font-normal">
+  <OrgUnitCardPopover id={u.id}>
+    <Building2 className="inline h-3 w-3 mr-1" />
+    {u.name}
+  </OrgUnitCardPopover>
+</Badge>;
+
+{
+  /* Contact */
+}
+<Badge variant="secondary" className="text-xs font-normal">
+  <ContactCardPopoverById id={c.id}>
+    <User className="inline h-3 w-3 mr-1" />
+    {c.name}
+    {c.position && ` · ${c.position}`}
+  </ContactCardPopoverById>
+</Badge>;
+```
+
+- **Badge variant:** Always `"secondary"`.
+- **Icons:** `Building2` for org units, `User` for contacts (from `lucide-react`).
+- **Position separator:** Use middle dot `·` (not dash `—`) with same text color.
+- **Popover:** Clicking the badge text opens a popover card with full details (fetched lazily by ID).
+- **Components:** `OrgUnitCardPopover` from `settings/components/OrgUnitCard`, `ContactCardPopoverById` from `settings/components/ContactCard`.
+- **Never** display org units or contacts as plain text or with `variant="outline"` / `variant="default"`.
+
+---
+
 ### Base UI `render` Prop Pattern
 
 Shadcn v2 uses **`@base-ui/react`**, not Radix UI. Base UI does **not** support the `asChild` prop. Instead, use the **`render`** prop to customize the rendered element.

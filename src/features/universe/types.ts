@@ -144,6 +144,63 @@ export interface RiskAssessmentFactorInput {
   sort_order?: number;
 }
 
+// =============================================================================
+// RISK CATALOGUE (Settings-level risk library)
+// =============================================================================
+
+export interface RiskCatalogueItem {
+  id: string;
+  name: string;
+  code: string | null;
+  description: string | null;
+  riskType: string;
+  riskDomain: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RiskCatalogueItemInput {
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  riskType: string;
+  riskDomain?: string | null;
+  sortOrder?: number;
+}
+
+// =============================================================================
+// ENTITY RISK (Universe-level per-entity risks)
+// =============================================================================
+
+export interface EntityRisk {
+  id: string;
+  entityId: string;
+  catalogueItemId: string | null;
+  catalogueItem: { id: string; name: string; code: string | null } | null;
+  name: string;
+  code: string | null;
+  description: string | null;
+  riskType: string;
+  riskDomain: string | null;
+  isPrimary: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EntityRiskInput {
+  catalogueItemId?: string | null;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  riskType: string;
+  riskDomain?: string | null;
+  isPrimary?: boolean;
+  sortOrder?: number;
+}
+
 // Backward-compatible aliases
 export type RiskFactor = RiskAssessmentFactor;
 export type RiskFactorInput = RiskAssessmentFactorInput;
