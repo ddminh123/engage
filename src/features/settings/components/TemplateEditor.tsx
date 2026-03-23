@@ -41,7 +41,7 @@ export function TemplateEditor({ content, onChange }: TemplateEditorProps) {
       Highlight.configure({ multicolor: true }),
       Underline,
       Image.configure({ inline: false, allowBase64: true }),
-      Table.configure({ resizable: true }),
+      Table.configure({ resizable: true, allowTableNodeSelection: true }),
       TableRow,
       TableCell,
       TableHeader,

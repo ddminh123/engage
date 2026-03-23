@@ -36,6 +36,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { TableGridPicker } from "./TableGridPicker";
 
 // ── Constants ──
 
@@ -457,24 +458,19 @@ export function EditorToolbar({ editor, fileInputRef }: EditorToolbarProps) {
         >
           <TableIcon className="h-4 w-4" />
         </PopoverTrigger>
-        <PopoverContent className="w-[180px] p-1" align="start">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors"
-            onClick={() =>
-              editor
-                .chain()
-                .focus()
-                .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-                .run()
-            }
-          >
-            <TableIcon className="h-4 w-4 text-muted-foreground" />
-            Chèn bảng
-          </button>
-          {editor.isActive("table") && (
+        <PopoverContent className="w-auto p-1" align="start">
+          {!editor.isActive("table") ? (
+            <TableGridPicker
+              onSelect={(rows, cols) =>
+                editor
+                  .chain()
+                  .focus()
+                  .insertTable({ rows, cols, withHeaderRow: true })
+                  .run()
+              }
+            />
+          ) : (
             <>
-              <div className="my-1 h-px bg-border" />
               <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors"

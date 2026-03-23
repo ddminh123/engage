@@ -80,7 +80,7 @@ export const WorkpaperEditor = forwardRef<
       Highlight.configure({ multicolor: true }),
       Underline,
       Image.configure({ inline: false, allowBase64: true }),
-      Table.configure({ resizable: true }),
+      Table.configure({ resizable: true, allowTableNodeSelection: true }),
       TableRow,
       TableCell,
       TableHeader,
@@ -104,7 +104,8 @@ export const WorkpaperEditor = forwardRef<
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm max-w-none focus:outline-none min-h-[calc(100vh-200px)] px-8 py-6",
+          "prose prose-sm max-w-none focus:outline-none min-h-[calc(100vh-200px)] px-6 py-4",
+        translate: "no",
       },
     },
   });
@@ -176,15 +177,20 @@ export const WorkpaperEditor = forwardRef<
         <BubbleMenu
           editor={editor}
           options={{ placement: "top", offset: 8 }}
+          shouldShow={({ editor: e }) => {
+            // Show for any non-empty selection (text or cell)
+            const { from, to } = e.state.selection;
+            return from !== to;
+          }}
           className="flex items-center gap-0.5 rounded-lg border bg-popover p-1 shadow-lg"
         >
           <BubbleButton
             onClick={() => handleAddComment("comment")}
-            title="Thêm bình luận"
+            title="Thêm ý kiến"
             className="text-blue-600 hover:text-blue-700"
           >
             <MessageSquarePlus className="h-3.5 w-3.5" />
-            <span className="text-xs ml-1">Bình luận</span>
+            <span className="text-xs ml-1">Ý kiến</span>
           </BubbleButton>
           <BubbleButton
             onClick={() => handleAddComment("review_note")}
@@ -212,7 +218,9 @@ export const WorkpaperEditor = forwardRef<
       {!readOnly && (
         <EditorContextMenu
           editor={editor}
-          onAddComment={() => handleAddComment("comment")}
+          onAddComment={(type: "comment" | "review_note") =>
+            handleAddComment(type)
+          }
         />
       )}
     </div>

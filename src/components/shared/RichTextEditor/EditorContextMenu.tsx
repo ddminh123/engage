@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { Editor } from "@tiptap/react";
+import type { Selection } from "@tiptap/pm/state";
 import {
   Scissors,
   Copy,
@@ -9,74 +10,180 @@ import {
   ClipboardPaste,
   Trash2,
   MessageSquarePlus,
+  NotepadText,
   Columns2,
   Rows2,
   Merge,
-  SplitSquareHorizontal,
   TableIcon,
+  ChevronRight,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface MenuPosition {
+// ── Types ──
+
+interface MenuState {
   x: number;
   y: number;
+  savedSelection: Selection;
+  hasText: boolean;
+  inTable: boolean;
 }
 
 interface EditorContextMenuProps {
   editor: Editor;
-  onAddComment?: () => void;
+  onAddComment?: (threadType: "comment" | "review_note") => void;
 }
 
-export function EditorContextMenu({ editor, onAddComment }: EditorContextMenuProps) {
-  const [pos, setPos] = useState<MenuPosition | null>(null);
+/** Clamp a position so the element stays within the viewport */
+function clamp(click: number, size: number, viewport: number, pad = 8) {
+  return click + size > viewport - pad
+    ? Math.max(pad, viewport - size - pad)
+    : click;
+}
+
+// ── Main component ──
+
+export function EditorContextMenu({
+  editor,
+  onAddComment,
+}: EditorContextMenuProps) {
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const [activeSub, setActiveSub] = useState<"table" | "comment" | null>(null);
+  const [subStyle, setSubStyle] = useState<React.CSSProperties>({});
   const menuRef = useRef<HTMLDivElement>(null);
+  const subRef = useRef<HTMLDivElement>(null);
+  const subTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Ref to hold selection captured on mousedown (before ProseMirror changes it)
+  const savedSelRef = useRef<Selection | null>(null);
 
-  const hasSelection = useCallback(() => {
-    const { from, to } = editor.state.selection;
-    return from !== to;
-  }, [editor]);
-
-  const inTable = useCallback(() => {
-    return editor.isActive("table");
-  }, [editor]);
-
-  // Listen for contextmenu on the editor DOM
+  // Save selection on right-click mousedown BEFORE ProseMirror processes it
   useEffect(() => {
     const el = editor.view.dom;
 
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      setPos({ x: e.clientX, y: e.clientY });
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 2) {
+        // Right-click: snapshot selection now, before ProseMirror resets it
+        savedSelRef.current = editor.state.selection;
+      }
     };
 
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Use the selection we captured on mousedown (before ProseMirror changed it)
+      const sel = savedSelRef.current ?? editor.state.selection;
+      const { from, to } = sel;
+
+      setMenu({
+        x: e.clientX,
+        y: e.clientY,
+        savedSelection: sel,
+        hasText: from !== to,
+        inTable: editor.isActive("table"),
+      });
+      setActiveSub(null);
+    };
+
+    // Capture phase so we run before ProseMirror's mousedown handler
+    el.addEventListener("mousedown", handleMouseDown, true);
     el.addEventListener("contextmenu", handleContextMenu);
-    return () => el.removeEventListener("contextmenu", handleContextMenu);
+    return () => {
+      el.removeEventListener("mousedown", handleMouseDown, true);
+      el.removeEventListener("contextmenu", handleContextMenu);
+    };
   }, [editor]);
+
+  // Restore saved selection + compute menu position after mount
+  useEffect(() => {
+    if (!menu) return;
+
+    // Restore the selection that was active at the time of right-click
+    const tr = editor.state.tr.setSelection(menu.savedSelection);
+    editor.view.dispatch(tr);
+    // Re-focus the editor so ProseMirror redraws CellSelection decorations (selectedCell highlight)
+    editor.view.focus();
+
+    // Position the menu after it's rendered (requestAnimationFrame ensures DOM is ready)
+    requestAnimationFrame(() => {
+      const el = menuRef.current;
+      if (!el) return;
+      setMenuStyle({
+        left: clamp(menu.x, el.offsetWidth, window.innerWidth),
+        top: clamp(menu.y, el.offsetHeight, window.innerHeight),
+      });
+    });
+  }, [menu, editor]);
+
+  // Compute submenu position when it opens
+  useEffect(() => {
+    if (!activeSub || !menu) return;
+    requestAnimationFrame(() => {
+      const menuEl = menuRef.current;
+      const subEl = subRef.current;
+      const triggerEl = menuEl?.querySelector<HTMLElement>(
+        `[data-submenu-trigger="${activeSub}"]`,
+      );
+      if (!menuEl || !subEl || !triggerEl) return;
+
+      const menuRect = menuEl.getBoundingClientRect();
+      const triggerRect = triggerEl.getBoundingClientRect();
+      const subW = subEl.offsetWidth;
+      const subH = subEl.offsetHeight;
+      const pad = 4;
+
+      // Horizontal: try right of main menu, else left
+      const rightSpace = window.innerWidth - menuRect.right;
+      const x =
+        rightSpace >= subW + pad
+          ? menuRect.right - pad
+          : menuRect.left - subW + pad;
+
+      // Vertical: align with trigger, clamp to viewport
+      const y = clamp(triggerRect.top, subH, window.innerHeight);
+
+      setSubStyle({ left: x, top: y });
+    });
+  }, [activeSub, menu]);
 
   // Close on click outside or Escape
   useEffect(() => {
-    if (!pos) return;
+    if (!menu) return;
 
     const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setPos(null);
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        (!subRef.current || !subRef.current.contains(e.target as Node))
+      ) {
+        setMenu(null);
       }
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPos(null);
+      if (e.key === "Escape") setMenu(null);
     };
+    const handleScroll = () => setMenu(null);
 
     document.addEventListener("mousedown", handleClick);
     document.addEventListener("keydown", handleKey);
+    window.addEventListener("scroll", handleScroll, true);
     return () => {
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKey);
+      window.removeEventListener("scroll", handleScroll, true);
     };
-  }, [pos]);
+  }, [menu]);
 
-  const close = () => setPos(null);
+  const close = () => setMenu(null);
 
   const exec = (fn: () => void) => {
+    // Restore selection before executing action
+    if (menu) {
+      const tr = editor.state.tr.setSelection(menu.savedSelection);
+      editor.view.dispatch(tr);
+    }
     fn();
     close();
   };
@@ -90,83 +197,182 @@ export function EditorContextMenu({ editor, onAddComment }: EditorContextMenuPro
       });
     });
   const handlePasteRich = () => exec(() => document.execCommand("paste"));
-  const handleDelete = () => exec(() => editor.chain().focus().deleteSelection().run());
+  const handleDelete = () =>
+    exec(() => editor.chain().focus().deleteSelection().run());
 
-  if (!pos) return null;
+  // Submenu hover handlers with debounce to avoid flicker
+  const openSub = (which: "table" | "comment") => {
+    clearTimeout(subTimeout.current);
+    setActiveSub(which);
+  };
+  const closeSub = () => {
+    subTimeout.current = setTimeout(() => setActiveSub(null), 200);
+  };
+  const keepSub = () => clearTimeout(subTimeout.current);
 
-  const selected = hasSelection();
-  const tableActive = inTable();
+  if (!menu) return null;
+
+  const { hasText, inTable } = menu;
 
   return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 min-w-[220px] rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95"
-      style={{ left: pos.x, top: pos.y }}
-    >
-      {/* ── Basic text operations ── */}
-      <MenuItem icon={Scissors} label="Cắt" shortcut="⌘X" onClick={handleCut} disabled={!selected} />
-      <MenuItem icon={Copy} label="Sao chép" shortcut="⌘C" onClick={handleCopy} disabled={!selected} />
-      <MenuItem icon={Clipboard} label="Dán" shortcut="⌘V" onClick={handlePasteRich} />
-      <MenuItem icon={ClipboardPaste} label="Dán không định dạng" shortcut="⌘⇧V" onClick={handlePaste} />
-      <MenuDivider />
-      <MenuItem icon={Trash2} label="Xóa" onClick={handleDelete} disabled={!selected} />
+    <>
+      {/* ── Main context menu ── */}
+      <div
+        ref={menuRef}
+        className="fixed z-50 min-w-[220px] rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95"
+        style={menuStyle}
+      >
+        <MenuItem
+          icon={Scissors}
+          label="Cắt"
+          shortcut="⌘X"
+          onClick={handleCut}
+          disabled={!hasText}
+        />
+        <MenuItem
+          icon={Copy}
+          label="Sao chép"
+          shortcut="⌘C"
+          onClick={handleCopy}
+          disabled={!hasText}
+        />
+        <MenuItem
+          icon={Clipboard}
+          label="Dán"
+          shortcut="⌘V"
+          onClick={handlePasteRich}
+        />
+        <MenuItem
+          icon={ClipboardPaste}
+          label="Dán không định dạng"
+          shortcut="⌘⇧V"
+          onClick={handlePaste}
+        />
 
-      {/* ── Comment (only when comments enabled + text selected) ── */}
-      {onAddComment && selected && (
-        <>
-          <MenuDivider />
+        {/* Soát xét — expandable submenu with Ý kiến + Review note */}
+        {onAddComment && hasText && (
+          <>
+            <MenuDivider />
+            <div
+              data-submenu-trigger="comment"
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors hover:bg-accent",
+                activeSub === "comment" && "bg-accent",
+              )}
+              onMouseEnter={() => openSub("comment")}
+              onMouseLeave={closeSub}
+            >
+              <ClipboardCheck className="h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left">Soát xét</span>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          </>
+        )}
+
+        {/* Table — expandable submenu trigger */}
+        {inTable && (
+          <>
+            <MenuDivider />
+            <div
+              data-submenu-trigger="table"
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors hover:bg-accent",
+                activeSub === "table" && "bg-accent",
+              )}
+              onMouseEnter={() => openSub("table")}
+              onMouseLeave={closeSub}
+            >
+              <TableIcon className="h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left">Bảng</span>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          </>
+        )}
+
+        {/* Xóa — always at the bottom */}
+        <MenuDivider />
+        <MenuItem
+          icon={Trash2}
+          label="Xóa"
+          onClick={handleDelete}
+          disabled={!hasText}
+        />
+      </div>
+
+      {/* ── Comment submenu ── */}
+      {activeSub === "comment" && onAddComment && (
+        <div
+          ref={subRef}
+          className="fixed z-[51] min-w-[180px] rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95"
+          style={subStyle}
+          onMouseEnter={keepSub}
+          onMouseLeave={closeSub}
+        >
           <MenuItem
             icon={MessageSquarePlus}
-            label="Bình luận"
-            shortcut="⌘⌥M"
-            onClick={() => exec(() => onAddComment())}
+            label="Ý kiến"
+            onClick={() => exec(() => onAddComment("comment"))}
           />
-        </>
+          <MenuItem
+            icon={NotepadText}
+            label="Review note"
+            onClick={() => exec(() => onAddComment("review_note"))}
+          />
+        </div>
       )}
 
-      {/* ── Table operations (only when cursor is inside a table) ── */}
-      {tableActive && (
-        <>
-          <MenuDivider />
-          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Bảng
-          </div>
+      {/* ── Table submenu ── */}
+      {activeSub === "table" && inTable && (
+        <div
+          ref={subRef}
+          className="fixed z-[51] min-w-[200px] rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95"
+          style={subStyle}
+          onMouseEnter={keepSub}
+          onMouseLeave={closeSub}
+        >
           <MenuItem
             icon={Columns2}
             label="Thêm cột trước"
-            onClick={() => exec(() => editor.chain().focus().addColumnBefore().run())}
+            onClick={() =>
+              exec(() => editor.chain().focus().addColumnBefore().run())
+            }
           />
           <MenuItem
             icon={Columns2}
             label="Thêm cột sau"
-            onClick={() => exec(() => editor.chain().focus().addColumnAfter().run())}
+            onClick={() =>
+              exec(() => editor.chain().focus().addColumnAfter().run())
+            }
           />
           <MenuItem
             icon={Rows2}
             label="Thêm hàng trên"
-            onClick={() => exec(() => editor.chain().focus().addRowBefore().run())}
+            onClick={() =>
+              exec(() => editor.chain().focus().addRowBefore().run())
+            }
           />
           <MenuItem
             icon={Rows2}
             label="Thêm hàng dưới"
-            onClick={() => exec(() => editor.chain().focus().addRowAfter().run())}
+            onClick={() =>
+              exec(() => editor.chain().focus().addRowAfter().run())
+            }
           />
           <MenuDivider />
           <MenuItem
             icon={Merge}
-            label="Gộp ô"
-            onClick={() => exec(() => editor.chain().focus().mergeCells().run())}
-          />
-          <MenuItem
-            icon={SplitSquareHorizontal}
-            label="Tách ô"
-            onClick={() => exec(() => editor.chain().focus().splitCell().run())}
+            label="Gộp/Tách ô"
+            onClick={() =>
+              exec(() => editor.chain().focus().mergeOrSplit().run())
+            }
           />
           <MenuDivider />
           <MenuItem
             icon={Columns2}
             label="Xóa cột"
-            onClick={() => exec(() => editor.chain().focus().deleteColumn().run())}
+            onClick={() =>
+              exec(() => editor.chain().focus().deleteColumn().run())
+            }
             destructive
           />
           <MenuItem
@@ -178,12 +384,14 @@ export function EditorContextMenu({ editor, onAddComment }: EditorContextMenuPro
           <MenuItem
             icon={TableIcon}
             label="Xóa bảng"
-            onClick={() => exec(() => editor.chain().focus().deleteTable().run())}
+            onClick={() =>
+              exec(() => editor.chain().focus().deleteTable().run())
+            }
             destructive
           />
-        </>
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -221,7 +429,9 @@ function MenuItem({
       <Icon className="h-4 w-4 shrink-0" />
       <span className="flex-1 text-left">{label}</span>
       {shortcut && (
-        <span className="ml-auto text-xs text-muted-foreground">{shortcut}</span>
+        <span className="ml-auto text-xs text-muted-foreground">
+          {shortcut}
+        </span>
       )}
     </button>
   );

@@ -90,8 +90,8 @@ export function WorkpaperCommentsTab({
       {isEmpty && (
         <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
           <MessageSquare className="h-8 w-8 opacity-40" />
-          <p className="text-sm">Chưa có bình luận nào</p>
-          <p className="text-xs">Chọn văn bản và nhấn nút bình luận để thêm</p>
+          <p className="text-sm">Chưa có ý kiến nào</p>
+          <p className="text-xs">Chọn văn bản và nhấn nút ý kiến để thêm</p>
         </div>
       )}
 
@@ -127,8 +127,8 @@ export function WorkpaperCommentsTab({
         <div>
           {openReviewNotes.length > 0 && (
             <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <MessageSquare className="h-3.5 w-3.5" />
-              Bình luận ({openComments.length})
+              <MessageSquare className="h-3.5 w-3.5" />Ý kiến (
+              {openComments.length})
             </p>
           )}
           <div className="space-y-2">
@@ -219,7 +219,7 @@ function NewCommentBox({
         {isReviewNote ? (
           <span className="font-medium text-orange-600">Review Note</span>
         ) : (
-          "Bình luận về"
+          "Ý kiến về"
         )}
         :{" "}
         <span className="font-medium text-foreground">
@@ -230,7 +230,7 @@ function NewCommentBox({
         ref={textareaRef}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={isReviewNote ? "Nhập review note..." : "Nhập bình luận..."}
+        placeholder={isReviewNote ? "Nhập review note..." : "Nhập ý kiến..."}
         className="min-h-[60px] text-sm resize-none"
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
