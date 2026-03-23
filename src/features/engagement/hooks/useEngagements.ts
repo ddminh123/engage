@@ -45,6 +45,12 @@ import {
   fetchWpAssignments,
   addWpAssignmentApi,
   removeWpAssignmentApi,
+  fetchCommentThreads,
+  createCommentThreadApi,
+  addCommentReplyApi,
+  updateThreadStatusApi,
+  deleteCommentThreadApi,
+  updateProcedureContentApi,
 } from '../api';
 import type {
   EngagementDetail,
@@ -798,6 +804,124 @@ export function useRemoveWpAssignment() {
     }) => removeWpAssignmentApi(engagementId, { entityType, entityId, userId }),
     onSuccess: (data, { engagementId }) => {
       qc.setQueryData(wpAssignmentsKey(engagementId), data);
+    },
+  });
+}
+
+// ── WP Comments ──
+
+const wpCommentsKey = (engagementId: string, entityType: string, entityId: string) =>
+  ['wp-comments', engagementId, entityType, entityId] as const;
+
+export function useCommentThreads(engagementId: string, entityType: string, entityId: string) {
+  return useQuery({
+    queryKey: wpCommentsKey(engagementId, entityType, entityId),
+    queryFn: () => fetchCommentThreads(engagementId, entityType, entityId),
+    enabled: !!engagementId && !!entityType && !!entityId,
+  });
+}
+
+export function useCreateCommentThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      ...data
+    }: {
+      engagementId: string;
+      entityType: string;
+      entityId: string;
+      threadType?: 'comment' | 'review_note';
+      quote?: string | null;
+      contentAnchor?: string | null;
+      comment: string;
+    }) => createCommentThreadApi(engagementId, data),
+    onSuccess: (_, { engagementId, entityType, entityId }) => {
+      qc.invalidateQueries({ queryKey: wpCommentsKey(engagementId, entityType, entityId) });
+    },
+  });
+}
+
+export function useAddCommentReply() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      threadId,
+      content,
+      entityType,
+      entityId,
+    }: {
+      engagementId: string;
+      threadId: string;
+      content: string;
+      entityType: string;
+      entityId: string;
+    }) => addCommentReplyApi(engagementId, threadId, content),
+    onSuccess: (_, { engagementId, entityType, entityId }) => {
+      qc.invalidateQueries({ queryKey: wpCommentsKey(engagementId, entityType, entityId) });
+    },
+  });
+}
+
+export function useUpdateThreadStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      threadId,
+      status,
+      entityType,
+      entityId,
+    }: {
+      engagementId: string;
+      threadId: string;
+      status: 'open' | 'resolved' | 'detached';
+      entityType: string;
+      entityId: string;
+    }) => updateThreadStatusApi(engagementId, threadId, status),
+    onSuccess: (_, { engagementId, entityType, entityId }) => {
+      qc.invalidateQueries({ queryKey: wpCommentsKey(engagementId, entityType, entityId) });
+    },
+  });
+}
+
+export function useDeleteCommentThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      threadId,
+      entityType,
+      entityId,
+    }: {
+      engagementId: string;
+      threadId: string;
+      entityType: string;
+      entityId: string;
+    }) => deleteCommentThreadApi(engagementId, threadId),
+    onSuccess: (_, { engagementId, entityType, entityId }) => {
+      qc.invalidateQueries({ queryKey: wpCommentsKey(engagementId, entityType, entityId) });
+    },
+  });
+}
+
+// ── Procedure Content (Tiptap JSON) ──
+
+export function useUpdateProcedureContent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      procedureId,
+      content,
+    }: {
+      engagementId: string;
+      procedureId: string;
+      content: unknown;
+    }) => updateProcedureContentApi(engagementId, procedureId, content),
+    onSuccess: (_, { engagementId }) => {
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
     },
   });
 }

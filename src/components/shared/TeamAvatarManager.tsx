@@ -61,7 +61,7 @@ export function TeamAvatarManager({
             <button
               type="button"
               title="Quản lý nhóm kiểm toán"
-              className="flex items-center"
+              className="flex items-center cursor-pointer bg-transparent border-0 p-0"
             />
           }
         >
@@ -69,7 +69,7 @@ export function TeamAvatarManager({
             users={avatarUsers}
             max={5}
             size="sm"
-            onAdd={() => setOpen(true)}
+            showAddPlaceholder
           />
         </PopoverTrigger>
         <PopoverContent className="w-[320px] p-0" align="start">

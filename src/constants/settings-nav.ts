@@ -8,6 +8,7 @@ export const SETTINGS_NAV_ITEMS = [
   { label: "Kế hoạch", href: "/settings/plan" },
   { label: "Cuộc kiểm toán", href: "/settings/engagement" },
   { label: "Phát hiện", href: "/settings/finding" },
+  { label: "Thư viện mẫu", href: "/settings/templates" },
 ] as const;
 
 export type SettingsNavItem = (typeof SETTINGS_NAV_ITEMS)[number];

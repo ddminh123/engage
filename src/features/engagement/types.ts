@@ -37,6 +37,43 @@ export interface WpAssignment {
 }
 
 // =============================================================================
+// WP COMMENTS (inline document comments)
+// =============================================================================
+
+export interface WpCommentAuthor {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+}
+
+export interface WpComment {
+  id: string;
+  threadId: string;
+  content: string;
+  authorId: string;
+  createdAt: string;
+  updatedAt: string;
+  author: WpCommentAuthor;
+}
+
+export type WpThreadType = 'comment' | 'review_note';
+
+export interface WpCommentThread {
+  id: string;
+  entityType: string;
+  entityId: string;
+  threadType: WpThreadType;
+  quote: string | null;
+  contentAnchor: string | null;
+  status: 'open' | 'resolved' | 'detached';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  creator: WpCommentAuthor;
+  comments: WpComment[];
+}
+
+// =============================================================================
 // ENGAGEMENT
 // =============================================================================
 
@@ -205,6 +242,7 @@ export interface EngagementProcedure {
   exceptions: number | null;
   sortOrder: number;
   priority: string | null;
+  content: unknown | null;
   reviewNotes: string | null;
   performedBy: string | null;
   reviewedBy: string | null;

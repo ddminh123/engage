@@ -116,32 +116,44 @@ export function useProcedureForm(
     [],
   );
 
+  // ── Build save payload ──
+  const buildPayload = useCallback((): ProcedureUpdateInput => ({
+    title: state.title,
+    description: state.description,
+    procedures: state.procedures,
+    procedureType: state.procedureType,
+    procedureCategory: state.procedureCategory,
+    priority: state.priority,
+    status: state.status,
+    observations: state.observations,
+    conclusion: state.conclusion,
+    effectiveness: state.effectiveness,
+    sampleSize: state.sampleSize,
+    exceptions: state.exceptions,
+    controlRefIds: state.controlRefIds,
+    riskRefIds: state.riskRefIds,
+    objectiveRefIds: state.objectiveRefIds,
+  }), [state]);
+
   // ── Explicit save (all changed fields at once) ──
   const handleSave = useCallback(() => {
     if (!procedure) return;
-    const data: ProcedureUpdateInput = {
-      title: state.title,
-      description: state.description,
-      procedures: state.procedures,
-      procedureType: state.procedureType,
-      procedureCategory: state.procedureCategory,
-      priority: state.priority,
-      status: state.status,
-      observations: state.observations,
-      conclusion: state.conclusion,
-      effectiveness: state.effectiveness,
-      sampleSize: state.sampleSize,
-      exceptions: state.exceptions,
-      controlRefIds: state.controlRefIds,
-      riskRefIds: state.riskRefIds,
-      objectiveRefIds: state.objectiveRefIds,
-    };
     updateMutation.mutate({
       engagementId,
       procedureId: procedure.id,
-      data,
+      data: buildPayload(),
     });
-  }, [engagementId, procedure, state, updateMutation]);
+  }, [engagementId, procedure, buildPayload, updateMutation]);
+
+  // ── Async save — returns promise for awaiting ──
+  const handleSaveAsync = useCallback(async () => {
+    if (!procedure) return;
+    await updateMutation.mutateAsync({
+      engagementId,
+      procedureId: procedure.id,
+      data: buildPayload(),
+    });
+  }, [engagementId, procedure, buildPayload, updateMutation]);
 
   // ── Set effectiveness shortcut ──
   const handleSetEffectiveness = useCallback(
@@ -155,6 +167,7 @@ export function useProcedureForm(
     state,
     setField,
     handleSave,
+    handleSaveAsync,
     handleSetEffectiveness,
     isSaving: updateMutation.isPending,
   };

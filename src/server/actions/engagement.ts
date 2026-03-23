@@ -107,6 +107,7 @@ export const updateProcedureSchema = createProcedureSchema
     sampleSize: z.number().int().nullable().optional(),
     exceptions: z.number().int().nullable().optional(),
     reviewNotes: z.string().nullable().optional(),
+    content: z.any().optional(),
     controlRefIds: z.array(z.string()).optional(),
     riskRefIds: z.array(z.string()).optional(),
     objectiveRefIds: z.array(z.string()).optional(),
@@ -342,6 +343,7 @@ function mapProcedure(p: any) {
     exceptions: p.exceptions as number | null,
     sortOrder: p.sort_order as number,
     priority: p.priority as string | null,
+    content: p.content ?? null,
     reviewNotes: p.review_notes as string | null,
     performedBy: p.performed_by as string | null,
     reviewedBy: p.reviewed_by as string | null,
@@ -1163,6 +1165,7 @@ export async function updateProcedure(
   if (parsed.sampleSize !== undefined) data.sample_size = parsed.sampleSize ?? null;
   if (parsed.exceptions !== undefined) data.exceptions = parsed.exceptions ?? null;
   if (parsed.reviewNotes !== undefined) data.review_notes = parsed.reviewNotes ?? null;
+  if (parsed.content !== undefined) data.content = parsed.content ?? undefined;
   if (parsed.sectionId !== undefined) data.section_id = parsed.sectionId;
   if (parsed.objectiveId !== undefined) data.objective_id = parsed.objectiveId;
 
@@ -2624,4 +2627,202 @@ export async function bulkAssignChildren(
   });
 
   return { count: result.count };
+}
+
+// =============================================================================
+// WORKPAPER COMMENTS
+// =============================================================================
+
+const createThreadSchema = z.object({
+  entityType: z.string().min(1),
+  entityId: z.string().min(1),
+  threadType: z.enum(['comment', 'review_note']).optional().default('comment'),
+  quote: z.string().nullable().optional(),
+  contentAnchor: z.string().nullable().optional(),
+  comment: z.string().min(1),
+});
+
+export async function getCommentThreads(entityType: string, entityId: string) {
+  return prisma.wpCommentThread.findMany({
+    where: { entity_type: entityType, entity_id: entityId },
+    include: {
+      creator: { select: { id: true, name: true, avatar_url: true } },
+      comments: {
+        include: {
+          author: { select: { id: true, name: true, avatar_url: true } },
+        },
+        orderBy: { created_at: 'asc' },
+      },
+    },
+    orderBy: { created_at: 'desc' },
+  });
+}
+
+export async function createCommentThread(
+  data: z.infer<typeof createThreadSchema>,
+  userId: string,
+  userName: string,
+) {
+  const parsed = createThreadSchema.parse(data);
+
+  const thread = await prisma.wpCommentThread.create({
+    data: {
+      entity_type: parsed.entityType,
+      entity_id: parsed.entityId,
+      thread_type: parsed.threadType,
+      quote: parsed.quote ?? null,
+      content_anchor: parsed.contentAnchor ?? null,
+      created_by: userId,
+      comments: {
+        create: {
+          content: parsed.comment,
+          author_id: userId,
+        },
+      },
+    },
+    include: {
+      creator: { select: { id: true, name: true, avatar_url: true } },
+      comments: {
+        include: {
+          author: { select: { id: true, name: true, avatar_url: true } },
+        },
+        orderBy: { created_at: 'asc' },
+      },
+    },
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'create',
+    entityType: 'wp_comment_thread',
+    entityId: thread.id,
+    changes: { thread: { old: null, new: { entityType: parsed.entityType, entityId: parsed.entityId, quote: parsed.quote } } },
+  });
+
+  return thread;
+}
+
+export async function addCommentToThread(
+  threadId: string,
+  content: string,
+  userId: string,
+  userName: string,
+) {
+  const comment = await prisma.wpComment.create({
+    data: {
+      thread_id: threadId,
+      content,
+      author_id: userId,
+    },
+    include: {
+      author: { select: { id: true, name: true, avatar_url: true } },
+    },
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'create',
+    entityType: 'wp_comment',
+    entityId: comment.id,
+    changes: { comment: { old: null, new: { threadId, content } } },
+  });
+
+  return comment;
+}
+
+export async function updateThreadStatus(
+  threadId: string,
+  status: 'open' | 'resolved' | 'detached',
+  userId: string,
+  userName: string,
+) {
+  const existing = await prisma.wpCommentThread.findUniqueOrThrow({ where: { id: threadId } });
+
+  const thread = await prisma.wpCommentThread.update({
+    where: { id: threadId },
+    data: { status },
+    include: {
+      creator: { select: { id: true, name: true, avatar_url: true } },
+      comments: {
+        include: {
+          author: { select: { id: true, name: true, avatar_url: true } },
+        },
+        orderBy: { created_at: 'asc' },
+      },
+    },
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'update',
+    entityType: 'wp_comment_thread',
+    entityId: threadId,
+    changes: { status: { old: existing.status, new: status } },
+  });
+
+  return thread;
+}
+
+export async function deleteComment(
+  commentId: string,
+  userId: string,
+  userName: string,
+) {
+  const comment = await prisma.wpComment.findUniqueOrThrow({ where: { id: commentId } });
+
+  await prisma.wpComment.delete({ where: { id: commentId } });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'delete',
+    entityType: 'wp_comment',
+    entityId: commentId,
+    changes: { comment: { old: { threadId: comment.thread_id, content: comment.content }, new: null } },
+  });
+}
+
+export async function deleteCommentThread(
+  threadId: string,
+  userId: string,
+  userName: string,
+) {
+  await prisma.wpCommentThread.delete({ where: { id: threadId } });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'delete',
+    entityType: 'wp_comment_thread',
+    entityId: threadId,
+    changes: { thread: { old: threadId, new: null } },
+  });
+}
+
+// =============================================================================
+// PROCEDURE CONTENT (Tiptap JSON)
+// =============================================================================
+
+export async function updateProcedureContent(
+  procedureId: string,
+  content: unknown,
+  userId: string,
+  userName: string,
+) {
+  await prisma.engagementProcedure.update({
+    where: { id: procedureId },
+    data: { content: content as any },
+  });
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'update',
+    entityType: 'engagement_procedure',
+    entityId: procedureId,
+    changes: { content: { old: '(document)', new: '(document updated)' } },
+  });
 }

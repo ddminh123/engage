@@ -140,6 +140,9 @@ model User {
   team_memberships TeamMember[]
   engagement_memberships EngagementMember[] @relation("EngagementMembers")
   wp_assignments         WpAssignment[]    @relation("WpAssignments")
+  wp_comments            WpComment[]       @relation("WpCommentAuthor")
+  wp_thread_creators     WpCommentThread[] @relation("WpThreadCreator")
+  created_templates      Template[]        @relation("TemplateCreator")
 
   @@index([status])
   @@index([role])
@@ -889,6 +892,7 @@ model EngagementProcedure {
   exceptions     Int?      // number of exceptions found
   sort_order     Int       @default(0)
   priority       String?   // high | medium | low
+  content        Json?     @db.Json   // unified Tiptap document JSON (replaces separate rich text fields)
   review_notes   String?   @db.Text
   performed_by   String?   // placeholder — will link to User
   reviewed_by    String?   // placeholder — will link to User
@@ -1007,4 +1011,86 @@ model ProcedureObjectiveRef {
 
   @@id([procedure_id, rcm_objective_id])
   @@map("procedure_objective_ref")
+}
+
+// =============================================================================
+// WORKPAPER COMMENTS — Inline comment threads on documents
+// =============================================================================
+
+model WpCommentThread {
+  id             String    @id @default(cuid())
+  entity_type    String    // procedure | risk_assessment | understanding
+  entity_id      String    // FK to the entity (polymorphic)
+  thread_type    String    @default("comment") // comment | review_note
+  quote          String?   @db.Text   // original selected text
+  content_anchor String?   @db.Text   // serialized position info for anchoring
+  status         String    @default("open") // open | resolved | detached
+  created_by     String
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  creator  User          @relation("WpThreadCreator", fields: [created_by], references: [id])
+  comments WpComment[]
+
+  @@index([entity_type, entity_id])
+  @@index([status])
+  @@index([created_by])
+  @@map("wp_comment_thread")
+}
+
+model WpComment {
+  id         String    @id @default(cuid())
+  thread_id  String
+  content    String    @db.Text
+  author_id  String
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  thread WpCommentThread @relation(fields: [thread_id], references: [id], onDelete: Cascade)
+  author User            @relation("WpCommentAuthor", fields: [author_id], references: [id])
+
+  @@index([thread_id])
+  @@index([author_id])
+  @@map("wp_comment")
+}
+
+// =============================================================================
+// TEMPLATE LIBRARY — Reusable rich-text templates for workpapers
+// =============================================================================
+
+model TemplateCategory {
+  id        String   @id @default(cuid())
+  name      String
+  parent_id String?
+  sort_order Int     @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  parent   TemplateCategory?  @relation("CategoryTree", fields: [parent_id], references: [id], onDelete: SetNull)
+  children TemplateCategory[] @relation("CategoryTree")
+  templates Template[]
+
+  @@index([parent_id])
+  @@map("template_category")
+}
+
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  content     Json     // Tiptap JSON content
+  entity_type String   // "procedure" | "entity_risk_assessment"
+  category_id String?
+  is_active   Boolean  @default(true)
+  created_by  String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  category TemplateCategory? @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  creator  User              @relation("TemplateCreator", fields: [created_by], references: [id])
+
+  @@index([entity_type])
+  @@index([category_id])
+  @@index([created_by])
+  @@map("template")
 }

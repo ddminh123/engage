@@ -10,6 +10,10 @@ import type {
   EntityTypeInput,
   AuditArea,
   AuditAreaInput,
+  Template,
+  TemplateInput,
+  TemplateCategory,
+  TemplateCategoryInput,
 } from './types';
 
 interface ApiResponse<T> {
@@ -240,4 +244,71 @@ export async function deleteAuditAreaApi(id: string): Promise<{ id: string }> {
   });
 
   return handleResponse<{ id: string }>(response);
+}
+
+// =============================================================================
+// TEMPLATE CATEGORIES
+// =============================================================================
+
+export async function fetchTemplateCategories(): Promise<TemplateCategory[]> {
+  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATE_CATEGORIES);
+  return handleResponse<TemplateCategory[]>(response);
+}
+
+export async function createTemplateCategoryApi(data: TemplateCategoryInput): Promise<TemplateCategory> {
+  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATE_CATEGORIES, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<TemplateCategory>(response);
+}
+
+// =============================================================================
+// TEMPLATES
+// =============================================================================
+
+export async function fetchTemplates(filters?: {
+  entityType?: string;
+  categoryId?: string;
+  isActive?: boolean;
+}): Promise<Template[]> {
+  const params = new URLSearchParams();
+  if (filters?.entityType) params.set('entityType', filters.entityType);
+  if (filters?.categoryId) params.set('categoryId', filters.categoryId);
+  if (filters?.isActive !== undefined) params.set('isActive', String(filters.isActive));
+
+  const url = `${API_ROUTES.SETTINGS_TEMPLATES}${params.toString() ? `?${params}` : ''}`;
+  const response = await fetch(url);
+  return handleResponse<Template[]>(response);
+}
+
+export async function fetchTemplateById(id: string): Promise<Template> {
+  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATES_BY_ID(id));
+  return handleResponse<Template>(response);
+}
+
+export async function createTemplateApi(data: TemplateInput): Promise<Template> {
+  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATES, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<Template>(response);
+}
+
+export async function updateTemplateApi(id: string, data: Partial<TemplateInput>): Promise<Template> {
+  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATES_BY_ID(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<Template>(response);
+}
+
+export async function deleteTemplateApi(id: string): Promise<{ success: boolean }> {
+  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATES_BY_ID(id), {
+    method: 'DELETE',
+  });
+  return handleResponse<{ success: boolean }>(response);
 }

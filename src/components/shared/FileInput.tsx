@@ -13,6 +13,8 @@ export type FileInputProps = {
   className?: string;
   placeholder?: string;
   hint?: string;
+  /** Compact layout for narrow spaces like task panes */
+  compact?: boolean;
 };
 
 export function FileInput({
@@ -24,6 +26,7 @@ export function FileInput({
   className,
   placeholder = "Kéo thả file vào đây hoặc bấm để chọn",
   hint = "Hỗ trợ tải lên một hoặc nhiều tệp",
+  compact = false,
 }: FileInputProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -66,7 +69,7 @@ export function FileInput({
   };
 
   return (
-    <div className={cn("space-y-2.5", className)}>
+    <div className={cn(compact ? "space-y-1.5" : "space-y-2.5", className)}>
       <Input
         ref={inputRef}
         id={id}
@@ -91,74 +94,115 @@ export function FileInput({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
-          "group relative cursor-pointer rounded-xl border border-dashed px-4 py-3 transition-all outline-none",
+          "group relative cursor-pointer border border-dashed transition-all outline-none",
           "bg-muted/20 border-border/70 hover:bg-muted/35 hover:border-border",
           "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           isDragging && "border-primary bg-primary/5 ring-2 ring-primary/15",
           files.length > 0 && "bg-background",
+          compact ? "rounded-lg px-2.5 py-2" : "rounded-xl px-4 py-3",
         )}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-background shadow-sm transition-colors",
-              isDragging
-                ? "border-primary/40 bg-primary/5"
-                : "border-border/70 group-hover:border-border",
-            )}
-          >
+        <div className={cn("flex items-center", compact ? "gap-2" : "gap-3")}>
+          {!compact && (
+            <div
+              className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-background shadow-sm transition-colors",
+                isDragging
+                  ? "border-primary/40 bg-primary/5"
+                  : "border-border/70 group-hover:border-border",
+              )}
+            >
+              <Upload
+                className={cn(
+                  "h-4 w-4 transition-colors",
+                  isDragging ? "text-primary" : "text-muted-foreground",
+                )}
+              />
+            </div>
+          )}
+
+          {compact && (
             <Upload
               className={cn(
-                "h-4 w-4 transition-colors",
+                "h-3.5 w-3.5 shrink-0 transition-colors",
                 isDragging ? "text-primary" : "text-muted-foreground",
               )}
             />
-          </div>
+          )}
 
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-foreground">
+            <div
+              className={cn(
+                "truncate font-medium text-foreground",
+                compact ? "text-xs" : "text-sm",
+              )}
+            >
               {placeholder}
             </div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{hint}</div>
+            {!compact && (
+              <div className="mt-0.5 text-xs text-muted-foreground">{hint}</div>
+            )}
           </div>
 
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              openPicker();
-            }}
-          >
-            Chọn tệp
-          </Button>
+          {!compact && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                openPicker();
+              }}
+            >
+              Chọn tệp
+            </Button>
+          )}
         </div>
       </div>
 
       {files.length > 0 && (
-        <div className="space-y-2">
+        <div className={cn(compact ? "space-y-1" : "space-y-2")}>
           {files.map((file, index) => (
             <div
               key={`${file.name}-${index}`}
               className={cn(
-                "flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5",
+                "flex items-center justify-between border",
                 "bg-background shadow-sm",
+                compact
+                  ? "gap-2 rounded-lg px-2 py-1.5"
+                  : "gap-3 rounded-xl px-3 py-2.5",
               )}
             >
-              <div className="min-w-0 flex items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-muted/30">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                </div>
+              <div
+                className={cn(
+                  "min-w-0 flex items-center",
+                  compact ? "gap-2" : "gap-3",
+                )}
+              >
+                {!compact && (
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-muted/30">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                )}
+                {compact && (
+                  <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                )}
 
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground">
+                  <div
+                    className={cn(
+                      "truncate font-medium text-foreground",
+                      compact ? "text-xs" : "text-sm",
+                    )}
+                  >
                     {file.name}
                   </div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">
-                    {formatFileSize(file.size)}
-                  </div>
+                  {!compact && (
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {formatFileSize(file.size)}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -166,14 +210,17 @@ export function FileInput({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
+                className={cn(
+                  "shrink-0 rounded-lg text-muted-foreground hover:text-foreground",
+                  compact ? "h-6 w-6" : "h-8 w-8",
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   removeFile(index);
                 }}
                 aria-label={`Xóa ${file.name}`}
               >
-                <X className="h-4 w-4" />
+                <X className={cn(compact ? "h-3 w-3" : "h-4 w-4")} />
               </Button>
             </div>
           ))}

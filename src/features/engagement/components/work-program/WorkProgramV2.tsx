@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useMemo, useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Layers, Target, Plus, Check, X, ChevronsUpDown } from "lucide-react";
 import {
   useBatchAction,
@@ -384,16 +385,18 @@ export function WorkProgramV2({
     return { sectionMap, objectiveMap, procedureMap };
   }, [sections, standaloneObjectives]);
 
+  const router = useRouter();
+
   const handleViewItem = useCallback(
     (type: "objective" | "procedure", id: string) => {
       if (type === "objective") {
         setViewObjective(entityMaps.objectiveMap.get(id) ?? null);
       } else {
-        // Open procedure in fullscreen form
-        setEditProcedure(entityMaps.procedureMap.get(id) ?? null);
+        // Navigate to workpaper view
+        router.push(`/engagement?id=${engagementId}&wp=${id}`);
       }
     },
-    [entityMaps],
+    [entityMaps, engagementId, router],
   );
 
   const handleViewSection = useCallback(
@@ -406,10 +409,10 @@ export function WorkProgramV2({
   const handleOpenForm = useCallback(
     (type: "objective" | "procedure", id: string) => {
       if (type === "procedure") {
-        setEditProcedure(entityMaps.procedureMap.get(id) ?? null);
+        router.push(`/engagement?id=${engagementId}&wp=${id}`);
       }
     },
-    [entityMaps],
+    [engagementId, router],
   );
 
   // ── Cross-parent move handlers ──

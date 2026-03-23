@@ -183,3 +183,44 @@
   outline: 2px solid oklch(0.488 0.243 264.376);
   outline-offset: 2px;
 }
+
+/* ── Workpaper comment highlights ── */
+.wp-comment-mark {
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+/* Comment type — yellow */
+.wp-comment-mark[data-thread-type="comment"] {
+  background-color: #fef9c3;
+  border-bottom-color: #facc15;
+}
+.wp-comment-mark[data-thread-type="comment"]:hover {
+  background-color: #fef08a;
+}
+
+/* Review note type — orange/amber */
+.wp-comment-mark[data-thread-type="review_note"] {
+  background-color: #ffedd5;
+  border-bottom-color: #f97316;
+}
+.wp-comment-mark[data-thread-type="review_note"]:hover {
+  background-color: #fed7aa;
+}
+
+/* Active (clicked) state — stronger highlight */
+.wp-comment-mark.wp-comment-active {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Resolved state — faded */
+.wp-comment-mark[data-resolved="true"] {
+  opacity: 0.5;
+  border-bottom-style: dashed;
+}
+.wp-comment-mark[data-resolved="true"]:hover {
+  opacity: 0.75;
+}

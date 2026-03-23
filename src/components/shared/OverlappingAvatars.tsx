@@ -15,6 +15,8 @@ interface OverlappingAvatarsProps {
   max?: number;
   size?: "sm" | "default";
   onAdd?: () => void;
+  /** Show the + placeholder as a non-interactive element (safe inside PopoverTrigger) */
+  showAddPlaceholder?: boolean;
   className?: string;
 }
 
@@ -23,6 +25,7 @@ export function OverlappingAvatars({
   max = 5,
   size = "sm",
   onAdd,
+  showAddPlaceholder,
   className,
 }: OverlappingAvatarsProps) {
   const visible = users.slice(0, max);
@@ -71,6 +74,18 @@ export function OverlappingAvatars({
         >
           <Plus className={size === "sm" ? "h-3 w-3" : "h-4 w-4"} />
         </button>
+      )}
+
+      {!onAdd && showAddPlaceholder && (
+        <div
+          className={cn(
+            "relative flex items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/30 text-muted-foreground",
+            users.length > 0 && "-ml-1",
+            size === "sm" ? "h-6 w-6" : "h-8 w-8",
+          )}
+        >
+          <Plus className={size === "sm" ? "h-3 w-3" : "h-4 w-4"} />
+        </div>
       )}
     </div>
   );

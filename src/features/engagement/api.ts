@@ -8,6 +8,8 @@ import type {
   EngagementProcedure,
   EngagementMember,
   WpAssignment,
+  WpCommentThread,
+  WpComment,
   DraftFinding,
   SectionInput,
   SectionUpdateInput,
@@ -545,4 +547,79 @@ export async function removeWpAssignmentApi(
     body: JSON.stringify(data),
   });
   return handleResponse<WpAssignment[]>(response);
+}
+
+// ── WP Comments ──
+
+export async function fetchCommentThreads(
+  engagementId: string,
+  entityType: string,
+  entityId: string,
+): Promise<WpCommentThread[]> {
+  const url = `${API_ROUTES.ENGAGEMENT_WP_COMMENTS(engagementId)}?entityType=${entityType}&entityId=${entityId}`;
+  const response = await fetch(url);
+  return handleResponse<WpCommentThread[]>(response);
+}
+
+export async function createCommentThreadApi(
+  engagementId: string,
+  data: { entityType: string; entityId: string; threadType?: 'comment' | 'review_note'; quote?: string | null; contentAnchor?: string | null; comment: string },
+): Promise<WpCommentThread> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_WP_COMMENTS(engagementId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<WpCommentThread>(response);
+}
+
+export async function addCommentReplyApi(
+  engagementId: string,
+  threadId: string,
+  content: string,
+): Promise<WpComment> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_WP_COMMENT_THREAD(engagementId, threadId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  return handleResponse<WpComment>(response);
+}
+
+export async function updateThreadStatusApi(
+  engagementId: string,
+  threadId: string,
+  status: 'open' | 'resolved' | 'detached',
+): Promise<{ id: string; status: string }> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_WP_COMMENT_THREAD(engagementId, threadId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  return handleResponse<{ id: string; status: string }>(response);
+}
+
+export async function deleteCommentThreadApi(
+  engagementId: string,
+  threadId: string,
+): Promise<void> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_WP_COMMENT_THREAD(engagementId, threadId), {
+    method: 'DELETE',
+  });
+  return handleResponse<void>(response);
+}
+
+// ── Procedure Content (Tiptap JSON) ──
+
+export async function updateProcedureContentApi(
+  engagementId: string,
+  procedureId: string,
+  content: unknown,
+): Promise<void> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_PROCEDURE_BY_ID(engagementId, procedureId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  return handleResponse<void>(response);
 }

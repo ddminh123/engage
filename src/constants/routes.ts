@@ -48,6 +48,8 @@ export const API_ROUTES = {
   ENGAGEMENT_MEMBER_BY_ID: (id: string, userId: string) => `/api/engagement/${id}/members/${userId}`,
   ENGAGEMENT_PROCEDURE_ASSIGNEE: (id: string, pId: string) => `/api/engagement/${id}/procedures/${pId}/assignee`,
   ENGAGEMENT_WP_ASSIGNMENTS: (id: string) => `/api/engagement/${id}/wp-assignments`,
+  ENGAGEMENT_WP_COMMENTS: (id: string) => `/api/engagement/${id}/wp-comments`,
+  ENGAGEMENT_WP_COMMENT_THREAD: (id: string, threadId: string) => `/api/engagement/${id}/wp-comments/${threadId}`,
 
   // Finding module
   FINDING: "/api/finding",
@@ -68,6 +70,11 @@ export const API_ROUTES = {
   // Expertise (Settings)
   SETTINGS_EXPERTISE: "/api/settings/expertise",
   SETTINGS_EXPERTISE_BY_ID: (id: string) => `/api/settings/expertise/${id}`,
+
+  // Template library (Settings)
+  SETTINGS_TEMPLATES: "/api/settings/templates",
+  SETTINGS_TEMPLATES_BY_ID: (id: string) => `/api/settings/templates/${id}`,
+  SETTINGS_TEMPLATE_CATEGORIES: "/api/settings/template-categories",
 
   // Document module
   DOCUMENT: "/api/document",

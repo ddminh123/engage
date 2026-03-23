@@ -113,3 +113,58 @@ export interface AuditAreaInput {
   is_active?: boolean;
   sort_order?: number;
 }
+
+// =============================================================================
+// TEMPLATE CATEGORY (Danh mục mẫu)
+// =============================================================================
+
+export interface TemplateCategoryChild {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface TemplateCategory {
+  id: string;
+  name: string;
+  parentId: string | null;
+  sortOrder: number;
+  templateCount: number;
+  children?: TemplateCategoryChild[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateCategoryInput {
+  name: string;
+  parent_id?: string | null;
+  sort_order?: number;
+}
+
+// =============================================================================
+// TEMPLATE (Mẫu workpaper)
+// =============================================================================
+
+export interface Template {
+  id: string;
+  name: string;
+  description: string | null;
+  content: unknown;
+  entityType: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  isActive: boolean;
+  createdBy: string;
+  creatorName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateInput {
+  name: string;
+  description?: string | null;
+  content?: unknown;
+  entity_type: string;
+  category_id?: string | null;
+  is_active?: boolean;
+}
