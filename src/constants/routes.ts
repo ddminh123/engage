@@ -44,12 +44,24 @@ export const API_ROUTES = {
   ENGAGEMENT_REORDER: (id: string) => `/api/engagement/${id}/reorder`,
   ENGAGEMENT_BATCH: (id: string) => `/api/engagement/${id}/batch`,
   ENGAGEMENT_SYNC_RCM_TO_WP: (id: string) => `/api/engagement/${id}/sync-rcm-to-wp`,
+  ENGAGEMENT_SYNC_PLANNING_TO_EXEC: (id: string) => `/api/engagement/${id}/sync-planning-to-execution`,
   ENGAGEMENT_MEMBERS: (id: string) => `/api/engagement/${id}/members`,
   ENGAGEMENT_MEMBER_BY_ID: (id: string, userId: string) => `/api/engagement/${id}/members/${userId}`,
   ENGAGEMENT_PROCEDURE_ASSIGNEE: (id: string, pId: string) => `/api/engagement/${id}/procedures/${pId}/assignee`,
+  ENGAGEMENT_PLANNING_WORKPAPERS: (id: string) => `/api/engagement/${id}/planning-workpapers`,
+  ENGAGEMENT_PLANNING_WORKPAPER_BY_ID: (id: string, wpId: string) => `/api/engagement/${id}/planning-workpapers/${wpId}`,
   ENGAGEMENT_WP_ASSIGNMENTS: (id: string) => `/api/engagement/${id}/wp-assignments`,
   ENGAGEMENT_WP_COMMENTS: (id: string) => `/api/engagement/${id}/wp-comments`,
   ENGAGEMENT_WP_COMMENT_THREAD: (id: string, threadId: string) => `/api/engagement/${id}/wp-comments/${threadId}`,
+
+  // Versioning & Approval
+  ENGAGEMENT_PROCEDURE_PUBLISH: (id: string, pId: string) => `/api/engagement/${id}/procedures/${pId}/publish`,
+  ENGAGEMENT_PROCEDURE_VERSIONS: (id: string, pId: string) => `/api/engagement/${id}/procedures/${pId}/versions`,
+  ENGAGEMENT_PROCEDURE_VERSION_BY_NUM: (id: string, pId: string, v: number) => `/api/engagement/${id}/procedures/${pId}/versions/${v}`,
+  ENGAGEMENT_PROCEDURE_VERSION_RESTORE: (id: string, pId: string, v: number) => `/api/engagement/${id}/procedures/${pId}/versions/${v}/restore`,
+  APPROVAL_TRANSITIONS: (entityType: string, entityId: string) => `/api/approval/${entityType}/${entityId}/transitions`,
+  APPROVAL_EXECUTE_TRANSITION: (entityType: string, entityId: string) => `/api/approval/${entityType}/${entityId}/transition`,
+  APPROVAL_AUTO_TRANSITION: (entityType: string, entityId: string) => `/api/approval/${entityType}/${entityId}/auto-transition`,
 
   // Finding module
   FINDING: "/api/finding",
@@ -70,6 +82,25 @@ export const API_ROUTES = {
   // Expertise (Settings)
   SETTINGS_EXPERTISE: "/api/settings/expertise",
   SETTINGS_EXPERTISE_BY_ID: (id: string) => `/api/settings/expertise/${id}`,
+
+  // Approval Statuses (Settings)
+  SETTINGS_APPROVAL_STATUSES: "/api/settings/approval-statuses",
+  SETTINGS_APPROVAL_STATUSES_BY_ID: (id: string) => `/api/settings/approval-statuses/${id}`,
+
+  // Approval Workflows (Settings)
+  SETTINGS_APPROVAL_WORKFLOWS: "/api/settings/approval-workflows",
+  SETTINGS_APPROVAL_WORKFLOWS_BY_ID: (id: string) => `/api/settings/approval-workflows/${id}`,
+  SETTINGS_APPROVAL_WORKFLOW_TRANSITIONS: (id: string) => `/api/settings/approval-workflows/${id}/transitions`,
+  SETTINGS_APPROVAL_WORKFLOW_TRANSITION_BY_ID: (id: string, tid: string) => `/api/settings/approval-workflows/${id}/transitions/${tid}`,
+  SETTINGS_ENTITY_BINDINGS: "/api/settings/approval-workflows/entity-bindings",
+
+  // Planning Steps (Settings)
+  SETTINGS_PLANNING_STEPS: "/api/settings/planning-steps",
+  SETTINGS_PLANNING_STEPS_BY_ID: (id: string) => `/api/settings/planning-steps/${id}`,
+  SETTINGS_PLANNING_STEPS_REORDER: "/api/settings/planning-steps/reorder",
+
+  // System settings
+  SETTINGS_SYSTEM: "/api/settings/system",
 
   // Template library (Settings)
   SETTINGS_TEMPLATES: "/api/settings/templates",

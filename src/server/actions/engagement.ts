@@ -335,7 +335,15 @@ function mapProcedure(p: any) {
     procedureType: p.procedure_type as string | null,
     procedureCategory: p.procedure_category as string | null,
     status: p.status as string,
+    approvalStatus: (p.approval_status as string) ?? 'draft',
+    currentVersion: (p.current_version as number) ?? 0,
+    approvedBy: p.approved_by as string | null,
+    approvedAt: p.approved_at ? (p.approved_at as Date).toISOString() : null,
+    approvedVersion: p.approved_version as number | null,
     addedFrom: (p.added_from as string) ?? 'execution',
+    phase: (p.phase as string) ?? 'planning',
+    planningRefId: p.planning_ref_id as string | null,
+    source: (p.source as string) ?? 'planned',
     observations: p.observations as string | null,
     conclusion: p.conclusion as string | null,
     effectiveness: p.effectiveness as string | null,
@@ -378,6 +386,9 @@ function mapObjective(o: any) {
     description: o.description as string | null,
     status: o.status as string,
     addedFrom: (o.added_from as string) ?? 'execution',
+    phase: (o.phase as string) ?? 'planning',
+    planningRefId: o.planning_ref_id as string | null,
+    source: (o.source as string) ?? 'planned',
     sortOrder: o.sort_order as number,
     reviewNotes: o.review_notes as string | null,
     reviewedBy: o.reviewed_by as string | null,
@@ -394,6 +405,9 @@ function mapSection(s: any) {
     description: s.description as string | null,
     status: s.status as string,
     addedFrom: (s.added_from as string) ?? 'execution',
+    phase: (s.phase as string) ?? 'planning',
+    planningRefId: s.planning_ref_id as string | null,
+    source: (s.source as string) ?? 'planned',
     sortOrder: s.sort_order as number,
     reviewNotes: s.review_notes as string | null,
     reviewedBy: s.reviewed_by as string | null,
@@ -519,6 +533,10 @@ function mapEngagementDetail(e: any) {
         }
       : null,
     understanding: e.understanding as string | null,
+    wpApprovalStatus: (e.wp_approval_status as string) ?? 'draft',
+    wpApprovedBy: e.wp_approved_by as string | null,
+    wpApprovedAt: e.wp_approved_at ? (e.wp_approved_at as Date).toISOString() : null,
+    wpApprovedVersion: e.wp_approved_version as number | null,
     ownerUnits: (e.owner_units ?? []).map(
       (o: { unit: { id: string; name: string } }) => ({ id: o.unit.id, name: o.unit.name }),
     ),
@@ -689,6 +707,29 @@ export async function createEngagement(
     include: engagementDetailInclude,
   });
 
+  // Auto-add creator + all CAE users to the engagement team
+  const caeUsers = await prisma.user.findMany({
+    where: { role: 'cae', status: 'active' },
+    select: { id: true },
+  });
+
+  const autoMembers = new Map<string, string>(); // userId -> role
+  autoMembers.set(userId, 'lead'); // creator as lead
+  for (const cae of caeUsers) {
+    if (!autoMembers.has(cae.id)) {
+      autoMembers.set(cae.id, 'reviewer');
+    }
+  }
+
+  await prisma.engagementMember.createMany({
+    data: Array.from(autoMembers.entries()).map(([uid, role]) => ({
+      engagement_id: engagement.id,
+      user_id: uid,
+      role,
+    })),
+    skipDuplicates: true,
+  });
+
   // If linked to a planned audit, update its status to in_progress
   if (parsed.plannedAuditId) {
     await prisma.plannedAudit.update({
@@ -705,7 +746,13 @@ export async function createEngagement(
     entityId: engagement.id,
   });
 
-  return mapEngagementDetail(engagement);
+  // Re-fetch to include the auto-added members
+  const result = await prisma.engagement.findUnique({
+    where: { id: engagement.id },
+    include: engagementDetailInclude,
+  });
+
+  return mapEngagementDetail(result!);
 }
 
 export async function updateEngagement(
@@ -2264,6 +2311,199 @@ export async function syncRcmToWorkProgram(
     createdObjectives,
     createdProcedures,
   };
+}
+
+// =============================================================================
+// SYNC PLANNING → EXECUTION
+// =============================================================================
+
+/**
+ * Clone all planning-phase sections, objectives, and procedures into
+ * execution-phase copies. Each execution item gets `planning_ref_id`
+ * pointing back to the original planning item.
+ * Skips items that already have an execution clone (idempotent).
+ */
+export async function syncPlanningToExecution(
+  engagementId: string,
+  userId: string,
+  userName: string,
+) {
+  await verifyEngagement(engagementId);
+
+  let createdSections = 0;
+  let createdObjectives = 0;
+  let createdProcedures = 0;
+
+  // 1. Clone sections (planning → execution)
+  const planningSections = await prisma.engagementSection.findMany({
+    where: { engagement_id: engagementId, phase: 'planning' },
+    include: {
+      objectives: {
+        include: { procedures: true },
+        orderBy: { sort_order: 'asc' },
+      },
+      procedures: {
+        where: { objective_id: null },
+        orderBy: { sort_order: 'asc' },
+      },
+    },
+    orderBy: { sort_order: 'asc' },
+  });
+
+  for (const sec of planningSections) {
+    // Check if execution clone already exists
+    const existing = await prisma.engagementSection.findFirst({
+      where: { engagement_id: engagementId, planning_ref_id: sec.id, phase: 'execution' },
+    });
+    if (existing) continue;
+
+    const execSec = await prisma.engagementSection.create({
+      data: {
+        engagement_id: engagementId,
+        title: sec.title,
+        description: sec.description,
+        status: 'not_started',
+        added_from: 'planning',
+        phase: 'execution',
+        planning_ref_id: sec.id,
+        source: 'planned',
+        sort_order: sec.sort_order,
+      },
+    });
+    createdSections++;
+
+    // Clone objectives under section
+    for (const obj of sec.objectives) {
+      const execObj = await prisma.engagementObjective.create({
+        data: {
+          engagement_id: engagementId,
+          section_id: execSec.id,
+          title: obj.title,
+          description: obj.description,
+          status: 'not_started',
+          added_from: 'planning',
+          phase: 'execution',
+          planning_ref_id: obj.id,
+          source: 'planned',
+          sort_order: obj.sort_order,
+        },
+      });
+      createdObjectives++;
+
+      // Clone procedures under objective
+      for (const proc of obj.procedures) {
+        await prisma.engagementProcedure.create({
+          data: {
+            engagement_id: engagementId,
+            section_id: execSec.id,
+            objective_id: execObj.id,
+            title: proc.title,
+            description: proc.description,
+            procedures: proc.procedures,
+            procedure_type: proc.procedure_type,
+            procedure_category: proc.procedure_category,
+            status: 'not_started',
+            added_from: 'planning',
+            phase: 'execution',
+            planning_ref_id: proc.id,
+            source: 'planned',
+            sort_order: proc.sort_order,
+            priority: proc.priority,
+          },
+        });
+        createdProcedures++;
+      }
+    }
+
+    // Clone direct procedures under section (no objective)
+    for (const proc of sec.procedures) {
+      await prisma.engagementProcedure.create({
+        data: {
+          engagement_id: engagementId,
+          section_id: execSec.id,
+          title: proc.title,
+          description: proc.description,
+          procedures: proc.procedures,
+          procedure_type: proc.procedure_type,
+          procedure_category: proc.procedure_category,
+          status: 'not_started',
+          added_from: 'planning',
+          phase: 'execution',
+          planning_ref_id: proc.id,
+          source: 'planned',
+          sort_order: proc.sort_order,
+          priority: proc.priority,
+        },
+      });
+      createdProcedures++;
+    }
+  }
+
+  // 2. Clone standalone objectives (no section)
+  const planningObjectives = await prisma.engagementObjective.findMany({
+    where: { engagement_id: engagementId, section_id: null, phase: 'planning' },
+    include: { procedures: { orderBy: { sort_order: 'asc' } } },
+    orderBy: { sort_order: 'asc' },
+  });
+
+  for (const obj of planningObjectives) {
+    const existing = await prisma.engagementObjective.findFirst({
+      where: { engagement_id: engagementId, planning_ref_id: obj.id, phase: 'execution' },
+    });
+    if (existing) continue;
+
+    const execObj = await prisma.engagementObjective.create({
+      data: {
+        engagement_id: engagementId,
+        title: obj.title,
+        description: obj.description,
+        status: 'not_started',
+        added_from: 'planning',
+        phase: 'execution',
+        planning_ref_id: obj.id,
+        source: 'planned',
+        sort_order: obj.sort_order,
+      },
+    });
+    createdObjectives++;
+
+    for (const proc of obj.procedures) {
+      await prisma.engagementProcedure.create({
+        data: {
+          engagement_id: engagementId,
+          objective_id: execObj.id,
+          title: proc.title,
+          description: proc.description,
+          procedures: proc.procedures,
+          procedure_type: proc.procedure_type,
+          procedure_category: proc.procedure_category,
+          status: 'not_started',
+          added_from: 'planning',
+          phase: 'execution',
+          planning_ref_id: proc.id,
+          source: 'planned',
+          sort_order: proc.sort_order,
+          priority: proc.priority,
+        },
+      });
+      createdProcedures++;
+    }
+  }
+
+  await logAudit({
+    userId,
+    userName,
+    action: 'sync_planning_to_execution',
+    entityType: 'engagement',
+    entityId: engagementId,
+    changes: {
+      createdSections: { old: 0, new: createdSections },
+      createdObjectives: { old: 0, new: createdObjectives },
+      createdProcedures: { old: 0, new: createdProcedures },
+    },
+  });
+
+  return { createdSections, createdObjectives, createdProcedures };
 }
 
 // =============================================================================

@@ -36,14 +36,16 @@ export const PROCEDURE_STATUS_OPTIONS = [
   { value: "not_started", label: LPROC.status.not_started },
   { value: "in_progress", label: LPROC.status.in_progress },
   { value: "waiting_review", label: LPROC.status.waiting_review },
-  { value: "reviewed", label: LPROC.status.reviewed },
+  { value: "needs_modification", label: LPROC.status.needs_modification },
+  { value: "approved", label: LPROC.status.approved },
 ];
 
 export const PROCEDURE_STATUS_DOT: Record<string, string> = {
   not_started: "bg-muted-foreground/40",
   in_progress: "bg-blue-500",
   waiting_review: "bg-amber-500",
-  reviewed: "bg-emerald-500",
+  needs_modification: "bg-red-500",
+  approved: "bg-emerald-500",
 };
 
 // ── Top-level node (section or standalone objective) ──
@@ -125,7 +127,7 @@ export function buildSectionTree(
       id: proc.id,
       type: "procedure" as const,
       title: proc.title,
-      status: proc.status,
+      status: proc.approvalStatus,
       parentId: obj.id,
       children: [],
     }));
@@ -167,7 +169,7 @@ export function buildSectionTree(
       id: proc.id,
       type: "procedure",
       title: proc.title,
-      status: proc.status,
+      status: proc.approvalStatus,
       parentId: section.id,
       children: [],
     });
@@ -226,7 +228,7 @@ export function buildObjectiveTree(
       id: proc.id,
       type: "procedure",
       title: proc.title,
-      status: proc.status,
+      status: proc.approvalStatus,
       parentId: objective.id,
       children: [],
     });
@@ -428,16 +430,16 @@ export function computeWpStats(
     for (const obj of sec.objectives) {
       procedures += obj.procedures.length;
       completed += obj.procedures.filter(
-        (p) => p.status === "reviewed",
+        (p) => p.approvalStatus === "approved" || p.approvalStatus === "reviewed",
       ).length;
     }
     procedures += sec.procedures.length;
-    completed += sec.procedures.filter((p) => p.status === "reviewed").length;
+    completed += sec.procedures.filter((p) => p.approvalStatus === "approved" || p.approvalStatus === "reviewed").length;
   }
 
   for (const obj of standaloneObjectives) {
     procedures += obj.procedures.length;
-    completed += obj.procedures.filter((p) => p.status === "reviewed").length;
+    completed += obj.procedures.filter((p) => p.approvalStatus === "approved" || p.approvalStatus === "reviewed").length;
   }
 
   return {

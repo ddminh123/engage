@@ -32,6 +32,7 @@ import {
   deleteRcmObjectiveApi,
   syncRcmObjectivesApi,
   syncRcmToWorkProgramApi,
+  syncPlanningToExecutionApi,
   reorderItemsApi,
   type ReorderEntityType,
   batchActionApi,
@@ -51,6 +52,12 @@ import {
   updateThreadStatusApi,
   deleteCommentThreadApi,
   updateProcedureContentApi,
+  publishProcedureApi,
+  fetchProcedureVersionsApi,
+  fetchProcedureVersionApi,
+  restoreProcedureVersionApi,
+  fetchAvailableTransitionsApi,
+  executeTransitionApi,
 } from '../api';
 import type {
   EngagementDetail,
@@ -684,6 +691,18 @@ export function useSyncRcmToWorkProgram() {
   });
 }
 
+// ── Sync Planning to Execution ──
+
+export function useSyncPlanningToExecution() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (engagementId: string) => syncPlanningToExecutionApi(engagementId),
+    onSuccess: (_, engagementId) => {
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+    },
+  });
+}
+
 // ── Engagement Members ──
 
 const membersKey = (engagementId: string) => ['engagement-members', engagementId];
@@ -922,6 +941,102 @@ export function useUpdateProcedureContent() {
     }) => updateProcedureContentApi(engagementId, procedureId, content),
     onSuccess: (_, { engagementId }) => {
       qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+    },
+  });
+}
+
+// ── Versioning ──
+
+const procedureVersionsKey = (engagementId: string, procedureId: string) =>
+  ['procedureVersions', engagementId, procedureId];
+
+export function useProcedureVersions(engagementId: string, procedureId: string) {
+  return useQuery({
+    queryKey: procedureVersionsKey(engagementId, procedureId),
+    queryFn: () => fetchProcedureVersionsApi(engagementId, procedureId),
+    enabled: !!engagementId && !!procedureId,
+  });
+}
+
+export function useProcedureVersion(engagementId: string, procedureId: string, version: number | null) {
+  return useQuery({
+    queryKey: ['procedureVersion', engagementId, procedureId, version],
+    queryFn: () => fetchProcedureVersionApi(engagementId, procedureId, version!),
+    enabled: !!engagementId && !!procedureId && version !== null,
+  });
+}
+
+export function usePublishProcedure() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      procedureId,
+      comment,
+    }: {
+      engagementId: string;
+      procedureId: string;
+      comment?: string;
+    }) => publishProcedureApi(engagementId, procedureId, comment),
+    onSuccess: (_, { engagementId, procedureId }) => {
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+      qc.invalidateQueries({ queryKey: procedureVersionsKey(engagementId, procedureId) });
+    },
+  });
+}
+
+// ── Approval Transitions ──
+
+const approvalTransitionsKey = (entityType: string, entityId: string) =>
+  ['approvalTransitions', entityType, entityId];
+
+export function useAvailableTransitions(entityType: string, entityId: string) {
+  return useQuery({
+    queryKey: approvalTransitionsKey(entityType, entityId),
+    queryFn: () => fetchAvailableTransitionsApi(entityType, entityId),
+    enabled: !!entityType && !!entityId,
+  });
+}
+
+export function useExecuteTransition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      entityType,
+      entityId,
+      transitionId,
+      comment,
+      engagementId,
+    }: {
+      entityType: string;
+      entityId: string;
+      transitionId: string;
+      comment?: string;
+      engagementId: string;
+    }) => executeTransitionApi(entityType, entityId, transitionId, comment),
+    onSuccess: (_, { entityType, entityId, engagementId }) => {
+      qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId) });
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+    },
+  });
+}
+
+export function useRestoreProcedureVersion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      procedureId,
+      version,
+    }: {
+      engagementId: string;
+      procedureId: string;
+      version: number;
+    }) => restoreProcedureVersionApi(engagementId, procedureId, version),
+    onSuccess: (_, { engagementId, procedureId }) => {
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+      qc.invalidateQueries({ queryKey: procedureVersionsKey(engagementId, procedureId) });
+      qc.invalidateQueries({ queryKey: approvalTransitionsKey('procedure', procedureId) });
     },
   });
 }

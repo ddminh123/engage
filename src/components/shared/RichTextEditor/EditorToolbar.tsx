@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Editor } from "@tiptap/react";
+import { useEditorState } from "@tiptap/react";
 import {
   Bold,
   Italic,
@@ -96,24 +97,51 @@ export function EditorToolbar({ editor, fileInputRef }: EditorToolbarProps) {
   const [linkUrl, setLinkUrl] = useState("");
   const [linkOpen, setLinkOpen] = useState(false);
 
-  // ── Derived state ──
-  const currentStyle = editor.isActive("heading", { level: 1 })
-    ? "h1"
-    : editor.isActive("heading", { level: 2 })
-      ? "h2"
-      : editor.isActive("heading", { level: 3 })
-        ? "h3"
-        : "paragraph";
+  // ── Derived state (re-renders on every editor transaction) ──
+  const editorState = useEditorState({
+    editor,
+    selector: ({ editor: e }) => {
+      const style = e.isActive("heading", { level: 1 })
+        ? "h1"
+        : e.isActive("heading", { level: 2 })
+          ? "h2"
+          : e.isActive("heading", { level: 3 })
+            ? "h3"
+            : "paragraph";
+      const ff = (e.getAttributes("textStyle")?.fontFamily as string) || "";
+      return {
+        currentStyle: style,
+        currentStyleLabel:
+          TEXT_STYLES.find((s) => s.value === style)?.label ?? "Văn bản",
+        currentFontLabel:
+          FONT_FAMILIES.find((f) => f.value === ff)?.label ?? "Mặc định",
+        isBold: e.isActive("bold"),
+        isItalic: e.isActive("italic"),
+        isUnderline: e.isActive("underline"),
+        isBulletList: e.isActive("bulletList"),
+        isOrderedList: e.isActive("orderedList"),
+        isLink: e.isActive("link"),
+        isTable: e.isActive("table"),
+        canUndo: e.can().undo(),
+        canRedo: e.can().redo(),
+      };
+    },
+  });
 
-  const currentStyleLabel =
-    TEXT_STYLES.find((s) => s.value === currentStyle)?.label ?? "Văn bản";
-
-  const currentFontLabel = (() => {
-    const attrs = editor.getAttributes("textStyle");
-    const ff = attrs?.fontFamily as string | undefined;
-    if (!ff) return "Mặc định";
-    return FONT_FAMILIES.find((f) => f.value === ff)?.label ?? "Mặc định";
-  })();
+  const {
+    currentStyle,
+    currentStyleLabel,
+    currentFontLabel,
+    isBold,
+    isItalic,
+    isUnderline,
+    isBulletList,
+    isOrderedList,
+    isLink,
+    isTable,
+    canUndo,
+    canRedo,
+  } = editorState;
 
   const applyTextStyle = (value: string) => {
     if (value === "paragraph") {
@@ -215,21 +243,21 @@ export function EditorToolbar({ editor, fileInputRef }: EditorToolbarProps) {
       {/* ── Bold / Italic / Underline ── */}
       <ToolbarBtn
         onClick={() => editor.chain().focus().toggleBold().run()}
-        active={editor.isActive("bold")}
+        active={isBold}
         title="Bold"
       >
         <Bold className="h-4 w-4" />
       </ToolbarBtn>
       <ToolbarBtn
         onClick={() => editor.chain().focus().toggleItalic().run()}
-        active={editor.isActive("italic")}
+        active={isItalic}
         title="Italic"
       >
         <Italic className="h-4 w-4" />
       </ToolbarBtn>
       <ToolbarBtn
         onClick={() => editor.chain().focus().toggleUnderline().run()}
-        active={editor.isActive("underline")}
+        active={isUnderline}
         title="Underline"
       >
         <UnderlineIcon className="h-4 w-4" />
@@ -338,14 +366,14 @@ export function EditorToolbar({ editor, fileInputRef }: EditorToolbarProps) {
       {/* ── Lists ── */}
       <ToolbarBtn
         onClick={() => editor.chain().focus().toggleBulletList().run()}
-        active={editor.isActive("bulletList")}
+        active={isBulletList}
         title="Bullet list"
       >
         <List className="h-4 w-4" />
       </ToolbarBtn>
       <ToolbarBtn
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        active={editor.isActive("orderedList")}
+        active={isOrderedList}
         title="Numbered list"
       >
         <ListOrdered className="h-4 w-4" />
@@ -398,7 +426,7 @@ export function EditorToolbar({ editor, fileInputRef }: EditorToolbarProps) {
               type="button"
               className={cn(
                 "inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-accent transition-colors",
-                editor.isActive("link") && "bg-accent text-accent-foreground",
+                isLink && "bg-accent text-accent-foreground",
               )}
               title="Chèn liên kết"
             />
@@ -420,9 +448,9 @@ export function EditorToolbar({ editor, fileInputRef }: EditorToolbarProps) {
           />
           <div className="flex gap-2">
             <Button size="sm" className="h-7 text-xs" onClick={handleSetLink}>
-              {editor.isActive("link") ? "Cập nhật" : "Chèn"}
+              {isLink ? "Cập nhật" : "Chèn"}
             </Button>
-            {editor.isActive("link") && (
+            {isLink && (
               <Button
                 size="sm"
                 variant="outline"
@@ -450,7 +478,7 @@ export function EditorToolbar({ editor, fileInputRef }: EditorToolbarProps) {
               type="button"
               className={cn(
                 "inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-accent transition-colors",
-                editor.isActive("table") && "bg-accent text-accent-foreground",
+                isTable && "bg-accent text-accent-foreground",
               )}
               title="Bảng"
             />
@@ -459,7 +487,7 @@ export function EditorToolbar({ editor, fileInputRef }: EditorToolbarProps) {
           <TableIcon className="h-4 w-4" />
         </PopoverTrigger>
         <PopoverContent className="w-auto p-1" align="start">
-          {!editor.isActive("table") ? (
+          {!isTable ? (
             <TableGridPicker
               onSelect={(rows, cols) =>
                 editor
@@ -534,14 +562,14 @@ export function EditorToolbar({ editor, fileInputRef }: EditorToolbarProps) {
       <div className="ml-auto flex items-center gap-0.5">
         <ToolbarBtn
           onClick={() => editor.chain().focus().undo().run()}
-          disabled={!editor.can().undo()}
+          disabled={!canUndo}
           title="Undo"
         >
           <Undo className="h-4 w-4" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => editor.chain().focus().redo().run()}
-          disabled={!editor.can().redo()}
+          disabled={!canRedo}
           title="Redo"
         >
           <Redo className="h-4 w-4" />

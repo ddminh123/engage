@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, Save, Loader2 } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type { JSONContent } from "@tiptap/react";
@@ -14,6 +13,8 @@ import type {
 import { WorkpaperEditor } from "./WorkpaperEditor";
 import type { WorkpaperEditorHandle } from "./WorkpaperEditor";
 import { WorkpaperCommentsTab } from "./WorkpaperCommentsTab";
+import { useAutoSave } from "./useAutoSave";
+import { AutoSaveIndicator } from "./AutoSaveStatus";
 
 // ── Configurable tab definition ──
 
@@ -30,11 +31,18 @@ export interface WorkpaperDocumentConfig {
   engagementId?: string;
   title: string;
   content: JSONContent | null;
+  /** Called by auto-save (content only). If not provided, falls back to onSave. */
+  onAutoSave?: (content: JSONContent) => Promise<void>;
+  /** Legacy manual save — used as fallback if onAutoSave is not provided */
   onSave: (content: JSONContent) => void | Promise<void>;
   onTitleChange?: (title: string) => void;
   onBack: () => void;
   isSaving?: boolean;
-  headerExtra?: React.ReactNode;
+  /** Render function for extra header content. Receives auto-save state so indicator can be positioned freely. */
+  headerExtra?: (autoSave: {
+    status: import("./useAutoSave").AutoSaveStatus;
+    lastSavedAt: Date | null;
+  }) => React.ReactNode;
   readOnly?: boolean;
   /** Configurable tabs for the right task pane (comments tab is always appended) */
   tabs?: WorkpaperTab[];
@@ -59,8 +67,11 @@ export interface WorkpaperDocumentConfig {
 
 export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
   const {
+    entityType,
+    entityId,
     title,
     content,
+    onAutoSave,
     onSave,
     onTitleChange,
     onBack,
@@ -81,6 +92,24 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
   } = config;
 
   const editorRef = React.useRef<WorkpaperEditorHandle>(null);
+
+  // Auto-save hook
+  const autoSaveFn = React.useCallback(
+    async (c: JSONContent) => {
+      if (onAutoSave) {
+        await onAutoSave(c);
+      } else {
+        await onSave(c);
+      }
+    },
+    [onAutoSave, onSave],
+  );
+
+  const autoSave = useAutoSave({
+    storageKey: `${entityType}:${entityId}`,
+    onSave: autoSaveFn,
+    disabled: readOnly,
+  });
 
   const [localContent, setLocalContent] = React.useState<JSONContent | null>(
     content,
@@ -113,15 +142,28 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     setTitleDraft(title);
   }, [title]);
 
-  const handleContentChange = React.useCallback((json: JSONContent) => {
-    setLocalContent(json);
-  }, []);
+  // Keyboard shortcuts: Escape to close, Cmd+S to force save
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !editingTitle) {
+        onBack();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        autoSave.saveNow();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onBack, editingTitle, autoSave]);
 
-  const handleSave = () => {
-    if (localContent) {
-      onSave(localContent);
-    }
-  };
+  const handleContentChange = React.useCallback(
+    (json: JSONContent) => {
+      setLocalContent(json);
+      autoSave.onContentChange(json);
+    },
+    [autoSave],
+  );
 
   // Click on commented text in editor → activate thread in sidebar
   const handleCommentActivated = React.useCallback(
@@ -182,6 +224,7 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
 
   const handleCancelCreate = () => {
     setPendingQuote(null);
+    editorRef.current?.clearPendingCommentRange();
   };
 
   const handleTitleSave = () => {
@@ -201,18 +244,11 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
   const totalOpenThreads = openComments + openReviewNotes;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] flex-col">
-      {/* ── Sticky Header ── */}
-      <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      {/* ── Header (single line) ── */}
+      <div className="shrink-0 border-b bg-background">
         <div className="flex items-center gap-3 px-4 py-2">
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground shrink-0"
-            title="Quay lại"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-
+          {/* Title — limited width so right-side controls stay visible */}
           {editingTitle && onTitleChange ? (
             <input
               ref={titleInputRef}
@@ -226,14 +262,14 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
                   setEditingTitle(false);
                 }
               }}
-              className="flex-1 min-w-0 text-lg font-semibold bg-transparent border-b-2 border-blue-400 outline-none px-1"
+              className="max-w-[320px] min-w-0 shrink text-lg font-semibold bg-transparent border-b-2 border-blue-400 outline-none px-1"
               title="Tiêu đề tài liệu"
               autoFocus
             />
           ) : (
             <h1
               className={cn(
-                "flex-1 min-w-0 text-lg font-semibold truncate",
+                "max-w-[320px] min-w-0 shrink text-lg font-semibold truncate",
                 onTitleChange &&
                   "cursor-pointer hover:text-blue-600 transition-colors",
               )}
@@ -246,20 +282,35 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
             </h1>
           )}
 
-          {headerExtra}
-
-          <Separator orientation="vertical" className="h-5" />
-
-          {!readOnly && (
-            <Button size="sm" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Save className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              Lưu
-            </Button>
+          {/* headerExtra: StatusBadge + AutoSave + VersionLink + flex-1 + Assignee + Actions */}
+          {headerExtra && (
+            <div className="flex flex-1 items-center gap-2 min-w-0">
+              {headerExtra({
+                status: autoSave.status,
+                lastSavedAt: autoSave.lastSavedAt,
+              })}
+            </div>
           )}
+
+          {/* Fallback auto-save indicator when no headerExtra */}
+          {!headerExtra && <div className="flex-1" />}
+          {!headerExtra && !readOnly && (
+            <AutoSaveIndicator
+              status={autoSave.status}
+              lastSavedAt={autoSave.lastSavedAt}
+            />
+          )}
+
+          {/* Close */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={onBack}
+            title="Đóng (Esc)"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 

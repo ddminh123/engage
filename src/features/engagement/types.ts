@@ -142,6 +142,10 @@ export interface EngagementDetail {
     plan: { id: string; title: string } | null;
   } | null;
   understanding: string | null;
+  wpApprovalStatus: string;
+  wpApprovedBy: string | null;
+  wpApprovedAt: string | null;
+  wpApprovedVersion: number | null;
   members: EngagementMember[];
   ownerUnits: { id: string; name: string }[];
   participatingUnits: { id: string; name: string }[];
@@ -201,6 +205,9 @@ export interface EngagementSection {
   description: string | null;
   status: string;
   addedFrom: string;
+  phase: string;
+  planningRefId: string | null;
+  source: string;
   sortOrder: number;
   reviewNotes: string | null;
   reviewedBy: string | null;
@@ -216,6 +223,9 @@ export interface EngagementObjective {
   description: string | null;
   status: string;
   addedFrom: string;
+  phase: string;
+  planningRefId: string | null;
+  source: string;
   sortOrder: number;
   reviewNotes: string | null;
   reviewedBy: string | null;
@@ -234,7 +244,15 @@ export interface EngagementProcedure {
   procedureType: string | null;
   procedureCategory: string | null;
   status: string;
+  approvalStatus: string;
+  currentVersion: number;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  approvedVersion: number | null;
   addedFrom: string;
+  phase: string;
+  planningRefId: string | null;
+  source: string;
   observations: string | null;
   conclusion: string | null;
   effectiveness: string | null;
@@ -449,3 +467,38 @@ export interface EngagementControlInput {
 }
 
 export interface EngagementControlUpdateInput extends Partial<EngagementControlInput> {}
+
+// =============================================================================
+// ENTITY VERSIONING
+// =============================================================================
+
+export interface EntityVersionSummary {
+  id: string;
+  entityType: string;
+  entityId: string;
+  version: number;
+  comment: string | null;
+  publishedBy: string;
+  publishedAt: string;
+  publisher: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+  };
+}
+
+export interface EntityVersionDetail extends EntityVersionSummary {
+  snapshot: Record<string, unknown>;
+}
+
+// =============================================================================
+// APPROVAL TRANSITIONS
+// =============================================================================
+
+export interface AvailableTransition {
+  id: string;
+  fromStatus: string;
+  toStatus: string;
+  actionLabel: string;
+  actionType: string;
+}

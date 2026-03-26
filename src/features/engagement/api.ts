@@ -32,6 +32,9 @@ import type {
   RcmObjective,
   RcmObjectiveInput,
   RcmObjectiveUpdateInput,
+  EntityVersionSummary,
+  EntityVersionDetail,
+  AvailableTransition,
 } from './types';
 
 interface ApiResponse<T> {
@@ -340,6 +343,15 @@ export async function syncRcmToWorkProgramApi(
   return handleResponse<{ createdObjectives: number; createdProcedures: number }>(response);
 }
 
+export async function syncPlanningToExecutionApi(
+  engagementId: string,
+): Promise<{ createdSections: number; createdObjectives: number; createdProcedures: number }> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_SYNC_PLANNING_TO_EXEC(engagementId), {
+    method: 'POST',
+  });
+  return handleResponse<{ createdSections: number; createdObjectives: number; createdProcedures: number }>(response);
+}
+
 // ── Engagement Risk CRUD (RACM light) ──
 
 export async function createEngagementRiskApi(
@@ -622,4 +634,84 @@ export async function updateProcedureContentApi(
     body: JSON.stringify({ content }),
   });
   return handleResponse<void>(response);
+}
+
+// ── Versioning ──
+
+export async function publishProcedureApi(
+  engagementId: string,
+  procedureId: string,
+  comment?: string,
+): Promise<EntityVersionSummary> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_PROCEDURE_PUBLISH(engagementId, procedureId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comment }),
+  });
+  return handleResponse<EntityVersionSummary>(response);
+}
+
+export async function fetchProcedureVersionsApi(
+  engagementId: string,
+  procedureId: string,
+): Promise<EntityVersionSummary[]> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_PROCEDURE_VERSIONS(engagementId, procedureId));
+  return handleResponse<EntityVersionSummary[]>(response);
+}
+
+export async function fetchProcedureVersionApi(
+  engagementId: string,
+  procedureId: string,
+  version: number,
+): Promise<EntityVersionDetail> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_PROCEDURE_VERSION_BY_NUM(engagementId, procedureId, version));
+  return handleResponse<EntityVersionDetail>(response);
+}
+
+export async function restoreProcedureVersionApi(
+  engagementId: string,
+  procedureId: string,
+  version: number,
+): Promise<{ success: boolean; restoredVersion: number }> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_PROCEDURE_VERSION_RESTORE(engagementId, procedureId, version), {
+    method: 'POST',
+  });
+  return handleResponse<{ success: boolean; restoredVersion: number }>(response);
+}
+
+// ── Approval Transitions ──
+
+export async function fetchAvailableTransitionsApi(
+  entityType: string,
+  entityId: string,
+): Promise<AvailableTransition[]> {
+  const response = await fetch(API_ROUTES.APPROVAL_TRANSITIONS(entityType, entityId));
+  return handleResponse<AvailableTransition[]>(response);
+}
+
+export async function executeTransitionApi(
+  entityType: string,
+  entityId: string,
+  transitionId: string,
+  comment?: string,
+): Promise<{ newStatus: string; actionType: string }> {
+  const response = await fetch(API_ROUTES.APPROVAL_EXECUTE_TRANSITION(entityType, entityId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transitionId, comment }),
+  });
+  return handleResponse<{ newStatus: string; actionType: string }>(response);
+}
+
+export async function autoTransitionApi(
+  entityType: string,
+  entityId: string,
+  actionType: string,
+): Promise<{ newStatus: string } | null> {
+  const response = await fetch(API_ROUTES.APPROVAL_AUTO_TRANSITION(entityType, entityId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actionType }),
+  });
+  return handleResponse<{ newStatus: string } | null>(response);
 }

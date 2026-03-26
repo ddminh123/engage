@@ -2,17 +2,18 @@
 
 > **Status**: ✅ Implemented  
 > **Location**: `src/components/shared/RichTextEditor/`  
-> **Used by**: `WorkpaperEditor`, `TemplateEditor`, and any future editor instances
+> **Base component**: `EngageEditor` — generic Tiptap wrapper used by all editor instances
 
 ---
 
 ## 1. Architecture Overview
 
-The editor is built on **[Tiptap v2](https://tiptap.dev)** (ProseMirror wrapper for React). Shared UI components are extracted into a reusable folder so any editor instance only needs to configure its Tiptap extensions and wire the shared toolbar/context menu.
+The editor is built on **[Tiptap v3](https://tiptap.dev)** (ProseMirror wrapper for React). A single `EngageEditor` base component encapsulates all shared Tiptap setup (extensions, toolbar, context menu, image upload). Consuming editors either use `EngageEditor` directly or wrap it with feature-specific logic.
 
 ```
 src/components/shared/RichTextEditor/
-├── EditorToolbar.tsx        # Shared formatting toolbar
+├── EngageEditor.tsx         # ★ Base editor component (useEditor + toolbar + context menu)
+├── EditorToolbar.tsx        # Shared formatting toolbar (uses useEditorState for sync)
 ├── EditorContextMenu.tsx    # Custom right-click context menu
 ├── TableGridPicker.tsx      # Row×Col grid selector for table creation
 ├── extensions/
@@ -20,270 +21,248 @@ src/components/shared/RichTextEditor/
 └── index.ts                 # Barrel exports
 ```
 
+### Component Hierarchy
+
+```
+EngageEditor (base)
+├── EditorToolbar        — formatting controls, synced via useEditorState
+├── EditorContent        — Tiptap content area
+└── EditorContextMenu    — right-click menu with clipboard-aware paste
+
+WorkpaperEditor (wrapper)
+└── EngageEditor
+    + CommentMark extension (via extraExtensions)
+    + Comment/review note imperative handle
+    + Pending comment highlight decoration
+
+TemplateEditor (thin consumer)
+└── EngageEditor (direct usage, no extra extensions)
+```
+
 ### Consuming Editors
 
-| Editor | Location | Notes |
-|--------|----------|-------|
-| `WorkpaperEditor` | `src/components/shared/workpaper/WorkpaperEditor.tsx` | Full editor with comments, review notes, BubbleMenu |
-| `TemplateEditor` | `src/features/settings/components/TemplateEditor.tsx` | Template editing, no comments |
+| Editor            | Location                                                | Role                                                                     |
+| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `EngageEditor`    | `src/components/shared/RichTextEditor/EngageEditor.tsx` | Base component — all Tiptap setup, toolbar, context menu, image upload   |
+| `WorkpaperEditor` | `src/components/shared/workpaper/WorkpaperEditor.tsx`   | Wraps EngageEditor + adds CommentMark, pending highlight, comment handle |
+| `TemplateEditor`  | `src/features/settings/components/TemplateEditor.tsx`   | Uses EngageEditor directly — template editing, no comments               |
 
 ---
 
-## 2. Tiptap Extensions Used
+## 2. EngageEditor — Base Component
 
-All editors share this common extension set:
-
-```ts
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import { TextStyle } from "@tiptap/extension-text-style";
-import { FontFamily } from "@tiptap/extension-font-family";
-import { Color } from "@tiptap/extension-color";
-import { Highlight } from "@tiptap/extension-highlight";
-import { Underline } from "@tiptap/extension-underline";
-import { Image } from "@tiptap/extension-image";
-import { Table } from "@tiptap/extension-table";
-import { TableRow } from "@tiptap/extension-table-row";
-import { TableCell } from "@tiptap/extension-table-cell";
-import { TableHeader } from "@tiptap/extension-table-header";
-import Link from "@tiptap/extension-link";
-import { LineHeight } from "@/components/shared/RichTextEditor/extensions/LineHeight";
-```
-
-### Extension Configuration
+### Props
 
 ```ts
-StarterKit.configure({ heading: { levels: [1, 2, 3] } })
-Highlight.configure({ multicolor: true })
-Image.configure({ inline: false, allowBase64: true })
-Table.configure({ resizable: true, allowTableNodeSelection: true })
-Link.configure({
-  openOnClick: false,
-  HTMLAttributes: { class: "text-primary underline cursor-pointer" },
-})
+interface EngageEditorProps {
+  content: JSONContent | null;
+  onChange: (content: JSONContent) => void;
+  readOnly?: boolean;
+  className?: string;
+  editorClassName?: string; // CSS class for the editor content area
+  placeholder?: string; // Default: "Bắt đầu nhập nội dung..."
+  extraExtensions?: AnyExtension[]; // Appended after the base extension set
+  onAddComment?: (threadType: "comment" | "review_note") => void; // Enables Ý kiến / Review note in context menu
+}
+
+interface EngageEditorHandle {
+  getEditor: () => Editor | null;
+}
 ```
 
-**Important**: `allowTableNodeSelection: true` is required for cell selection, merge/split operations to work correctly.
+### Usage — Minimal
+
+```tsx
+import { EngageEditor } from "@/components/shared/RichTextEditor/EngageEditor";
+
+<EngageEditor
+  content={content}
+  onChange={onChange}
+  className="rounded-md border"
+  placeholder="Nhập nội dung mẫu..."
+/>;
+```
+
+### Usage — With Extra Extensions
+
+```tsx
+import { EngageEditor, type EngageEditorHandle } from "@/components/shared/RichTextEditor/EngageEditor";
+
+const ref = useRef<EngageEditorHandle>(null);
+
+<EngageEditor
+  ref={ref}
+  content={content}
+  onChange={onChange}
+  extraExtensions={[MyCustomExtension.configure({ ... })]}
+  onAddComment={(threadType) => { /* handle comment creation */ }}
+/>
+```
+
+### What EngageEditor Handles
+
+- All base Tiptap extensions (StarterKit, Table, Image, Link, etc.)
+- `EditorToolbar` with `useEditorState` for reactive formatting state
+- `EditorContextMenu` with clipboard-aware paste and optional comment items
+- Image upload (base64)
+- Google Translate prevention (`notranslate` class + `translate="no"`)
+- ReadOnly toggle
+- SSR-safe (`immediatelyRender: false`)
+
+---
+
+## 3. Tiptap Extensions
+
+### Base Extensions (built into EngageEditor)
+
+| Extension   | Configuration                                    |
+| ----------- | ------------------------------------------------ |
+| StarterKit  | `heading: { levels: [1, 2, 3] }`                 |
+| Placeholder | Configurable via `placeholder` prop              |
+| TextStyle   | Default                                          |
+| FontFamily  | Default                                          |
+| Color       | Default                                          |
+| Highlight   | `multicolor: true`                               |
+| Underline   | Default                                          |
+| Image       | `inline: false, allowBase64: true`               |
+| Table       | `resizable: true, allowTableNodeSelection: true` |
+| TableRow    | Default                                          |
+| TableCell   | Default                                          |
+| TableHeader | Default                                          |
+| Link        | `openOnClick: false`, blue underline class       |
+| LineHeight  | Custom extension (see below)                     |
+
+**Important**: `allowTableNodeSelection: true` is required for cell selection, merge/split operations.
 
 ### Custom Extensions
 
 #### LineHeight (`extensions/LineHeight.ts`)
 
-A custom Tiptap extension that adds `line-height` support to paragraph and heading nodes.
+Adds `line-height` support to paragraph and heading nodes.
 
-**Commands**:
-- `setLineHeight(height: string)` — e.g., `"1.0"`, `"1.5"`, `"2.0"`
-- `unsetLineHeight()` — reset to default
-
-**How it works**: Adds a `lineHeight` global attribute to `paragraph` and `heading` node types. Parses from `element.style.lineHeight` and renders as inline `style="line-height: X"`.
+- **Commands**: `setLineHeight(height)`, `unsetLineHeight()`
+- **How it works**: Global attribute on `paragraph`/`heading` nodes, parsed from `element.style.lineHeight`
 
 #### CommentMark (`workpaper/extensions/CommentMark.ts`)
 
 WorkpaperEditor-only extension for inline comment/review note marks.
 
-**Attributes**: `threadId`, `threadType`  
-**Callbacks**: `onCommentActivated(threadId)`, `onCommentClicked(threadId)`  
-**Commands**: `setComment(threadId, threadType)`, `highlightThread(threadId)`
+- **Attributes**: `threadId`, `threadType`, `resolved`
+- **Callbacks**: `onCommentActivated(threadId)`, `onCommentClicked(threadId)`
+- **Commands**:
+  - `setComment(threadId, threadType)` — apply mark to selection
+  - `unsetComment(threadId)` — remove mark by threadId
+  - `highlightThread(threadId)` — add `.wp-comment-active` class to mark DOM elements
+  - `setPendingCommentRange(from, to)` — apply temporary blue decoration (ProseMirror decoration, not a mark)
+  - `clearPendingCommentRange()` — remove the pending decoration
+
+**Pending comment highlight**: Uses a ProseMirror plugin with `DecorationSet` to show a blue dashed underline on the selected text while the comment is being composed. Persists even when editor loses focus. Cleared on commit (`applyCommentMark`) or cancel.
 
 ---
 
-## 3. Shared Components
+## 4. Shared Components
 
 ### EditorToolbar
 
-Full-featured formatting toolbar. Accepts:
+Full-featured formatting toolbar. Uses `useEditorState` from `@tiptap/react` to subscribe to editor transactions — toolbar buttons (bold, italic, underline, etc.) reactively reflect the current selection's formatting.
 
-```ts
-interface Props {
-  editor: Editor;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-}
-```
-
-**Features**:
-- Text style dropdown (paragraph, H1–H3)
-- Font family selector
-- Bold, Italic, Underline
-- Text color picker (9 colors)
-- Highlight color picker (7 colors)
-- Ordered/unordered lists
-- Line spacing selector (1.0, 1.15, 1.5, 2.0, 2.5, 3.0)
-- Link insertion (URL input with insert/update/remove)
-- **Table grid picker** (8×8 hover grid like Google Docs)
-- Table management (add/remove rows/cols, delete table) — shown when cursor is inside a table
-- Horizontal rule
-- Image upload (base64)
-- Undo/Redo
+**Features**: Text style dropdown, font family, B/I/U, text color (9 colors), highlight color (7 colors), lists, line spacing, link insertion, table grid picker (8×8), table management, horizontal rule, image upload, undo/redo.
 
 ### EditorContextMenu
 
-Custom portal-based right-click context menu that replaces the browser default within the editor.
+Custom right-click context menu replacing the browser default.
 
 ```ts
 interface Props {
   editor: Editor;
-  onAddComment?: () => void;  // Optional — enables "Bình luận" item
+  onAddComment?: (threadType: "comment" | "review_note") => void;
 }
 ```
 
-**Menu structure** (top to bottom):
-1. Cắt / Sao chép / Dán / Dán không định dạng
-2. Bình luận *(if `onAddComment` provided and text is selected)*
-3. Bảng ▸ *(expandable submenu, if cursor is inside a table)*
-4. Xóa *(always at bottom)*
+**Menu structure**:
 
-**Table submenu** (hover-expandable):
-- Thêm cột trước/sau, Thêm hàng trên/dưới
-- Gộp/Tách ô (`mergeOrSplit()` command)
-- Xóa cột, Xóa hàng, Xóa bảng
-
-#### Key Technical Details
-
-**Selection preservation on right-click**:  
-ProseMirror's table plugin processes `mousedown` and resets CellSelection before `contextmenu` fires. To fix this:
-
-1. A **capturing-phase** `mousedown` listener saves the current selection to a ref when `e.button === 2` (right-click)
-2. The `contextmenu` handler uses this pre-saved selection
-3. After the menu mounts, the selection is **restored** via `editor.state.tr.setSelection(savedSelection)` and `editor.view.focus()` to re-render CellSelection decorations
-
-```ts
-// Capture phase runs BEFORE ProseMirror's handler
-el.addEventListener("mousedown", handleMouseDown, true);
+```
+Cắt                  ⌘X
+Sao chép             ⌘C
+Dán                  ⌘V        ← only if clipboard has content
+Dán không định dạng  ⌘⇧V       ← only if clipboard has content
+──────────────────
+Ý kiến                          ← neutral color (if onAddComment provided + text selected)
+Review note                     ← red/destructive color
+──────────────────
+Bảng                ▸           ← expandable submenu (if in table)
+──────────────────
+Xóa
 ```
 
-**Smart viewport positioning**:  
-Both the main menu and submenu are clamped within the viewport using a `clamp()` utility + `requestAnimationFrame` to measure actual DOM size after render.
+**Key behaviors**:
 
-**Submenu positioning**:  
-Computed via `useEffect` after `tableSubOpen` changes — tries right of main menu, falls back to left if insufficient space.
+- **Clipboard-aware paste**: On right-click, `navigator.clipboard.readText()` is checked. If clipboard is empty or permission denied, Dán/Dán không định dạng are hidden.
+- **Selection preservation**: Capture-phase mousedown listener saves selection before ProseMirror resets it. Restored after menu mounts.
+- **Smart viewport positioning**: Menu and submenu clamped within viewport via `clamp()` + `requestAnimationFrame`.
 
 ### TableGridPicker
 
-Interactive 8×8 grid for table creation (like Google Docs / Confluence).
-
-```ts
-interface Props {
-  onSelect: (rows: number, cols: number) => void;
-}
-```
-
-Renders a grid of small buttons that highlight on hover, with a `"cols × rows"` label.
+Interactive 8×8 grid for table creation (like Google Docs / Confluence). Renders hover-highlighted cells with a `"cols × rows"` label.
 
 ---
 
-## 4. CSS / Styling
+## 5. CSS / Styling
 
-All editor styles are in `src/app/globals.css` under the `.tiptap` selector.
+All editor styles in `src/app/globals.css` under `.tiptap`.
 
 ### Compact Editor Density
 
-Overrides Tailwind Typography's `prose` defaults for a GDocs-like density:
+| Property         | Value                              | Notes                       |
+| ---------------- | ---------------------------------- | --------------------------- |
+| Base font        | `0.8125rem` (13px)                 | Close to GDocs 11pt at 100% |
+| Line-height      | `1.4`                              | Tighter than prose default  |
+| H1               | `1.25rem`, margin `0.5em / 0.15em` |                             |
+| H2               | `1.1rem`, margin `0.4em / 0.1em`   |                             |
+| H3               | `0.95rem`, margin `0.35em / 0.1em` |                             |
+| Paragraph margin | `0.15em` top/bottom                | Minimal spacing             |
+| List margin      | `0.15em`, padding-left `1.25em`    |                             |
 
-| Property | Value | Notes |
-|----------|-------|-------|
-| Base font | `0.8125rem` (13px) | Close to GDocs 11pt at 100% |
-| Line-height | `1.4` | Tighter than prose default |
-| H1 | `1.25rem`, margin `0.5em / 0.15em` | |
-| H2 | `1.1rem`, margin `0.4em / 0.1em` | |
-| H3 | `0.95rem`, margin `0.35em / 0.1em` | |
-| Paragraph margin | `0.15em` top/bottom | Minimal spacing |
-| List margin | `0.15em`, padding-left `1.25em` | |
-
-### Table Styles
+### Comment Highlight Styles
 
 ```css
-.tiptap table { margin: 0.35em 0; }
-.tiptap table td, .tiptap table th {
-  padding: 0.2rem 0.4rem;
-  font-size: 0.8125rem;
-  min-width: 80px;
+/* Committed comment — yellow */
+.wp-comment-mark[data-thread-type="comment"] {
+  background-color: #fef9c3;
+  border-bottom: 2px solid #facc15;
 }
-.tiptap table th { background-color: var(--muted); font-weight: 600; }
-.tiptap table .selectedCell::after {
-  /* Blue overlay for selected cells */
-  background: oklch(0.488 0.243 264.376 / 0.12);
+
+/* Committed review note — orange */
+.wp-comment-mark[data-thread-type="review_note"] {
+  background-color: #ffedd5;
+  border-bottom: 2px solid #f97316;
 }
-.tiptap table .column-resize-handle {
-  /* Blue resize bar on column borders */
-  background-color: oklch(0.488 0.243 264.376);
+
+/* Pending comment (not yet committed) — blue dashed */
+.wp-comment-pending {
+  background-color: #dbeafe;
+  border-bottom: 2px dashed #3b82f6;
 }
-```
 
-### Image Styles
-
-```css
-.tiptap img { max-width: 100%; border-radius: 0.5rem; }
-.tiptap img.ProseMirror-selectednode {
-  outline: 2px solid oklch(0.488 0.243 264.376);
+/* Active (clicked/focused) — blue outline */
+.wp-comment-mark.wp-comment-active {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
 }
-```
 
----
-
-## 5. How to Create a New Editor Instance
-
-```tsx
-"use client";
-
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import { Table } from "@tiptap/extension-table";
-import { TableRow } from "@tiptap/extension-table-row";
-import { TableCell } from "@tiptap/extension-table-cell";
-import { TableHeader } from "@tiptap/extension-table-header";
-// ... other extensions
-import { EditorToolbar } from "@/components/shared/RichTextEditor/EditorToolbar";
-import { EditorContextMenu } from "@/components/shared/RichTextEditor/EditorContextMenu";
-import { LineHeight } from "@/components/shared/RichTextEditor/extensions/LineHeight";
-
-export function MyEditor({ content, onChange }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      // ... TextStyle, FontFamily, Color, Highlight, Underline, Image
-      Table.configure({ resizable: true, allowTableNodeSelection: true }),
-      TableRow, TableCell, TableHeader,
-      Link.configure({ openOnClick: false }),
-      LineHeight,
-    ],
-    content,
-    immediatelyRender: false,  // Required for SSR/hydration
-    onUpdate: ({ editor: e }) => onChange(e.getJSON()),
-    editorProps: {
-      attributes: {
-        class: "prose prose-sm max-w-none focus:outline-none min-h-[200px] px-4 py-3",
-      },
-    },
-  });
-
-  if (!editor) return null;
-
-  return (
-    <div className="flex flex-col">
-      <EditorToolbar editor={editor} fileInputRef={fileInputRef} />
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
-        onChange={handleImageUpload} />
-      <EditorContent editor={editor} className="flex-1" />
-      <EditorContextMenu editor={editor} />
-    </div>
-  );
+/* Resolved — faded + dashed underline */
+.wp-comment-mark[data-resolved="true"] {
+  opacity: 0.5;
+  border-bottom-style: dashed;
 }
 ```
-
-**Key points**:
-- Always set `immediatelyRender: false` to avoid SSR hydration warnings
-- Always set `allowTableNodeSelection: true` on Table extension
-- Use `prose prose-sm max-w-none` class — the `.tiptap` CSS overrides handle density
-- Pass `onAddComment` to `EditorContextMenu` only if your editor supports comments
 
 ---
 
 ## 6. npm Dependencies
 
 ```
-@tiptap/react
+@tiptap/react          (v3.20+)
 @tiptap/pm
 @tiptap/starter-kit
 @tiptap/extension-placeholder
@@ -304,14 +283,38 @@ export function MyEditor({ content, onChange }) {
 
 ## 7. Known Patterns & Gotchas
 
-1. **CellSelection vs TextSelection**: ProseMirror's table plugin uses `CellSelection` for multi-cell selection. Check `sel.toJSON().type === "cell"` to distinguish from regular `TextSelection`. BubbleMenu should hide for CellSelection but show for text selection within a cell.
+1. **Google Translate icon**: Prevent by adding **both** `notranslate` CSS class and `translate="no"` attribute to the editor element. EngageEditor does this automatically.
 
-2. **Right-click resets CellSelection**: ProseMirror processes `mousedown` before `contextmenu`. Use a **capture-phase** mousedown listener to save the selection before ProseMirror changes it.
+2. **Toolbar sync**: `EditorToolbar` uses `useEditorState` hook from `@tiptap/react` to subscribe to editor transactions. This ensures toolbar buttons reflect the current selection's formatting. Do NOT use raw `editor.isActive()` in JSX — it won't re-render.
 
-3. **Merge/Split**: Use `mergeOrSplit()` — the smart command that auto-detects whether to merge (multiple cells selected) or split (single merged cell selected). Do NOT use separate `mergeCells()` / `splitCell()`.
+3. **CellSelection vs TextSelection**: ProseMirror table plugin uses `CellSelection` for multi-cell selection. Check `sel.toJSON().type === "cell"` to distinguish.
 
-4. **PopoverTrigger**: Base UI's `PopoverTrigger` expects a native `<button>` element in the `render` prop. Using `<div role="button">` will cause a console error.
+4. **Empty-cell commenting**: Expand collapsed selection (`from === to`) inside a table cell to the cell's content boundaries via `$pos.start(d)` / `$pos.end(d)`. Use `"[empty cell]"` as fallback quote.
 
-5. **Barrel exports**: If TypeScript can't resolve barrel `index.ts` exports, use direct file imports instead (e.g., `import { EditorToolbar } from "@/components/shared/RichTextEditor/EditorToolbar"`).
+5. **Right-click resets CellSelection**: Use capture-phase mousedown listener to save selection before ProseMirror changes it. After restoring, call `editor.view.focus()`.
 
-6. **Editor focus after selection restore**: After restoring a selection via `editor.state.tr.setSelection()`, call `editor.view.focus()` to ensure ProseMirror redraws decorations (especially CellSelection highlights).
+6. **Pending comment decoration**: Uses ProseMirror `DecorationSet` (not a mark) keyed by `pendingCommentKey`. This persists when editor loses focus. Must be cleared explicitly on commit or cancel.
+
+7. **Merge/Split**: Use `mergeOrSplit()` — auto-detects merge vs split. Do NOT use separate `mergeCells()` / `splitCell()`.
+
+8. **PopoverTrigger**: Base UI's `PopoverTrigger` requires a native `<button>` in the `render` prop.
+
+9. **Barrel exports**: If TypeScript can't resolve barrel `index.ts` exports, use direct file imports.
+
+10. **BubbleMenu**: Currently hidden (temporarily disabled). Comment/review note actions available via context menu only.
+
+---
+
+## 8. Naming Conventions (Vietnamese UI)
+
+| English     | Vietnamese          | Usage                                |
+| ----------- | ------------------- | ------------------------------------ |
+| Comment     | Ý kiến              | Context menu item, comment tab label |
+| Review Note | Review note         | Context menu item (red/destructive)  |
+| Review tab  | Soát xét            | Sidebar tab name                     |
+| Cut         | Cắt                 | Context menu                         |
+| Copy        | Sao chép            | Context menu                         |
+| Paste       | Dán                 | Context menu (clipboard-aware)       |
+| Paste plain | Dán không định dạng | Context menu (clipboard-aware)       |
+| Delete      | Xóa                 | Context menu (always at bottom)      |
+| Table       | Bảng                | Context menu expandable trigger      |

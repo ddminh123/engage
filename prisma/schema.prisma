@@ -123,7 +123,7 @@ model User {
   password_hash String?   // null for SSO-only users
   phone         String?
   title         String?   // job title (free text, independent of system role)
-  role          String    @default("member") // cae | admin | team_owner | member
+  role          String    @default("auditor") // cae | admin | audit_director | audit_manager | senior_auditor | auditor
   status        String    @default("active") // active | locked | inactive
   provider      String    @default("credentials") // credentials | entra_id
   supervisor_id String?   // self-ref FK — default reviewer
@@ -143,6 +143,7 @@ model User {
   wp_comments            WpComment[]       @relation("WpCommentAuthor")
   wp_thread_creators     WpCommentThread[] @relation("WpThreadCreator")
   created_templates      Template[]        @relation("TemplateCreator")
+  published_versions     EntityVersion[]   @relation("VersionPublisher")
 
   @@index([status])
   @@index([role])
@@ -642,6 +643,11 @@ model Engagement {
   estimated_days   Int?
   priority         String?   // high | medium | low
   notes            String?   @db.Text
+  // Work-program overall approval
+  wp_approval_status  String   @default("not_started")  // not_started | in_progress | waiting_review | needs_modification | reviewed | waiting_approval | approved
+  wp_approved_by      String?
+  wp_approved_at      DateTime?
+  wp_approved_version Int?
   created_by       String?   // placeholder — will link to User
   created_at       DateTime  @default(now())
   updated_at       DateTime  @updatedAt
@@ -662,6 +668,7 @@ model Engagement {
   participating_units EngagementParticipant[]
   contact_points      EngagementContactPoint[]
   auditee_reps        EngagementAuditeeRep[]
+  planning_workpapers PlanningWorkpaper[]
 
   @@index([status])
   @@index([entity_id])
@@ -832,6 +839,9 @@ model EngagementSection {
   description   String?   @db.Text
   status        String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
   added_from    String    @default("execution") // planning | execution
+  phase          String    @default("planning")   // planning | execution
+  planning_ref_id String?                          // FK → self (execution item → planning item)
+  source         String    @default("planned")     // planned | fieldwork
   sort_order    Int       @default(0)
   review_notes  String?   @db.Text
   reviewed_by   String?
@@ -839,11 +849,15 @@ model EngagementSection {
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
 
-  engagement Engagement            @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  engagement      Engagement            @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  planning_ref    EngagementSection?    @relation("SectionPlanningRef", fields: [planning_ref_id], references: [id], onDelete: SetNull)
+  execution_refs  EngagementSection[]   @relation("SectionPlanningRef")
   objectives EngagementObjective[]
   procedures EngagementProcedure[] // procedures directly under section (no objective)
 
   @@index([engagement_id])
+  @@index([phase])
+  @@index([planning_ref_id])
   @@index([sort_order])
   @@map("engagement_section")
 }
@@ -856,6 +870,9 @@ model EngagementObjective {
   description   String?   @db.Text
   status        String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
   added_from    String    @default("execution") // planning | execution
+  phase          String    @default("planning")   // planning | execution
+  planning_ref_id String?                          // FK → self (execution item → planning item)
+  source         String    @default("planned")     // planned | fieldwork
   sort_order    Int       @default(0)
   review_notes  String?   @db.Text
   reviewed_by   String?
@@ -863,12 +880,16 @@ model EngagementObjective {
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
 
-  engagement Engagement            @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
-  section    EngagementSection?    @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  engagement      Engagement            @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  section         EngagementSection?    @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  planning_ref    EngagementObjective?  @relation("ObjectivePlanningRef", fields: [planning_ref_id], references: [id], onDelete: SetNull)
+  execution_refs  EngagementObjective[] @relation("ObjectivePlanningRef")
   procedures EngagementProcedure[]
 
   @@index([engagement_id])
   @@index([section_id])
+  @@index([phase])
+  @@index([planning_ref_id])
   @@index([sort_order])
   @@map("engagement_objective")
 }
@@ -883,8 +904,16 @@ model EngagementProcedure {
   procedures     String?   @db.Text  // detailed testing steps / methodology
   procedure_type     String?   // inquiry | observation | inspection | re_performance | analytical | walkthrough | other
   procedure_category String?   // toc | substantive
-  status         String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
+  status         String    @default("not_started") // DEPRECATED — use approval_status instead
+  approval_status   String    @default("not_started")  // not_started | in_progress | waiting_review | needs_modification | approved
+  current_version   Int       @default(0)             // last published version (0 = never published)
+  approved_by       String?
+  approved_at       DateTime?
+  approved_version  Int?                               // which version was approved
   added_from     String    @default("execution") // planning | execution
+  phase          String    @default("planning")   // planning | execution
+  planning_ref_id String?                          // FK → self (execution item → planning item)
+  source         String    @default("planned")     // planned | fieldwork
   observations   String?   @db.Text  // what was found during testing
   conclusion     String?   @db.Text  // auditor's conclusion
   effectiveness  String?   // effective | ineffective
@@ -901,9 +930,11 @@ model EngagementProcedure {
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
-  engagement Engagement           @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
-  section    EngagementSection?   @relation(fields: [section_id], references: [id], onDelete: Cascade)
-  objective  EngagementObjective? @relation(fields: [objective_id], references: [id], onDelete: Cascade)
+  engagement      Engagement           @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  section         EngagementSection?   @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  objective       EngagementObjective? @relation(fields: [objective_id], references: [id], onDelete: Cascade)
+  planning_ref    EngagementProcedure? @relation("ProcedurePlanningRef", fields: [planning_ref_id], references: [id], onDelete: SetNull)
+  execution_refs  EngagementProcedure[] @relation("ProcedurePlanningRef")
   findings   DraftFindingProcedure[]
   ref_controls   ProcedureControlRef[]
   ref_risks      ProcedureRiskRef[]
@@ -912,6 +943,8 @@ model EngagementProcedure {
   @@index([engagement_id])
   @@index([section_id])
   @@index([objective_id])
+  @@index([phase])
+  @@index([planning_ref_id])
   @@index([sort_order])
   @@index([status])
   @@map("engagement_procedure")
@@ -1011,6 +1044,142 @@ model ProcedureObjectiveRef {
 
   @@id([procedure_id, rcm_objective_id])
   @@map("procedure_objective_ref")
+}
+
+// =============================================================================
+// PLANNING STEP CONFIGURATION — System-level configurable planning steps
+// =============================================================================
+
+model PlanningStepConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique   // "scope" | "objectives" | "understanding" | "rcm" | "work_program" | custom cuid
+  title       String              // "Phạm vi & Thông tin chung", "Kế hoạch lấy mẫu", etc.
+  icon        String?             // lucide icon name (optional)
+  step_type   String              // "fixed" | "workpaper"
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  planning_workpapers PlanningWorkpaper[]
+
+  @@index([sort_order])
+  @@map("planning_step_config")
+}
+
+// Per-engagement workpaper for generic planning steps (step_type = "workpaper")
+model PlanningWorkpaper {
+  id               String   @id @default(cuid())
+  engagement_id    String
+  step_config_id   String
+  content          Json?    @db.Json    // Tiptap JSON
+  approval_status  String   @default("not_started")  // not_started | in_progress | waiting_review | needs_modification | reviewed | waiting_approval | approved
+  current_version  Int      @default(0)
+  approved_by      String?
+  approved_at      DateTime?
+  approved_version Int?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  engagement  Engagement         @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  step_config PlanningStepConfig @relation(fields: [step_config_id], references: [id])
+
+  @@unique([engagement_id, step_config_id])
+  @@index([engagement_id])
+  @@map("planning_workpaper")
+}
+
+// =============================================================================
+// ENTITY VERSIONING — Publish-only snapshots for any versionable entity
+// =============================================================================
+
+model EntityVersion {
+  id            String   @id @default(cuid())
+  entity_type   String   // "procedure" | "understanding" | future...
+  entity_id     String   // FK to the actual record (polymorphic)
+  version       Int      // auto-increment per entity (1, 2, 3...)
+  snapshot      Json     @db.Json  // full entity state at publish time
+  comment       String?  @db.Text  // optional version comment
+  published_by  String   // user who published
+  published_at  DateTime @default(now())
+
+  publisher User @relation("VersionPublisher", fields: [published_by], references: [id])
+
+  @@unique([entity_type, entity_id, version])
+  @@index([entity_type, entity_id])
+  @@index([published_by])
+  @@index([published_at])
+  @@map("entity_version")
+}
+
+// =============================================================================
+// APPROVAL STATUSES — Dynamic status definitions with categories
+// =============================================================================
+
+model ApprovalStatus {
+  id          String   @id @default(cuid())
+  key         String   @unique          // slug: "not_started", "in_progress", etc.
+  label       String                    // display: "Chưa bắt đầu"
+  color       String   @default("#94a3b8")  // hex from 15-color palette
+  category    String                    // "open" | "active" | "review" | "done"
+  is_system   Boolean  @default(false)  // true = can't delete or change key/category
+  is_archived Boolean  @default(false)  // true = hidden from config but still resolvable for display
+  sort_order  Int      @default(0)      // within category for display ordering
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@index([category])
+  @@map("approval_status")
+}
+
+// =============================================================================
+// APPROVAL WORKFLOWS — Configurable state-machine per entity type
+// =============================================================================
+
+model ApprovalWorkflow {
+  id                  String   @id @default(cuid())
+  entity_type         String?  @unique  // DEPRECATED — use ApprovalEntityBinding instead
+  name                String             // display name, e.g. "Quy trình 2 bước"
+  allow_self_approval Boolean  @default(false)  // CAE always allowed regardless
+  is_active           Boolean  @default(true)
+  is_default          Boolean  @default(false)   // fallback when entity type has no binding
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  transitions     ApprovalTransition[]
+  entity_bindings ApprovalEntityBinding[]
+
+  @@map("approval_workflow")
+}
+
+// Maps entity types to workflows (many entity types → one workflow)
+model ApprovalEntityBinding {
+  id           String @id @default(cuid())
+  entity_type  String @unique   // "procedure" | "work_program" | "planning_workpaper" | etc.
+  workflow_id  String
+  label        String?          // display name for the entity type, e.g. "Thủ tục kiểm toán"
+
+  workflow ApprovalWorkflow @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+
+  @@index([workflow_id])
+  @@map("approval_entity_binding")
+}
+
+model ApprovalTransition {
+  id            String  @id @default(cuid())
+  workflow_id   String
+  from_status   String  // "draft" | "waiting_review" | "needs_modification" | "reviewed"
+  to_status     String  // target status
+  action_label  String  // UI button label: "Gửi soát xét" | "Phê duyệt" | "Yêu cầu chỉnh sửa"
+  action_type   String  // semantic: "submit" | "approve" | "reject" | "revise"
+  allowed_roles Json    // ["reviewer","lead","cae"] — engagement member roles + system roles
+  sort_order    Int     @default(0)
+
+  workflow ApprovalWorkflow @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+
+  @@unique([workflow_id, from_status, to_status])
+  @@index([workflow_id])
+  @@map("approval_transition")
 }
 
 // =============================================================================

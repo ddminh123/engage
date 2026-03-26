@@ -261,13 +261,20 @@
   background-color: #fef08a;
 }
 
-/* Review note type — orange/amber */
+/* Review note type — purple */
 .wp-comment-mark[data-thread-type="review_note"] {
-  background-color: #ffedd5;
-  border-bottom-color: #f97316;
+  background-color: #f3e8ff;
+  border-bottom-color: #a855f7;
 }
 .wp-comment-mark[data-thread-type="review_note"]:hover {
-  background-color: #fed7aa;
+  background-color: #e9d5ff;
+}
+
+/* Pending comment (not yet committed) — blue tint */
+.wp-comment-pending {
+  background-color: #dbeafe;
+  border-bottom: 2px dashed #3b82f6;
+  border-radius: 2px;
 }
 
 /* Active (clicked) state — stronger highlight */

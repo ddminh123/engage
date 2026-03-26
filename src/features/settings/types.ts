@@ -168,3 +168,128 @@ export interface TemplateInput {
   category_id?: string | null;
   is_active?: boolean;
 }
+
+export interface ApprovalWorkflowTransition {
+  id: string;
+  workflowId: string;
+  fromStatus: string;
+  toStatus: string;
+  actionLabel: string;
+  actionType: 'submit' | 'approve' | 'reject' | 'revise';
+  allowedRoles: string[];
+  sortOrder: number;
+}
+
+export interface ApprovalEntityBinding {
+  id: string;
+  entityType: string;
+  workflowId: string;
+  label: string | null;
+}
+
+export interface ApprovalWorkflow {
+  id: string;
+  entityType: string | null;
+  name: string;
+  allowSelfApproval: boolean;
+  isActive: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  transitions: ApprovalWorkflowTransition[];
+  entityBindings: ApprovalEntityBinding[];
+}
+
+export interface ApprovalWorkflowInput {
+  entityType?: string;
+  name: string;
+  allowSelfApproval?: boolean;
+  isActive?: boolean;
+  isDefault?: boolean;
+}
+
+export interface EntityBindingInput {
+  entityType: string;
+  workflowId: string;
+  label?: string;
+}
+
+export interface ApprovalWorkflowUpdateInput {
+  name?: string;
+  allowSelfApproval?: boolean;
+  isActive?: boolean;
+  isDefault?: boolean;
+}
+
+export interface ApprovalTransitionInput {
+  fromStatus: string;
+  toStatus: string;
+  actionLabel: string;
+  actionType: 'submit' | 'approve' | 'reject' | 'revise';
+  allowedRoles: string[];
+  sortOrder?: number;
+}
+
+// =============================================================================
+// APPROVAL STATUS (Dynamic status definitions)
+// =============================================================================
+
+export type StatusCategory = 'open' | 'active' | 'review' | 'done';
+
+export interface ApprovalStatusItem {
+  id: string;
+  key: string;
+  label: string;
+  color: string;
+  category: StatusCategory;
+  isSystem: boolean;
+  isArchived: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApprovalStatusInput {
+  key: string;
+  label: string;
+  color: string;
+  category: StatusCategory;
+  sortOrder?: number;
+}
+
+export interface ApprovalStatusUpdateInput {
+  label?: string;
+  color?: string;
+  category?: StatusCategory;
+  sortOrder?: number;
+}
+
+// =============================================================================
+// PLANNING STEP CONFIG (Cấu hình bước kế hoạch)
+// =============================================================================
+
+export interface PlanningStepConfig {
+  id: string;
+  key: string;
+  title: string;
+  icon: string | null;
+  stepType: 'fixed' | 'workpaper';
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlanningStepConfigInput {
+  title: string;
+  icon?: string | null;
+  step_type?: 'fixed' | 'workpaper';
+  is_active?: boolean;
+}
+
+export interface PlanningStepConfigUpdateInput {
+  title?: string;
+  icon?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+}

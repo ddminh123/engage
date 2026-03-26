@@ -16,7 +16,6 @@ import {
   Merge,
   TableIcon,
   ChevronRight,
-  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +27,7 @@ interface MenuState {
   savedSelection: Selection;
   hasText: boolean;
   inTable: boolean;
+  hasClipboard: boolean;
 }
 
 interface EditorContextMenuProps {
@@ -50,7 +50,7 @@ export function EditorContextMenu({
 }: EditorContextMenuProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-  const [activeSub, setActiveSub] = useState<"table" | "comment" | null>(null);
+  const [activeSub, setActiveSub] = useState<"table" | null>(null);
   const [subStyle, setSubStyle] = useState<React.CSSProperties>({});
   const menuRef = useRef<HTMLDivElement>(null);
   const subRef = useRef<HTMLDivElement>(null);
@@ -69,7 +69,7 @@ export function EditorContextMenu({
       }
     };
 
-    const handleContextMenu = (e: MouseEvent) => {
+    const handleContextMenu = async (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
 
@@ -77,12 +77,23 @@ export function EditorContextMenu({
       const sel = savedSelRef.current ?? editor.state.selection;
       const { from, to } = sel;
 
+      // Check clipboard content availability
+      let hasClip = false;
+      try {
+        const text = await navigator.clipboard.readText();
+        hasClip = text.length > 0;
+      } catch {
+        // Clipboard API denied or unavailable — hide paste
+        hasClip = false;
+      }
+
       setMenu({
         x: e.clientX,
         y: e.clientY,
         savedSelection: sel,
-        hasText: from !== to,
+        hasText: from !== to || editor.isActive("table"),
         inTable: editor.isActive("table"),
+        hasClipboard: hasClip,
       });
       setActiveSub(null);
     };
@@ -201,7 +212,7 @@ export function EditorContextMenu({
     exec(() => editor.chain().focus().deleteSelection().run());
 
   // Submenu hover handlers with debounce to avoid flicker
-  const openSub = (which: "table" | "comment") => {
+  const openSub = (which: "table") => {
     clearTimeout(subTimeout.current);
     setActiveSub(which);
   };
@@ -236,36 +247,38 @@ export function EditorContextMenu({
           onClick={handleCopy}
           disabled={!hasText}
         />
-        <MenuItem
-          icon={Clipboard}
-          label="Dán"
-          shortcut="⌘V"
-          onClick={handlePasteRich}
-        />
-        <MenuItem
-          icon={ClipboardPaste}
-          label="Dán không định dạng"
-          shortcut="⌘⇧V"
-          onClick={handlePaste}
-        />
+        {menu.hasClipboard && (
+          <MenuItem
+            icon={Clipboard}
+            label="Dán"
+            shortcut="⌘V"
+            onClick={handlePasteRich}
+          />
+        )}
+        {menu.hasClipboard && (
+          <MenuItem
+            icon={ClipboardPaste}
+            label="Dán không định dạng"
+            shortcut="⌘⇧V"
+            onClick={handlePaste}
+          />
+        )}
 
-        {/* Soát xét — expandable submenu with Ý kiến + Review note */}
+        {/* Ý kiến + Review note — flat items */}
         {onAddComment && hasText && (
           <>
             <MenuDivider />
-            <div
-              data-submenu-trigger="comment"
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors hover:bg-accent",
-                activeSub === "comment" && "bg-accent",
-              )}
-              onMouseEnter={() => openSub("comment")}
-              onMouseLeave={closeSub}
-            >
-              <ClipboardCheck className="h-4 w-4 shrink-0" />
-              <span className="flex-1 text-left">Soát xét</span>
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-            </div>
+            <MenuItem
+              icon={MessageSquarePlus}
+              label="Ý kiến"
+              onClick={() => exec(() => onAddComment("comment"))}
+            />
+            <MenuItem
+              icon={NotepadText}
+              label="Review note"
+              onClick={() => exec(() => onAddComment("review_note"))}
+              destructive
+            />
           </>
         )}
 
@@ -298,28 +311,6 @@ export function EditorContextMenu({
           disabled={!hasText}
         />
       </div>
-
-      {/* ── Comment submenu ── */}
-      {activeSub === "comment" && onAddComment && (
-        <div
-          ref={subRef}
-          className="fixed z-[51] min-w-[180px] rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95"
-          style={subStyle}
-          onMouseEnter={keepSub}
-          onMouseLeave={closeSub}
-        >
-          <MenuItem
-            icon={MessageSquarePlus}
-            label="Ý kiến"
-            onClick={() => exec(() => onAddComment("comment"))}
-          />
-          <MenuItem
-            icon={NotepadText}
-            label="Review note"
-            onClick={() => exec(() => onAddComment("review_note"))}
-          />
-        </div>
-      )}
 
       {/* ── Table submenu ── */}
       {activeSub === "table" && inTable && (

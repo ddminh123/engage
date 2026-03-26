@@ -106,7 +106,9 @@ export function WpProcedureItem({
         />
         {mode === "execution" && (
           <LabeledSelect
-            value={state.editingStatus || procedure.status || "not_started"}
+            value={
+              state.editingStatus || procedure.approvalStatus || "not_started"
+            }
             onChange={(v) => dispatch({ type: "SET_EDIT_STATUS", value: v })}
             options={PROCEDURE_STATUS_OPTIONS}
             className="h-7 w-32 text-xs"
@@ -188,18 +190,7 @@ export function WpProcedureItem({
 
       {/* Status — always visible */}
       <span className={cn("shrink-0", !onAssign && "ml-auto")}>
-        {mode === "execution" ? (
-          <LabeledSelect
-            value={procedure.status ?? "not_started"}
-            onChange={(v) =>
-              editor.handleUpdateProcedureStatus(procedure.id, v)
-            }
-            options={PROCEDURE_STATUS_OPTIONS}
-            className="h-7 w-36 text-xs"
-          />
-        ) : (
-          <WpStatusBadge status={procedure.status} />
-        )}
+        <WpStatusBadge status={procedure.approvalStatus} />
       </span>
     </div>
   );
@@ -215,7 +206,7 @@ export function WpProcedureItem({
               type: "START_EDIT_PROCEDURE",
               id: procedure.id,
               title: procedure.title,
-              status: procedure.status ?? "not_started",
+              status: procedure.approvalStatus ?? "not_started",
             })
           }
           onDelete={() =>

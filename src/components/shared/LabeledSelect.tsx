@@ -59,7 +59,7 @@ export function LabeledSelect({
       </SelectTrigger>
       <SelectContent>
         {options.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value}>
+          <SelectItem key={opt.value} value={opt.value} label={opt.label}>
             {renderOption ? renderOption(opt) : opt.label}
           </SelectItem>
         ))}

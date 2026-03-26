@@ -27,11 +27,13 @@ export const TEAMS_LABELS = {
   STATUS_LOCKED: 'Đã khóa',
   STATUS_INACTIVE: 'Ngừng hoạt động',
 
-  // User roles
+  // User roles (system-level)
   ROLE_CAE: 'Trưởng KTNB',
   ROLE_ADMIN: 'Quản trị viên',
-  ROLE_TEAM_OWNER: 'Trưởng nhóm',
-  ROLE_MEMBER: 'Thành viên',
+  ROLE_AUDIT_DIRECTOR: 'Giám đốc kiểm toán',
+  ROLE_AUDIT_MANAGER: 'Trưởng phòng kiểm toán',
+  ROLE_SENIOR_AUDITOR: 'Kiểm toán viên chính',
+  ROLE_AUDITOR: 'Kiểm toán viên',
 
   // User actions
   ACTION_LOCK: 'Khóa tài khoản',
@@ -92,8 +94,10 @@ export const TEAMS_LABELS = {
 export const USER_ROLE_OPTIONS = [
   { value: 'cae', label: TEAMS_LABELS.ROLE_CAE },
   { value: 'admin', label: TEAMS_LABELS.ROLE_ADMIN },
-  { value: 'team_owner', label: TEAMS_LABELS.ROLE_TEAM_OWNER },
-  { value: 'member', label: TEAMS_LABELS.ROLE_MEMBER },
+  { value: 'audit_director', label: TEAMS_LABELS.ROLE_AUDIT_DIRECTOR },
+  { value: 'audit_manager', label: TEAMS_LABELS.ROLE_AUDIT_MANAGER },
+  { value: 'senior_auditor', label: TEAMS_LABELS.ROLE_SENIOR_AUDITOR },
+  { value: 'auditor', label: TEAMS_LABELS.ROLE_AUDITOR },
 ] as const;
 
 export const USER_STATUS_OPTIONS = [

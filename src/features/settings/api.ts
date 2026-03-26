@@ -14,6 +14,19 @@ import type {
   TemplateInput,
   TemplateCategory,
   TemplateCategoryInput,
+  ApprovalWorkflow,
+  ApprovalWorkflowInput,
+  ApprovalWorkflowUpdateInput,
+  ApprovalWorkflowTransition,
+  ApprovalTransitionInput,
+  ApprovalEntityBinding,
+  EntityBindingInput,
+  PlanningStepConfig,
+  PlanningStepConfigInput,
+  PlanningStepConfigUpdateInput,
+  ApprovalStatusItem,
+  ApprovalStatusInput,
+  ApprovalStatusUpdateInput,
 } from './types';
 
 interface ApiResponse<T> {
@@ -311,4 +324,205 @@ export async function deleteTemplateApi(id: string): Promise<{ success: boolean 
     method: 'DELETE',
   });
   return handleResponse<{ success: boolean }>(response);
+}
+
+// ── Approval Workflows ──
+
+export async function fetchApprovalWorkflowsApi(): Promise<ApprovalWorkflow[]> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_WORKFLOWS);
+  return handleResponse<ApprovalWorkflow[]>(response);
+}
+
+export async function fetchApprovalWorkflowApi(id: string): Promise<ApprovalWorkflow> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_WORKFLOWS_BY_ID(id));
+  return handleResponse<ApprovalWorkflow>(response);
+}
+
+export async function createApprovalWorkflowApi(data: ApprovalWorkflowInput): Promise<ApprovalWorkflow> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_WORKFLOWS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ApprovalWorkflow>(response);
+}
+
+export async function updateApprovalWorkflowApi(id: string, data: ApprovalWorkflowUpdateInput): Promise<ApprovalWorkflow> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_WORKFLOWS_BY_ID(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ApprovalWorkflow>(response);
+}
+
+export async function deleteApprovalWorkflowApi(id: string): Promise<{ success: boolean }> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_WORKFLOWS_BY_ID(id), {
+    method: 'DELETE',
+  });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+export async function addApprovalTransitionApi(workflowId: string, data: ApprovalTransitionInput): Promise<ApprovalWorkflowTransition> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_WORKFLOW_TRANSITIONS(workflowId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ApprovalWorkflowTransition>(response);
+}
+
+export async function updateApprovalTransitionApi(workflowId: string, transitionId: string, data: Partial<ApprovalTransitionInput>): Promise<ApprovalWorkflowTransition> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_WORKFLOW_TRANSITION_BY_ID(workflowId, transitionId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ApprovalWorkflowTransition>(response);
+}
+
+export async function reorderApprovalTransitionsApi(workflowId: string, orderedIds: string[]): Promise<ApprovalWorkflow> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_WORKFLOW_TRANSITIONS(workflowId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderedIds }),
+  });
+  return handleResponse<ApprovalWorkflow>(response);
+}
+
+export async function deleteApprovalTransitionApi(workflowId: string, transitionId: string): Promise<{ success: boolean }> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_WORKFLOW_TRANSITION_BY_ID(workflowId, transitionId), {
+    method: 'DELETE',
+  });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+// =============================================================================
+// APPROVAL STATUSES
+// =============================================================================
+
+export async function fetchApprovalStatusesApi(): Promise<ApprovalStatusItem[]> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_STATUSES);
+  return handleResponse<ApprovalStatusItem[]>(response);
+}
+
+export async function createApprovalStatusApi(data: ApprovalStatusInput): Promise<ApprovalStatusItem> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_STATUSES, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ApprovalStatusItem>(response);
+}
+
+export async function updateApprovalStatusApi(id: string, data: ApprovalStatusUpdateInput): Promise<ApprovalStatusItem> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_STATUSES_BY_ID(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ApprovalStatusItem>(response);
+}
+
+export async function deleteApprovalStatusApi(id: string): Promise<{ success: boolean }> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_STATUSES_BY_ID(id), {
+    method: 'DELETE',
+  });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+export async function restoreApprovalStatusApi(id: string): Promise<ApprovalStatusItem> {
+  const response = await fetch(API_ROUTES.SETTINGS_APPROVAL_STATUSES_BY_ID(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ restore: true }),
+  });
+  return handleResponse<ApprovalStatusItem>(response);
+}
+
+// =============================================================================
+// ENTITY BINDINGS (Approval Workflow)
+// =============================================================================
+
+export async function upsertEntityBindingApi(data: EntityBindingInput): Promise<ApprovalEntityBinding> {
+  const response = await fetch(API_ROUTES.SETTINGS_ENTITY_BINDINGS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ApprovalEntityBinding>(response);
+}
+
+export async function deleteEntityBindingApi(entityType: string): Promise<{ success: boolean }> {
+  const response = await fetch(
+    `${API_ROUTES.SETTINGS_ENTITY_BINDINGS}?entityType=${encodeURIComponent(entityType)}`,
+    { method: 'DELETE' },
+  );
+  return handleResponse<{ success: boolean }>(response);
+}
+
+// =============================================================================
+// PLANNING STEP CONFIG
+// =============================================================================
+
+export async function fetchPlanningStepsApi(): Promise<PlanningStepConfig[]> {
+  const response = await fetch(API_ROUTES.SETTINGS_PLANNING_STEPS);
+  return handleResponse<PlanningStepConfig[]>(response);
+}
+
+export async function createPlanningStepApi(data: PlanningStepConfigInput): Promise<PlanningStepConfig> {
+  const response = await fetch(API_ROUTES.SETTINGS_PLANNING_STEPS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<PlanningStepConfig>(response);
+}
+
+export async function updatePlanningStepApi(id: string, data: PlanningStepConfigUpdateInput): Promise<PlanningStepConfig> {
+  const response = await fetch(API_ROUTES.SETTINGS_PLANNING_STEPS_BY_ID(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<PlanningStepConfig>(response);
+}
+
+export async function deletePlanningStepApi(id: string): Promise<{ success: boolean }> {
+  const response = await fetch(API_ROUTES.SETTINGS_PLANNING_STEPS_BY_ID(id), {
+    method: 'DELETE',
+  });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+export async function reorderPlanningStepsApi(orderedIds: string[]): Promise<{ success: boolean }> {
+  const response = await fetch(API_ROUTES.SETTINGS_PLANNING_STEPS_REORDER, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderedIds }),
+  });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+// =============================================================================
+// System Settings
+// =============================================================================
+
+export async function fetchSystemSettingsApi(): Promise<Record<string, unknown>> {
+  const response = await fetch(API_ROUTES.SETTINGS_SYSTEM);
+  return handleResponse<Record<string, unknown>>(response);
+}
+
+export async function fetchSystemSettingApi(key: string): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API_ROUTES.SETTINGS_SYSTEM}?key=${encodeURIComponent(key)}`);
+  return handleResponse<Record<string, unknown>>(response);
+}
+
+export async function updateSystemSettingsApi(settings: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const response = await fetch(API_ROUTES.SETTINGS_SYSTEM, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings }),
+  });
+  return handleResponse<Record<string, unknown>>(response);
 }

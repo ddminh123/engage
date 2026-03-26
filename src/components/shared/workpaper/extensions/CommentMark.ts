@@ -1,5 +1,6 @@
 import { Mark, mergeAttributes } from "@tiptap/react";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 export interface CommentMarkOptions {
   HTMLAttributes: Record<string, unknown>;
@@ -13,9 +14,13 @@ declare module "@tiptap/react" {
       setComment: (threadId: string, threadType?: string) => ReturnType;
       unsetComment: (threadId: string) => ReturnType;
       highlightThread: (threadId: string | null) => ReturnType;
+      setPendingCommentRange: (from: number, to: number) => ReturnType;
+      clearPendingCommentRange: () => ReturnType;
     };
   }
 }
+
+const pendingCommentKey = new PluginKey("pendingCommentHighlight");
 
 export const CommentMark = Mark.create<CommentMarkOptions>({
   name: "comment",
@@ -97,6 +102,22 @@ export const CommentMark = Mark.create<CommentMarkOptions>({
           });
           return true;
         },
+      setPendingCommentRange:
+        (from: number, to: number) =>
+        ({ tr, dispatch }) => {
+          if (dispatch) {
+            tr.setMeta(pendingCommentKey, { from, to });
+          }
+          return true;
+        },
+      clearPendingCommentRange:
+        () =>
+        ({ tr, dispatch }) => {
+          if (dispatch) {
+            tr.setMeta(pendingCommentKey, { from: null, to: null });
+          }
+          return true;
+        },
       highlightThread:
         (threadId: string | null) =>
         ({ view }) => {
@@ -121,6 +142,36 @@ export const CommentMark = Mark.create<CommentMarkOptions>({
   addProseMirrorPlugins() {
     const { onCommentClicked } = this.options;
     return [
+      // Pending comment highlight decoration plugin
+      new Plugin({
+        key: pendingCommentKey,
+        state: {
+          init() {
+            return DecorationSet.empty;
+          },
+          apply(tr, oldSet) {
+            const meta = tr.getMeta(pendingCommentKey) as
+              | { from: number | null; to: number | null }
+              | undefined;
+            if (meta) {
+              if (meta.from != null && meta.to != null) {
+                const deco = Decoration.inline(meta.from, meta.to, {
+                  class: "wp-comment-pending",
+                });
+                return DecorationSet.create(tr.doc, [deco]);
+              }
+              return DecorationSet.empty;
+            }
+            // Map existing decorations through document changes
+            return oldSet.map(tr.mapping, tr.doc);
+          },
+        },
+        props: {
+          decorations(state) {
+            return this.getState(state);
+          },
+        },
+      }),
       new Plugin({
         key: new PluginKey("commentMarkClick"),
         props: {

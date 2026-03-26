@@ -1,29 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
-import { BubbleMenu } from "@tiptap/react/menus";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import { Table } from "@tiptap/extension-table";
-import { TableRow } from "@tiptap/extension-table-row";
-import { TableCell } from "@tiptap/extension-table-cell";
-import { TableHeader } from "@tiptap/extension-table-header";
-import { TextStyle } from "@tiptap/extension-text-style";
-import { FontFamily } from "@tiptap/extension-font-family";
-import { Color } from "@tiptap/extension-color";
-import { Highlight } from "@tiptap/extension-highlight";
-import { Underline } from "@tiptap/extension-underline";
-import { Image } from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
-import type { JSONContent, Editor } from "@tiptap/react";
-import { LineHeight } from "@/components/shared/RichTextEditor/extensions/LineHeight";
-import { MessageSquarePlus, NotepadText } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { EditorToolbar } from "@/components/shared/RichTextEditor/EditorToolbar";
-import { EditorContextMenu } from "@/components/shared/RichTextEditor/EditorContextMenu";
+import { useRef, useImperativeHandle, forwardRef, useMemo } from "react";
+import type { Editor } from "@tiptap/react";
+import type { JSONContent } from "@tiptap/react";
+import {
+  EngageEditor,
+  type EngageEditorHandle,
+} from "@/components/shared/RichTextEditor/EngageEditor";
 import { CommentMark } from "./extensions/CommentMark";
 import type { WpThreadType } from "@/features/engagement/types";
+
+// ── Public handle (superset of EngageEditorHandle) ──
 
 export interface WorkpaperEditorHandle {
   getEditor: () => Editor | null;
@@ -34,6 +21,7 @@ export interface WorkpaperEditorHandle {
     from: number,
     to: number,
   ) => void;
+  clearPendingCommentRange: () => void;
 }
 
 interface WorkpaperEditorProps {
@@ -66,55 +54,27 @@ export const WorkpaperEditor = forwardRef<
   },
   ref,
 ) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const baseRef = useRef<EngageEditorHandle>(null);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-      }),
-      Placeholder.configure({ placeholder: "Bắt đầu nhập nội dung..." }),
-      TextStyle,
-      FontFamily,
-      Color,
-      Highlight.configure({ multicolor: true }),
-      Underline,
-      Image.configure({ inline: false, allowBase64: true }),
-      Table.configure({ resizable: true, allowTableNodeSelection: true }),
-      TableRow,
-      TableCell,
-      TableHeader,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: { class: "text-primary underline cursor-pointer" },
-      }),
-      LineHeight,
+  // Memoize extra extensions so the array reference is stable
+  const extraExtensions = useMemo(
+    () => [
       CommentMark.configure({
         HTMLAttributes: {},
         onCommentActivated,
         onCommentClicked,
       }),
     ],
-    content: content ?? undefined,
-    editable: !readOnly,
-    immediatelyRender: false,
-    onUpdate: ({ editor: e }) => {
-      onChange(e.getJSON());
-    },
-    editorProps: {
-      attributes: {
-        class:
-          "prose prose-sm max-w-none focus:outline-none min-h-[calc(100vh-200px)] px-6 py-4",
-        translate: "no",
-      },
-    },
-  });
+    [onCommentActivated, onCommentClicked],
+  );
 
+  // Expose comment-specific imperative methods
   useImperativeHandle(
     ref,
     () => ({
-      getEditor: () => editor,
+      getEditor: () => baseRef.current?.getEditor() ?? null,
       highlightThread: (threadId: string | null) => {
+        const editor = baseRef.current?.getEditor();
         if (editor) {
           editor.commands.highlightThread(threadId);
         }
@@ -125,136 +85,67 @@ export const WorkpaperEditor = forwardRef<
         from: number,
         to: number,
       ) => {
+        const editor = baseRef.current?.getEditor();
         if (editor) {
           editor
             .chain()
+            .clearPendingCommentRange()
             .setTextSelection({ from, to })
             .setComment(threadId, threadType)
             .run();
         }
       },
+      clearPendingCommentRange: () => {
+        const editor = baseRef.current?.getEditor();
+        if (editor) {
+          editor.commands.clearPendingCommentRange();
+        }
+      },
     }),
-    [editor],
+    [],
   );
 
-  useEffect(() => {
-    if (editor && readOnly !== !editor.isEditable) {
-      editor.setEditable(!readOnly);
-    }
-  }, [editor, readOnly]);
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editor) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = reader.result as string;
-      editor.chain().focus().setImage({ src }).run();
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  const handleAddComment = (threadType: WpThreadType) => {
+  const handleAddComment = (threadType: "comment" | "review_note") => {
+    const editor = baseRef.current?.getEditor();
     if (!editor) return;
-    const { from, to } = editor.state.selection;
+    let { from, to } = editor.state.selection;
+
+    // If collapsed selection inside a table cell, expand to the cell content range
+    if (from === to && editor.isActive("table")) {
+      const $pos = editor.state.doc.resolve(from);
+      for (let d = $pos.depth; d > 0; d--) {
+        const node = $pos.node(d);
+        if (
+          node.type.name === "tableCell" ||
+          node.type.name === "tableHeader"
+        ) {
+          from = $pos.start(d);
+          to = $pos.end(d);
+          break;
+        }
+      }
+    }
+
     if (from === to) return;
     const quote = editor.state.doc.textBetween(from, to, " ");
-    onAddComment(quote, threadType, from, to);
+    // Apply temporary highlight decoration so text stays visible while composing
+    editor.commands.setPendingCommentRange(from, to);
+    onAddComment(quote || "[empty cell]", threadType, from, to);
   };
 
-  if (!editor) return null;
-
   return (
-    <div className={cn("flex flex-col", className)}>
-      {/* Sticky toolbar */}
-      {!readOnly && (
-        <EditorToolbar editor={editor} fileInputRef={fileInputRef} />
-      )}
-
-      {/* Bubble menu — only Comment / Review note with icons */}
-      {!readOnly && (
-        <BubbleMenu
-          editor={editor}
-          options={{ placement: "top", offset: 8 }}
-          shouldShow={({ editor: e }) => {
-            // Show for any non-empty selection (text or cell)
-            const { from, to } = e.state.selection;
-            return from !== to;
-          }}
-          className="flex items-center gap-0.5 rounded-lg border bg-popover p-1 shadow-lg"
-        >
-          <BubbleButton
-            onClick={() => handleAddComment("comment")}
-            title="Thêm ý kiến"
-            className="text-blue-600 hover:text-blue-700"
-          >
-            <MessageSquarePlus className="h-3.5 w-3.5" />
-            <span className="text-xs ml-1">Ý kiến</span>
-          </BubbleButton>
-          <BubbleButton
-            onClick={() => handleAddComment("review_note")}
-            title="Thêm review note"
-            className="text-orange-600 hover:text-orange-700"
-          >
-            <NotepadText className="h-3.5 w-3.5" />
-            <span className="text-xs ml-1">Review note</span>
-          </BubbleButton>
-        </BubbleMenu>
-      )}
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        title="Upload image"
-        onChange={handleImageUpload}
-      />
-
-      <EditorContent editor={editor} className="flex-1" />
-
-      {/* Right-click context menu */}
-      {!readOnly && (
-        <EditorContextMenu
-          editor={editor}
-          onAddComment={(type: "comment" | "review_note") =>
-            handleAddComment(type)
-          }
-        />
-      )}
-    </div>
+    <EngageEditor
+      ref={baseRef}
+      content={content}
+      onChange={onChange}
+      readOnly={readOnly}
+      className={className}
+      editorClassName="min-h-[calc(100vh-200px)]"
+      extraExtensions={extraExtensions}
+      onAddComment={handleAddComment}
+    />
   );
 });
 
 // Re-export editor ref for parent access
 export type { Editor };
-
-function BubbleButton({
-  children,
-  onClick,
-  active,
-  title,
-  className: cls,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  active?: boolean;
-  title?: string;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "inline-flex items-center rounded px-1.5 py-1 transition-colors hover:bg-accent",
-        active && "bg-accent text-accent-foreground",
-        cls,
-      )}
-      onClick={onClick}
-      title={title}
-    >
-      {children}
-    </button>
-  );
-}

@@ -48,6 +48,7 @@ interface WorkProgramV2Props {
   mode: WpMode;
   rcmObjectives?: RcmObjective[];
   members?: EngagementMember[];
+  readOnly?: boolean;
 }
 
 // ── Main Component ──
@@ -60,6 +61,7 @@ export function WorkProgramV2({
   mode,
   rcmObjectives = [],
   members = [],
+  readOnly = false,
 }: WorkProgramV2Props) {
   const editor = useWorkProgramEditor(
     engagementId,
@@ -485,26 +487,29 @@ export function WorkProgramV2({
 
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="default"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => dispatch({ type: "START_ADD_SECTION" })}
-          >
-            <Plus className="mr-1 h-3 w-3" />
-            {WP_LABELS.addSection}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => dispatch({ type: "START_ADD_TOP_OBJECTIVE" })}
-          >
-            <Target className="mr-1 h-3 w-3" />
-            {WP_LABELS.addObjective}
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => dispatch({ type: "START_ADD_SECTION" })}
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              {WP_LABELS.addSection}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => dispatch({ type: "START_ADD_TOP_OBJECTIVE" })}
+            >
+              <Target className="mr-1 h-3 w-3" />
+              {WP_LABELS.addObjective}
+            </Button>
+          </div>
+        )}
+        {readOnly && <div />}
         {topNodes.length > 0 && (
           <Button variant="ghost" size="sm" onClick={handleExpandCollapseAll}>
             <ChevronsUpDown className="mr-1.5 h-3.5 w-3.5" />
@@ -514,13 +519,15 @@ export function WorkProgramV2({
       </div>
 
       {/* ── Batch action bar ── */}
-      <WpBatchBar
-        count={validSelectedIds.size}
-        onDuplicate={handleBatchDuplicate}
-        onDelete={handleBatchDelete}
-        onClear={clearSelection}
-        isPending={batchAction.isPending}
-      />
+      {!readOnly && (
+        <WpBatchBar
+          count={validSelectedIds.size}
+          onDuplicate={handleBatchDuplicate}
+          onDelete={handleBatchDelete}
+          onClear={clearSelection}
+          isPending={batchAction.isPending}
+        />
+      )}
 
       {/* ── Empty state ── */}
       {topNodes.length === 0 && !state.addingTopType && (
@@ -561,6 +568,7 @@ export function WorkProgramV2({
                   members={members}
                   onAssign={handleAssignUser}
                   onUnassign={handleUnassignUser}
+                  readOnly={readOnly}
                 />
               );
             }
@@ -586,6 +594,7 @@ export function WorkProgramV2({
                   members={members}
                   onAssign={handleAssignUser}
                   onUnassign={handleUnassignUser}
+                  readOnly={readOnly}
                 />
               );
             }
@@ -595,7 +604,7 @@ export function WorkProgramV2({
       )}
 
       {/* ── Inline add section / top-level objective ── */}
-      {state.addingTopType === "section" && (
+      {!readOnly && state.addingTopType === "section" && (
         <div ref={addFormRef} className="rounded-lg border bg-muted/30 p-3">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 shrink-0 text-blue-600" />
@@ -627,7 +636,7 @@ export function WorkProgramV2({
         </div>
       )}
 
-      {state.addingTopType === "objective" && (
+      {!readOnly && state.addingTopType === "objective" && (
         <div ref={addFormRef} className="rounded-lg border bg-muted/30 p-3">
           <div className="flex items-center gap-2">
             <Target className="h-4 w-4 shrink-0 text-emerald-600" />

@@ -12,7 +12,7 @@ export const createUserSchema = z.object({
   password: z.string().min(6),
   phone: z.string().optional(),
   title: z.string().optional(),
-  role: z.enum(['cae', 'admin', 'team_owner', 'member']),
+  role: z.enum(['cae', 'admin', 'audit_director', 'audit_manager', 'senior_auditor', 'auditor']),
   supervisorId: z.string().optional(),
   description: z.string().optional(),
   expertiseIds: z.array(z.string()).optional(),
@@ -24,7 +24,7 @@ export const updateUserSchema = z.object({
   password: z.string().min(6).optional(),
   phone: z.string().nullable().optional(),
   title: z.string().nullable().optional(),
-  role: z.enum(['cae', 'admin', 'team_owner', 'member']).optional(),
+  role: z.enum(['cae', 'admin', 'audit_director', 'audit_manager', 'senior_auditor', 'auditor']).optional(),
   supervisorId: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   status: z.enum(['active', 'locked', 'inactive']).optional(),
@@ -146,8 +146,10 @@ export async function createUser(data: z.infer<typeof createUserSchema>) {
     where: {
       name: data.role === 'cae' ? 'CAE'
         : data.role === 'admin' ? 'Admin'
-        : data.role === 'team_owner' ? 'Team Owner'
-        : 'Team Member',
+        : data.role === 'audit_director' ? 'Audit Director'
+        : data.role === 'audit_manager' ? 'Audit Manager'
+        : data.role === 'senior_auditor' ? 'Senior Auditor'
+        : 'Auditor',
       is_system: true,
     },
   });
@@ -206,8 +208,10 @@ export async function updateUser(id: string, data: z.infer<typeof updateUserSche
       where: {
         name: data.role === 'cae' ? 'CAE'
           : data.role === 'admin' ? 'Admin'
-          : data.role === 'team_owner' ? 'Team Owner'
-          : 'Team Member',
+          : data.role === 'audit_director' ? 'Audit Director'
+          : data.role === 'audit_manager' ? 'Audit Manager'
+          : data.role === 'senior_auditor' ? 'Senior Auditor'
+          : 'Auditor',
         is_system: true,
       },
     });

@@ -117,6 +117,45 @@ src/
 | Nav      | Tabs, Breadcrumb, DropdownMenu |
 | Feedback | Toast, Skeleton, Progress      |
 
+### Select Component — `label` Prop Rule
+
+Our Select component uses `@base-ui/react/select`. Base UI requires a **`label` prop** on `SelectItem` to display the correct text in the trigger when selected. The auto-derive in our wrapper (`src/components/ui/select.tsx`) only works when `children` is a **plain string literal**. It fails when children contain JSX, template literals with expressions, or multiple React nodes.
+
+**Rule: ALWAYS pass an explicit `label` prop to `<SelectItem>`.**
+
+```tsx
+// ✅ CORRECT — explicit label prop
+<SelectItem value={item.id} label={item.name}>
+  {item.name}
+</SelectItem>
+
+// ✅ CORRECT — JSX children with label
+<SelectItem value={option.value} label={option.label}>
+  <span className="flex items-center gap-2">
+    <Icon className="h-3 w-3" />
+    {option.label}
+  </span>
+</SelectItem>
+
+// ✅ CORRECT — computed label
+const displayLabel = `${wf.name}${wf.isDefault ? " (mặc định)" : ""}`;
+<SelectItem value={wf.id} label={displayLabel}>
+  {displayLabel}
+</SelectItem>
+
+// ❌ WRONG — no label prop, children is JSX → trigger shows raw value (ID)
+<SelectItem value={item.id}>
+  <span>{item.name}</span>
+</SelectItem>
+
+// ❌ WRONG — no label prop, children is mixed expression → trigger shows raw value
+<SelectItem value={wf.id}>
+  {wf.name}{wf.isDefault && " (mặc định)"}
+</SelectItem>
+```
+
+**Why:** Without `label`, Base UI falls back to `typeof children === "string"` which returns `false` for JSX/fragments, causing the trigger to display the raw `value` (typically an ID like `cmn47mmqq000r671crb0g5nrl`).
+
 ### Org Unit & Contact Badge Standard
 
 All org unit and contact references across the application (universe, plan, engagement) **must** use the following pattern:

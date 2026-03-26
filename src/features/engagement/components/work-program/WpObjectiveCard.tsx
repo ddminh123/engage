@@ -66,6 +66,7 @@ interface WpObjectiveCardProps {
     entityId: string,
     userId: string,
   ) => void;
+  readOnly?: boolean;
 }
 
 export function WpObjectiveCard({
@@ -88,6 +89,7 @@ export function WpObjectiveCard({
   members = [],
   onAssign,
   onUnassign,
+  readOnly = false,
 }: WpObjectiveCardProps) {
   const {
     state,
@@ -254,7 +256,9 @@ export function WpObjectiveCard({
     <Collapsible open={open} onOpenChange={onOpenChange}>
       <div className="rounded-lg border" data-node-id={objective.id}>
         {/* ── Card header ── */}
-        {isEditingHeader ? (
+        {isEditingHeader && !readOnly ? (
+          cardHeader
+        ) : readOnly ? (
           cardHeader
         ) : (
           <WpContextMenu
@@ -319,7 +323,7 @@ export function WpObjectiveCard({
             )}
 
             {/* Inline add procedure */}
-            {isAddingProcedure ? (
+            {!readOnly && isAddingProcedure ? (
               <WpInlineAdd
                 type="procedure"
                 onChange={handleTextChange}
@@ -329,7 +333,7 @@ export function WpObjectiveCard({
                 isSaving={isCreatingProcedure}
                 onOpenForm={() => onOpenForm?.("procedure", objective.id)}
               />
-            ) : (
+            ) : !readOnly ? (
               <WpAddButton
                 showProcedure
                 onAddProcedure={() =>
@@ -339,7 +343,7 @@ export function WpObjectiveCard({
                   })
                 }
               />
-            )}
+            ) : null}
           </div>
         </CollapsibleContent>
       </div>

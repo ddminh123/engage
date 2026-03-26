@@ -46,14 +46,21 @@ import { Building2, User } from "lucide-react";
 import { OrgUnitCardPopover } from "@/features/settings/components/OrgUnitCard";
 import { ContactCardPopoverById } from "@/features/settings/components/ContactCard";
 import { usePlanningEditor } from "../../hooks/usePlanningEditor";
+import { useIsReviewMode } from "@/features/settings/hooks/useApprovalStatuses";
 import { useSyncRcmToWorkProgram } from "../../hooks/useEngagements";
+import { usePlanningSteps } from "@/features/settings/hooks/usePlanningSteps";
+import { usePlanningWorkpapers } from "../../hooks/usePlanningWorkpapers";
 import type {
   PlanningState,
   PlanningAction,
 } from "../../hooks/usePlanningEditor";
 import { InlineInput } from "./InlineInput";
 import { RcmDataTable } from "./RcmDataTable";
+import { PlanningWorkpaperCard } from "./PlanningWorkpaperCard";
 import { WorkProgramV2 } from "../work-program";
+import { PlanningCardStatus } from "./PlanningCardStatus";
+import { UserAvatar } from "@/components/shared/UserAvatar";
+import { cn } from "@/lib/utils";
 import type {
   EngagementDetail,
   AuditObjective,
@@ -74,6 +81,21 @@ const LO = ENGAGEMENT_LABELS.objective;
 
 interface PlanningTabProps {
   engagement: EngagementDetail;
+}
+
+// Icon map: string name → Lucide component
+const ICON_MAP: Record<string, React.ElementType> = {
+  FileText,
+  Target,
+  BookOpen,
+  ShieldAlert,
+  ShieldCheck: Shield,
+  ClipboardList,
+};
+
+function StepIcon({ name }: { name: string | null | undefined }) {
+  const Icon = name ? ICON_MAP[name] : FileText;
+  return Icon ? <Icon className="h-4 w-4" /> : <FileText className="h-4 w-4" />;
 }
 
 export function PlanningTab({ engagement }: PlanningTabProps) {
@@ -109,17 +131,84 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
     message: string;
   } | null>(null);
 
+  // Fetch configurable step order
+  const { data: stepConfigs } = usePlanningSteps();
+  const { data: planningWorkpapers } = usePlanningWorkpapers(engagement.id);
+
+  // Filter to planning-phase WP items only
+  const planningSections = useMemo(
+    () => engagement.sections.filter((s) => s.phase === "planning"),
+    [engagement.sections],
+  );
+  const planningObjectives = useMemo(
+    () =>
+      (engagement.standaloneObjectives ?? []).filter(
+        (o) => o.phase === "planning",
+      ),
+    [engagement.standaloneObjectives],
+  );
+
+  // Active steps sorted by sort_order
+  const activeSteps = useMemo(
+    () =>
+      (stepConfigs ?? [])
+        .filter((s) => s.isActive)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    [stepConfigs],
+  );
+
+  // Map workpapers by stepConfigId for quick lookup
+  const wpByStep = useMemo(() => {
+    const map = new Map<
+      string,
+      typeof planningWorkpapers extends (infer T)[] | undefined ? T : never
+    >();
+    for (const wp of planningWorkpapers ?? []) {
+      map.set(wp.stepConfigId, wp);
+    }
+    return map;
+  }, [planningWorkpapers]);
+
   const isCollapsed = (key: string) => collapsed.has(key);
 
-  const SECTION_KEYS = [
-    "scope",
-    "objectives",
-    "understanding",
-    "racm",
-    "racm_table",
-    "procedures",
-  ];
-  const allCollapsed = SECTION_KEYS.every((k) => collapsed.has(k));
+  // Build section keys from steps for collapse/expand all
+  const sectionKeys = useMemo(
+    () =>
+      activeSteps.map((s) =>
+        s.key === "rcm"
+          ? "racm_table"
+          : s.key === "work_program"
+            ? "procedures"
+            : s.key,
+      ),
+    [activeSteps],
+  );
+  const allCollapsed =
+    sectionKeys.length > 0 && sectionKeys.every((k) => collapsed.has(k));
+
+  // Review mode: read-only when WP is in a review/done category
+  const isReviewMode = useIsReviewMode(engagement.wpApprovalStatus);
+
+  // Helper: build headerRight content for a planning card
+  const cardHeaderRight = (
+    entityType: string,
+    entityId: string | undefined,
+    status: string,
+  ) => (
+    <>
+      <MemberAvatarGroup members={engagement.members} max={3} />
+      {entityId ? (
+        <PlanningCardStatus
+          entityType={entityType}
+          entityId={entityId}
+          engagementId={engagement.id}
+          status={status}
+        />
+      ) : (
+        <StaticStatusBadge status={status} />
+      )}
+    </>
+  );
 
   return (
     <div className="space-y-3">
@@ -132,7 +221,7 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
             if (allCollapsed) {
               expandAll();
             } else {
-              collapseAll(SECTION_KEYS);
+              collapseAll(sectionKeys);
             }
           }}
         >
@@ -141,223 +230,329 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
         </Button>
       </div>
 
-      {/* ── 1. Scope & Basics ── */}
-      <CollapsibleCard
-        title={LP.scopeBasics}
-        icon={<FileText className="h-4 w-4" />}
-        collapsed={isCollapsed("scope")}
-        onToggle={() => toggleCollapse("scope")}
-      >
-        <ScopeSection engagement={engagement} />
-      </CollapsibleCard>
-
-      {/* ── 1b. Audit Objectives ── */}
-      <CollapsibleCard
-        title={LAO.title}
-        icon={<Target className="h-4 w-4" />}
-        collapsed={isCollapsed("objectives")}
-        onToggle={() => toggleCollapse("objectives")}
-      >
-        <div className="flex justify-end mb-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => dispatch({ type: "START_ADD_OBJECTIVE" })}
-          >
-            <Plus className="mr-1 h-3 w-3" />
-            {LAO.createTitle}
-          </Button>
-        </div>
-        {engagement.auditObjectives.length === 0 && !state.addingObjective && (
-          <p className="py-2 text-sm text-muted-foreground">{LAO.noData}</p>
-        )}
-
-        <SortableList
-          items={engagement.auditObjectives}
-          onReorder={handleReorderAuditObjectives}
-          renderItem={(obj, dragHandle) => {
-            const idx = engagement.auditObjectives.findIndex(
-              (o) => o.id === obj.id,
-            );
+      {/* ── Dynamic step rendering ── */}
+      {activeSteps.map((step) => {
+        switch (step.key) {
+          case "scope": {
+            const scopeWp = wpByStep.get(step.id);
             return (
-              <ContextMenu>
-                <ContextMenuTrigger asChild>
-                  <div className="group/row flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
-                    <DragHandle {...dragHandle} />
-                    <span className="w-6 text-center text-xs text-muted-foreground">
-                      {idx + 1}
-                    </span>
-
-                    {state.editingObjectiveId === obj.id ? (
-                      <InlineInput
-                        value={state.editingObjectiveTitle}
-                        onChange={(t) =>
-                          dispatch({
-                            type: "SET_EDITING_OBJECTIVE_TITLE",
-                            title: t,
-                          })
-                        }
-                        onSubmit={() => handleUpdateObjective(obj.id)}
-                        onCancel={() =>
-                          dispatch({ type: "CANCEL_EDIT_OBJECTIVE" })
-                        }
-                        autoFocus
-                      />
-                    ) : (
-                      <>
-                        <span className="flex-1 text-sm">{obj.title}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() =>
-                            dispatch({
-                              type: "START_EDIT_OBJECTIVE",
-                              id: obj.id,
-                              title: obj.title,
-                            })
-                          }
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() =>
-                            dispatch({
-                              type: "SET_DELETE_TARGET",
-                              target: {
-                                type: "objective",
-                                id: obj.id,
-                                title: obj.title,
-                              },
-                            })
-                          }
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuItem
-                    onClick={() => handleMoveToTopAuditObjective(obj.id)}
-                    disabled={idx === 0}
-                  >
-                    <ArrowUpToLine className="mr-2 h-3.5 w-3.5" />
-                    Đưa lên đầu
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
+              <CollapsibleCard
+                key={step.key}
+                title={step.title}
+                icon={<StepIcon name={step.icon} />}
+                collapsed={isCollapsed("scope")}
+                onToggle={() => toggleCollapse("scope")}
+                headerRight={cardHeaderRight(
+                  "planning_workpaper",
+                  scopeWp?.id,
+                  scopeWp?.approvalStatus ?? "not_started",
+                )}
+              >
+                <ScopeSection engagement={engagement} />
+              </CollapsibleCard>
             );
-          }}
-        />
+          }
 
-        {state.addingObjective && (
-          <div className="px-2 py-1.5">
-            <InlineInput
-              value={state.addingObjectiveTitle}
-              onChange={(t) =>
-                dispatch({ type: "SET_OBJECTIVE_TITLE", title: t })
-              }
-              onSubmit={handleAddObjective}
-              onCancel={() => dispatch({ type: "CANCEL_ADD_OBJECTIVE" })}
-              placeholder="Tên mục tiêu kiểm toán..."
-              icon={<Target className="h-3.5 w-3.5 text-muted-foreground" />}
-              autoFocus
-            />
-          </div>
-        )}
-      </CollapsibleCard>
+          case "objectives":
+            return (
+              <CollapsibleCard
+                key={step.key}
+                title={step.title}
+                icon={<StepIcon name={step.icon} />}
+                collapsed={isCollapsed("objectives")}
+                onToggle={() => toggleCollapse("objectives")}
+                headerRight={cardHeaderRight(
+                  "work_program",
+                  undefined,
+                  "not_started",
+                )}
+              >
+                {!isReviewMode && (
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => dispatch({ type: "START_ADD_OBJECTIVE" })}
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      {LAO.createTitle}
+                    </Button>
+                  </div>
+                )}
+                {engagement.auditObjectives.length === 0 &&
+                  !state.addingObjective && (
+                    <p className="py-2 text-sm text-muted-foreground">
+                      {LAO.noData}
+                    </p>
+                  )}
 
-      {/* ── 2. Understanding ── */}
-      <CollapsibleCard
-        title={LP.understanding}
-        icon={<BookOpen className="h-4 w-4" />}
-        collapsed={isCollapsed("understanding")}
-        onToggle={() => toggleCollapse("understanding")}
-      >
-        {!state.understandingEditorOpen && (
-          <div className="flex justify-end mb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => dispatch({ type: "OPEN_UNDERSTANDING_EDITOR" })}
-            >
-              <Pencil className="mr-1 h-3 w-3" />
-              {engagement.understanding ? "Sửa" : "Thêm"}
-            </Button>
-          </div>
-        )}
-        <UnderstandingSection
-          content={engagement.understanding ?? ""}
-          isEditing={state.understandingEditorOpen}
-          onSave={handleSaveUnderstanding}
-          onCancel={() => dispatch({ type: "CLOSE_UNDERSTANDING_EDITOR" })}
-          onStartEdit={() => dispatch({ type: "OPEN_UNDERSTANDING_EDITOR" })}
-          isSaving={isSavingUnderstanding}
-        />
-      </CollapsibleCard>
+                <SortableList
+                  items={engagement.auditObjectives}
+                  onReorder={handleReorderAuditObjectives}
+                  renderItem={(obj, dragHandle) => {
+                    const idx = engagement.auditObjectives.findIndex(
+                      (o) => o.id === obj.id,
+                    );
+                    return (
+                      <ContextMenu>
+                        <ContextMenuTrigger asChild>
+                          <div className="group/row flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
+                            <DragHandle {...dragHandle} />
+                            <span className="w-6 text-center text-xs text-muted-foreground">
+                              {idx + 1}
+                            </span>
 
-      {/* ── 3. Risk & Control Matrix (DataTable) ── */}
-      <CollapsibleCard
-        title={LP.riskControl}
-        icon={<ShieldAlert className="h-4 w-4" />}
-        collapsed={isCollapsed("racm_table")}
-        onToggle={() => toggleCollapse("racm_table")}
-      >
-        <RcmDataTable
-          engagementId={engagement.id}
-          rcmObjectives={engagement.rcmObjectives}
-        />
-      </CollapsibleCard>
+                            {state.editingObjectiveId === obj.id ? (
+                              <InlineInput
+                                value={state.editingObjectiveTitle}
+                                onChange={(t) =>
+                                  dispatch({
+                                    type: "SET_EDITING_OBJECTIVE_TITLE",
+                                    title: t,
+                                  })
+                                }
+                                onSubmit={() => handleUpdateObjective(obj.id)}
+                                onCancel={() =>
+                                  dispatch({ type: "CANCEL_EDIT_OBJECTIVE" })
+                                }
+                                autoFocus
+                              />
+                            ) : (
+                              <>
+                                <span className="flex-1 text-sm">
+                                  {obj.title}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() =>
+                                    dispatch({
+                                      type: "START_EDIT_OBJECTIVE",
+                                      id: obj.id,
+                                      title: obj.title,
+                                    })
+                                  }
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() =>
+                                    dispatch({
+                                      type: "SET_DELETE_TARGET",
+                                      target: {
+                                        type: "objective",
+                                        id: obj.id,
+                                        title: obj.title,
+                                      },
+                                    })
+                                  }
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem
+                            onClick={() =>
+                              handleMoveToTopAuditObjective(obj.id)
+                            }
+                            disabled={idx === 0}
+                          >
+                            <ArrowUpToLine className="mr-2 h-3.5 w-3.5" />
+                            Đưa lên đầu
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    );
+                  }}
+                />
 
-      {/* ── 4. Work Program (Section / Objective / Procedure) ── */}
-      <CollapsibleCard
-        title={LP.procedures}
-        icon={<ClipboardList className="h-4 w-4" />}
-        collapsed={isCollapsed("procedures")}
-        onToggle={() => toggleCollapse("procedures")}
-        action={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              syncRcmToWp.mutate(engagement.id, {
-                onSuccess: (data) => {
-                  setSyncResult({
-                    success: true,
-                    message: `Đã tạo ${data.createdObjectives} mục tiêu và ${data.createdProcedures} thủ tục từ RCM`,
-                  });
-                },
-                onError: () => {
-                  setSyncResult({
-                    success: false,
-                    message: "Lỗi khi đồng bộ RCM sang Work Program",
-                  });
-                },
-              });
-            }}
-            disabled={syncRcmToWp.isPending}
-          >
-            {syncRcmToWp.isPending ? "Đang tạo..." : "Tạo từ RCM"}
-          </Button>
+                {state.addingObjective && (
+                  <div className="px-2 py-1.5">
+                    <InlineInput
+                      value={state.addingObjectiveTitle}
+                      onChange={(t) =>
+                        dispatch({ type: "SET_OBJECTIVE_TITLE", title: t })
+                      }
+                      onSubmit={handleAddObjective}
+                      onCancel={() =>
+                        dispatch({ type: "CANCEL_ADD_OBJECTIVE" })
+                      }
+                      placeholder="Tên mục tiêu kiểm toán..."
+                      icon={
+                        <Target className="h-3.5 w-3.5 text-muted-foreground" />
+                      }
+                      autoFocus
+                    />
+                  </div>
+                )}
+              </CollapsibleCard>
+            );
+
+          case "understanding": {
+            const undWp = wpByStep.get(step.id);
+            return (
+              <CollapsibleCard
+                key={step.key}
+                title={step.title}
+                icon={<StepIcon name={step.icon} />}
+                collapsed={isCollapsed("understanding")}
+                onToggle={() => toggleCollapse("understanding")}
+                headerRight={cardHeaderRight(
+                  "planning_workpaper",
+                  undWp?.id,
+                  undWp?.approvalStatus ?? "not_started",
+                )}
+              >
+                {!isReviewMode && !state.understandingEditorOpen && (
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() =>
+                        dispatch({ type: "OPEN_UNDERSTANDING_EDITOR" })
+                      }
+                    >
+                      <Pencil className="mr-1 h-3 w-3" />
+                      {engagement.understanding ? "Sửa" : "Thêm"}
+                    </Button>
+                  </div>
+                )}
+                <UnderstandingSection
+                  content={engagement.understanding ?? ""}
+                  isEditing={state.understandingEditorOpen}
+                  onSave={handleSaveUnderstanding}
+                  onCancel={() =>
+                    dispatch({ type: "CLOSE_UNDERSTANDING_EDITOR" })
+                  }
+                  onStartEdit={() =>
+                    dispatch({ type: "OPEN_UNDERSTANDING_EDITOR" })
+                  }
+                  isSaving={isSavingUnderstanding}
+                />
+              </CollapsibleCard>
+            );
+          }
+
+          case "rcm":
+            return (
+              <CollapsibleCard
+                key={step.key}
+                title={step.title}
+                icon={<StepIcon name={step.icon} />}
+                collapsed={isCollapsed("racm_table")}
+                onToggle={() => toggleCollapse("racm_table")}
+                headerRight={cardHeaderRight(
+                  "work_program",
+                  undefined,
+                  "not_started",
+                )}
+              >
+                <RcmDataTable
+                  engagementId={engagement.id}
+                  rcmObjectives={engagement.rcmObjectives}
+                />
+              </CollapsibleCard>
+            );
+
+          case "work_program":
+            return (
+              <CollapsibleCard
+                key={step.key}
+                title={step.title}
+                icon={<StepIcon name={step.icon} />}
+                collapsed={isCollapsed("procedures")}
+                onToggle={() => toggleCollapse("procedures")}
+                headerRight={cardHeaderRight(
+                  "work_program",
+                  engagement.id,
+                  engagement.wpApprovalStatus,
+                )}
+              >
+                {!isReviewMode && (
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        syncRcmToWp.mutate(engagement.id, {
+                          onSuccess: (data) => {
+                            setSyncResult({
+                              success: true,
+                              message: `Đã tạo ${data.createdObjectives} mục tiêu và ${data.createdProcedures} thủ tục từ RCM`,
+                            });
+                          },
+                          onError: () => {
+                            setSyncResult({
+                              success: false,
+                              message: "Lỗi khi đồng bộ RCM sang Work Program",
+                            });
+                          },
+                        });
+                      }}
+                      disabled={syncRcmToWp.isPending}
+                    >
+                      {syncRcmToWp.isPending ? "Đang tạo..." : "Tạo từ RCM"}
+                    </Button>
+                  </div>
+                )}
+                <WorkProgramV2
+                  engagementId={engagement.id}
+                  sections={planningSections}
+                  standaloneObjectives={planningObjectives}
+                  findingCount={engagement.findings?.length ?? 0}
+                  mode="planning"
+                  rcmObjectives={engagement.rcmObjectives}
+                  members={engagement.members}
+                  readOnly={isReviewMode}
+                />
+              </CollapsibleCard>
+            );
+
+          default: {
+            // Custom workpaper step
+            if (step.stepType !== "workpaper") return null;
+            const wp = wpByStep.get(step.id);
+            return (
+              <CollapsibleCard
+                key={step.key}
+                title={step.title}
+                icon={<StepIcon name={step.icon} />}
+                collapsed={isCollapsed(step.key)}
+                onToggle={() => toggleCollapse(step.key)}
+                headerRight={cardHeaderRight(
+                  "planning_workpaper",
+                  wp?.id,
+                  wp?.approvalStatus ?? "not_started",
+                )}
+              >
+                <PlanningWorkpaperCard
+                  engagementId={engagement.id}
+                  stepConfigId={step.id}
+                  stepTitle={step.title}
+                  workpaper={
+                    wp
+                      ? {
+                          id: wp.id,
+                          content: wp.content,
+                          approvalStatus: wp.approvalStatus,
+                        }
+                      : null
+                  }
+                />
+              </CollapsibleCard>
+            );
+          }
         }
-      >
-        <WorkProgramV2
-          engagementId={engagement.id}
-          sections={engagement.sections}
-          standaloneObjectives={engagement.standaloneObjectives}
-          findingCount={engagement.findings?.length ?? 0}
-          mode="planning"
-          rcmObjectives={engagement.rcmObjectives}
-          members={engagement.members}
-        />
-      </CollapsibleCard>
+      })}
 
       {/* ── Delete confirmation ── */}
       <ConfirmDialog
@@ -413,6 +608,87 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
 // Sub-components
 // ════════════════════════════════════════════════════════════════════════════════
 
+const STATIC_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  draft: {
+    label: "Bản nháp",
+    color: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  waiting_review: {
+    label: "Chờ soát xét",
+    color: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  needs_modification: {
+    label: "Cần chỉnh sửa",
+    color: "bg-red-50 text-red-700 border-red-200",
+  },
+  reviewed: {
+    label: "Đã soát xét",
+    color: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  waiting_approval: {
+    label: "Chờ phê duyệt",
+    color: "bg-purple-50 text-purple-700 border-purple-200",
+  },
+  approved: {
+    label: "Đã phê duyệt",
+    color: "bg-green-50 text-green-700 border-green-200",
+  },
+};
+
+function StaticStatusBadge({ status }: { status: string }) {
+  const info = STATIC_STATUS_MAP[status] ?? {
+    label: status,
+    color: "bg-slate-100 text-slate-700 border-slate-200",
+  };
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium",
+        info.color,
+      )}
+    >
+      {info.label}
+    </span>
+  );
+}
+
+function MemberAvatarGroup({
+  members,
+  max = 3,
+}: {
+  members: {
+    userId: string;
+    role: string;
+    user: { id: string; name: string; avatarUrl?: string | null };
+  }[];
+  max?: number;
+}) {
+  const visible = members.slice(0, max);
+  const overflow = members.length - max;
+
+  return (
+    <div className="flex items-center">
+      {visible.map((m, i) => (
+        <UserAvatar
+          key={m.userId}
+          user={{
+            id: m.user.id,
+            name: m.user.name,
+            avatarUrl: m.user.avatarUrl,
+          }}
+          size="sm"
+          className={cn("ring-2 ring-background", i > 0 && "-ml-1.5")}
+        />
+      ))}
+      {overflow > 0 && (
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-medium ring-2 ring-background -ml-1.5">
+          +{overflow}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Collapsible Card ──
 
 function CollapsibleCard({
@@ -420,14 +696,14 @@ function CollapsibleCard({
   icon,
   collapsed,
   onToggle,
-  action,
+  headerRight,
   children,
 }: {
   title: string;
   icon?: React.ReactNode;
   collapsed: boolean;
   onToggle: () => void;
-  action?: React.ReactNode;
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -445,7 +721,14 @@ function CollapsibleCard({
         </span>
         {icon}
         <span className="flex-1 text-sm font-semibold">{title}</span>
-        {action && <span onClick={(e) => e.stopPropagation()}>{action}</span>}
+        {headerRight && (
+          <span
+            className="flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {headerRight}
+          </span>
+        )}
       </div>
       {!collapsed && (
         <div className="px-4 pb-4">

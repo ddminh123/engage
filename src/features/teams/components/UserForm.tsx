@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { UserSearch } from "@/components/shared/UserSearch";
 import { useCreateUser, useUpdateUser } from "../hooks/useUsers";
 import { TEAMS_LABELS, USER_ROLE_OPTIONS } from "@/constants/labels/teams";
@@ -24,7 +30,14 @@ const userFormSchema = z.object({
   password: z.string().optional(),
   phone: z.string().optional(),
   title: z.string().optional(),
-  role: z.enum(["cae", "admin", "team_owner", "member"]),
+  role: z.enum([
+    "cae",
+    "admin",
+    "audit_director",
+    "audit_manager",
+    "senior_auditor",
+    "auditor",
+  ]),
   supervisorId: z.string().nullable().optional(),
   description: z.string().optional(),
 });
@@ -51,7 +64,7 @@ export function UserForm({ open, onOpenChange, initialData }: UserFormProps) {
       password: "",
       phone: "",
       title: "",
-      role: "member",
+      role: "auditor",
       supervisorId: null,
       description: "",
     },
@@ -77,7 +90,7 @@ export function UserForm({ open, onOpenChange, initialData }: UserFormProps) {
           password: "",
           phone: "",
           title: "",
-          role: "member",
+          role: "auditor",
           supervisorId: null,
           description: "",
         });
@@ -94,7 +107,9 @@ export function UserForm({ open, onOpenChange, initialData }: UserFormProps) {
         await updateMutation.mutateAsync({ id: initialData.id, data });
       } else {
         if (!values.password) {
-          form.setError("password", { message: L.VALIDATION_PASSWORD_REQUIRED });
+          form.setError("password", {
+            message: L.VALIDATION_PASSWORD_REQUIRED,
+          });
           return;
         }
         await createMutation.mutateAsync({
@@ -117,7 +132,11 @@ export function UserForm({ open, onOpenChange, initialData }: UserFormProps) {
       size="md"
       footer={
         <>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
             Hủy
           </Button>
           <Button onClick={form.handleSubmit(onSubmit)} disabled={isPending}>
@@ -133,14 +152,18 @@ export function UserForm({ open, onOpenChange, initialData }: UserFormProps) {
             <Label htmlFor="name">{L.USER_NAME} *</Label>
             <Input id="name" {...form.register("name")} />
             {form.formState.errors.name && (
-              <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
+              <p className="text-xs text-destructive">
+                {form.formState.errors.name.message}
+              </p>
             )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">{L.USER_EMAIL} *</Label>
             <Input id="email" type="email" {...form.register("email")} />
             {form.formState.errors.email && (
-              <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+              <p className="text-xs text-destructive">
+                {form.formState.errors.email.message}
+              </p>
             )}
           </div>
         </div>
@@ -157,7 +180,9 @@ export function UserForm({ open, onOpenChange, initialData }: UserFormProps) {
               {...form.register("password")}
             />
             {form.formState.errors.password && (
-              <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
+              <p className="text-xs text-destructive">
+                {form.formState.errors.password.message}
+              </p>
             )}
           </div>
           <div className="space-y-2">
@@ -175,7 +200,9 @@ export function UserForm({ open, onOpenChange, initialData }: UserFormProps) {
             <Label>{L.USER_ROLE} *</Label>
             <Select
               value={form.watch("role")}
-              onValueChange={(v) => form.setValue("role", v as UserFormValues["role"])}
+              onValueChange={(v) =>
+                form.setValue("role", v as UserFormValues["role"])
+              }
             >
               <SelectTrigger>
                 <SelectValue />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Plus, Users, X } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-const ROLE_OPTIONS = [
+const ENGAGEMENT_ROLE_OPTIONS = [
   { value: "lead", label: "Trưởng nhóm" },
   { value: "member", label: "Thành viên" },
   { value: "reviewer", label: "Soát xét" },
@@ -54,23 +54,31 @@ export function TeamAvatarManager({
   const excludeIds = members.map((m) => m.userId);
 
   return (
-    <div className={cn("flex items-center", className)}>
+    <div className={cn("flex items-center gap-2", className)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           render={
             <button
               type="button"
               title="Quản lý nhóm kiểm toán"
-              className="flex items-center cursor-pointer bg-transparent border-0 p-0"
+              className="flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
             />
           }
         >
-          <OverlappingAvatars
-            users={avatarUsers}
-            max={5}
-            size="sm"
-            showAddPlaceholder
-          />
+          {members.length > 0 ? (
+            <OverlappingAvatars
+              users={avatarUsers}
+              max={5}
+              size="sm"
+              showAddPlaceholder
+            />
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <Users className="h-3.5 w-3.5" />
+              Chưa có thành viên
+              <Plus className="h-3 w-3" />
+            </span>
+          )}
         </PopoverTrigger>
         <PopoverContent className="w-[320px] p-0" align="start">
           {/* Current members */}
@@ -99,7 +107,7 @@ export function TeamAvatarManager({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {ROLE_OPTIONS.map((opt) => (
+                        {ENGAGEMENT_ROLE_OPTIONS.map((opt) => (
                           <SelectItem
                             key={opt.value}
                             value={opt.value}
@@ -122,14 +130,20 @@ export function TeamAvatarManager({
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground py-1">
-                Chưa có thành viên nào.
-              </p>
+              <div className="flex flex-col items-center gap-2 py-3">
+                <Users className="h-5 w-5 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  Chưa có thành viên trong cuộc kiểm toán
+                </p>
+              </div>
             )}
           </div>
 
           {/* Divider + add member */}
           <div className="border-t p-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Thêm thành viên
+            </p>
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <UserSearch
@@ -152,7 +166,7 @@ export function TeamAvatarManager({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLE_OPTIONS.map((opt) => (
+                  {ENGAGEMENT_ROLE_OPTIONS.map((opt) => (
                     <SelectItem
                       key={opt.value}
                       value={opt.value}

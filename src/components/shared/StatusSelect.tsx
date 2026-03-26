@@ -58,7 +58,11 @@ export function StatusSelect({
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
+          <SelectItem
+            key={option.value}
+            value={option.value}
+            label={option.label}
+          >
             <span className="flex items-center gap-2">
               <StatusDot color={option.color} />
               {option.label}

@@ -70,6 +70,7 @@ interface WpSectionCardProps {
     entityId: string,
     userId: string,
   ) => void;
+  readOnly?: boolean;
 }
 
 export function WpSectionCard({
@@ -95,6 +96,7 @@ export function WpSectionCard({
   members = [],
   onAssign,
   onUnassign,
+  readOnly = false,
 }: WpSectionCardProps) {
   const {
     state,
@@ -282,7 +284,9 @@ export function WpSectionCard({
     <Collapsible open={open} onOpenChange={onOpenChange}>
       <div className="rounded-lg border" data-node-id={section.id}>
         {/* ── Card header ── */}
-        {isEditingHeader ? (
+        {isEditingHeader && !readOnly ? (
+          cardHeader
+        ) : readOnly ? (
           cardHeader
         ) : (
           <WpContextMenu
@@ -370,7 +374,7 @@ export function WpSectionCard({
             )}
 
             {/* Inline add forms */}
-            {isAddingObjective && (
+            {!readOnly && isAddingObjective && (
               <WpInlineAdd
                 type="objective"
                 onChange={handleTextChange}
@@ -381,7 +385,7 @@ export function WpSectionCard({
               />
             )}
 
-            {isAddingProcedure && (
+            {!readOnly && isAddingProcedure && (
               <WpInlineAdd
                 type="procedure"
                 onChange={handleTextChange}
@@ -394,7 +398,7 @@ export function WpSectionCard({
             )}
 
             {/* Add buttons */}
-            {!isAddingObjective && !isAddingProcedure && (
+            {!readOnly && !isAddingObjective && !isAddingProcedure && (
               <WpAddButton
                 showObjective
                 showProcedure
