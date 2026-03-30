@@ -49,6 +49,7 @@ interface WorkProgramV2Props {
   rcmObjectives?: RcmObjective[];
   members?: EngagementMember[];
   readOnly?: boolean;
+  onOpenWorkpaper?: (procedureId: string) => void;
 }
 
 // ── Main Component ──
@@ -62,6 +63,7 @@ export function WorkProgramV2({
   rcmObjectives = [],
   members = [],
   readOnly = false,
+  onOpenWorkpaper,
 }: WorkProgramV2Props) {
   const editor = useWorkProgramEditor(
     engagementId,
@@ -395,10 +397,14 @@ export function WorkProgramV2({
         setViewObjective(entityMaps.objectiveMap.get(id) ?? null);
       } else {
         // Navigate to workpaper view
-        router.push(`/engagement?id=${engagementId}&wp=${id}`);
+        if (onOpenWorkpaper) {
+          onOpenWorkpaper(id);
+        } else {
+          router.push(`/engagement/${engagementId}?tab=${mode}&wp=${id}`);
+        }
       }
     },
-    [entityMaps, engagementId, router],
+    [entityMaps, engagementId, router, mode, onOpenWorkpaper],
   );
 
   const handleViewSection = useCallback(
@@ -411,10 +417,14 @@ export function WorkProgramV2({
   const handleOpenForm = useCallback(
     (type: "objective" | "procedure", id: string) => {
       if (type === "procedure") {
-        router.push(`/engagement?id=${engagementId}&wp=${id}`);
+        if (onOpenWorkpaper) {
+          onOpenWorkpaper(id);
+        } else {
+          router.push(`/engagement/${engagementId}?tab=${mode}&wp=${id}`);
+        }
       }
     },
-    [engagementId, router],
+    [engagementId, router, mode, onOpenWorkpaper],
   );
 
   // ── Cross-parent move handlers ──
@@ -611,6 +621,7 @@ export function WorkProgramV2({
             <InlineTableInput
               placeholder="Tên phần hành..."
               onChange={handleTextChange}
+              onSubmit={(v) => handleAddSection(v)}
               onCancel={() => dispatch({ type: "CANCEL_ADD_TOP" })}
               autoFocus
             />
@@ -643,6 +654,7 @@ export function WorkProgramV2({
             <InlineTableInput
               placeholder="Tên mục tiêu..."
               onChange={handleTextChange}
+              onSubmit={(v) => handleAddObjective(v)}
               onCancel={() => dispatch({ type: "CANCEL_ADD_TOP" })}
               autoFocus
             />

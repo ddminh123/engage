@@ -10,9 +10,13 @@ import type { EngagementDetail } from "../../types";
 
 interface ExecutionTabProps {
   engagement: EngagementDetail;
+  onOpenWorkpaper?: (procedureId: string) => void;
 }
 
-export function ExecutionTab({ engagement }: ExecutionTabProps) {
+export function ExecutionTab({
+  engagement,
+  onOpenWorkpaper,
+}: ExecutionTabProps) {
   const syncMutation = useSyncPlanningToExecution();
   const [syncResult, setSyncResult] = React.useState<{
     success: boolean;
@@ -93,6 +97,7 @@ export function ExecutionTab({ engagement }: ExecutionTabProps) {
           findingCount={engagement.findings?.length ?? 0}
           mode="execution"
           members={engagement.members}
+          onOpenWorkpaper={onOpenWorkpaper}
         />
       )}
 

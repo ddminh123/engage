@@ -252,22 +252,22 @@
   transition: background-color 0.15s, border-color 0.15s;
 }
 
-/* Comment type — yellow */
+/* Comment type — blue (matches sidebar comment cards) */
 .wp-comment-mark[data-thread-type="comment"] {
-  background-color: #fef9c3;
-  border-bottom-color: #facc15;
+  background-color: #dbeafe;
+  border-bottom-color: #3b82f6;
 }
 .wp-comment-mark[data-thread-type="comment"]:hover {
-  background-color: #fef08a;
+  background-color: #bfdbfe;
 }
 
-/* Review note type — purple */
+/* Review note type — orange (matches sidebar RN cards) */
 .wp-comment-mark[data-thread-type="review_note"] {
-  background-color: #f3e8ff;
-  border-bottom-color: #a855f7;
+  background-color: #ffedd5;
+  border-bottom-color: #f97316;
 }
 .wp-comment-mark[data-thread-type="review_note"]:hover {
-  background-color: #e9d5ff;
+  background-color: #fed7aa;
 }
 
 /* Pending comment (not yet committed) — blue tint */

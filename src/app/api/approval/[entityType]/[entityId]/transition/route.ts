@@ -9,7 +9,7 @@ export const POST = withAccess(
     const { entityType, entityId } = await context.params;
     try {
       const body = await req.json();
-      const { transitionId, comment } = body as { transitionId: string; comment?: string };
+      const { transitionId, comment, nextAssigneeId } = body as { transitionId: string; comment?: string; nextAssigneeId?: string };
 
       if (!transitionId) {
         return Response.json(
@@ -35,6 +35,7 @@ export const POST = withAccess(
         session.user.name,
         engagementId,
         comment,
+        nextAssigneeId,
       );
 
       return Response.json({ data });
@@ -53,6 +54,21 @@ async function resolveEngagementId(entityType: string, entityId: string): Promis
         select: { engagement_id: true },
       });
       return p?.engagement_id ?? null;
+    }
+    case 'work_program': {
+      // entityId IS the engagementId for work_program
+      const eng = await prisma.engagement.findUnique({
+        where: { id: entityId },
+        select: { id: true },
+      });
+      return eng?.id ?? null;
+    }
+    case 'planning_workpaper': {
+      const pw = await prisma.planningWorkpaper.findUnique({
+        where: { id: entityId },
+        select: { engagement_id: true },
+      });
+      return pw?.engagement_id ?? null;
     }
     default:
       return null;

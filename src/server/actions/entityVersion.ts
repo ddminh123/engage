@@ -23,8 +23,14 @@ export async function publishEntity(
   snapshot: unknown,
   userId: string,
   userName: string,
-  comment?: string | null,
+  options?: {
+    comment?: string | null;
+    versionType?: string | null;
+    actionLabel?: string | null;
+  },
 ) {
+  const { comment, versionType, actionLabel } = options ?? {};
+
   // Get the next version number
   const lastVersion = await prisma.entityVersion.findFirst({
     where: { entity_type: entityType, entity_id: entityId },
@@ -39,6 +45,8 @@ export async function publishEntity(
       entity_type: entityType,
       entity_id: entityId,
       version: nextVersion,
+      version_type: versionType ?? null,
+      action_label: actionLabel ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       snapshot: snapshot as any,
       comment: comment ?? null,
@@ -60,6 +68,8 @@ export async function publishEntity(
     entityType: version.entity_type,
     entityId: version.entity_id,
     version: version.version,
+    versionType: version.version_type,
+    actionLabel: version.action_label,
     comment: version.comment,
     publishedBy: version.published_by,
     publishedAt: version.published_at.toISOString(),
@@ -86,6 +96,8 @@ export async function getVersionHistory(entityType: string, entityId: string) {
     entityType: v.entity_type,
     entityId: v.entity_id,
     version: v.version,
+    versionType: v.version_type,
+    actionLabel: v.action_label,
     comment: v.comment,
     publishedBy: v.published_by,
     publishedAt: v.published_at.toISOString(),

@@ -1,37 +1,28 @@
 "use client";
 
 import * as React from "react";
-import { Check, XCircle, Plus, Upload, Loader2, History } from "lucide-react";
+import { Check, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { LabeledSelect } from "@/components/shared/LabeledSelect";
 import { StatusBadge } from "@/components/shared/workpaper/StatusBadge";
 import { AutoSaveIndicator } from "@/components/shared/workpaper/AutoSaveStatus";
 import { WorkpaperActions } from "@/components/shared/workpaper/WorkpaperActions";
+import { HistorySheet } from "@/components/shared/workpaper/HistorySheet";
 import {
   MultiSelectCommand,
   type MultiSelectOption,
 } from "@/components/shared/MultiSelectCommand";
 import { FileInput } from "@/components/shared/FileInput";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { WorkflowFlowChart } from "@/components/shared/WorkflowFlowChart";
 import { useApprovalWorkflows } from "@/features/settings/hooks/useApprovalWorkflows";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -41,6 +32,7 @@ import { ENGAGEMENT_LABELS } from "@/constants/labels";
 import { cn } from "@/lib/utils";
 import { useProcedureForm } from "./useProcedureForm";
 import { WpAssigneePicker } from "./WpAssigneePicker";
+import { LinkedFindingsList } from "./LinkedFindingsList";
 import {
   useCommentThreads,
   useCreateCommentThread,
@@ -48,7 +40,6 @@ import {
   useUpdateThreadStatus,
   useDeleteCommentThread,
   useUpdateProcedureContent,
-  usePublishProcedure,
   useProcedureVersions,
   useProcedureVersion,
   useRestoreProcedureVersion,
@@ -59,10 +50,11 @@ import type {
   EngagementProcedure,
   EngagementMember,
   WpAssignment,
-  EntityVersionSummary,
+  WpSignoff,
 } from "../../types";
 import type { JSONContent } from "@tiptap/react";
 import { autoTransitionApi } from "../../api";
+import { useQueryClient } from "@tanstack/react-query";
 
 const LP = ENGAGEMENT_LABELS.procedure;
 
@@ -71,10 +63,6 @@ const TYPE_OPTIONS = Object.entries(LP.procedureType).map(([v, l]) => ({
   label: l,
 }));
 const CATEGORY_OPTIONS = Object.entries(LP.procedureCategory).map(([v, l]) => ({
-  value: v,
-  label: l,
-}));
-const STATUS_OPTIONS = Object.entries(LP.status).map(([v, l]) => ({
   value: v,
   label: l,
 }));
@@ -102,6 +90,7 @@ interface ProcedureWorkpaperProps {
   objectiveOptions?: MultiSelectOption[];
   members?: EngagementMember[];
   wpAssignments?: WpAssignment[];
+  wpSignoffs?: WpSignoff[];
   onAssign?: (
     entityType: "section" | "objective" | "procedure",
     entityId: string,
@@ -123,6 +112,7 @@ export function ProcedureWorkpaper({
   objectiveOptions = [],
   members = [],
   wpAssignments = [],
+  wpSignoffs = [],
   onAssign,
   onUnassign,
 }: ProcedureWorkpaperProps) {
@@ -143,7 +133,6 @@ export function ProcedureWorkpaper({
   const deleteThread = useDeleteCommentThread();
 
   // Versioning & Approval
-  const publishMutation = usePublishProcedure();
   const { data: versions = [] } = useProcedureVersions(
     engagementId,
     procedure.id,
@@ -155,43 +144,33 @@ export function ProcedureWorkpaper({
   const transitionMutation = useExecuteTransition();
   const restoreMutation = useRestoreProcedureVersion();
 
-  const [publishDialogOpen, setPublishDialogOpen] = React.useState(false);
-  const [publishComment, setPublishComment] = React.useState("");
   const [workflowChartOpen, setWorkflowChartOpen] = React.useState(false);
+  const [viewVersion, setViewVersion] = React.useState<number | null>(null);
 
-  const VL = ENGAGEMENT_LABELS.versioning;
+  const { data: versionDetail } = useProcedureVersion(
+    engagementId,
+    procedure.id,
+    viewVersion,
+  );
 
-  const handlePublish = async () => {
-    try {
-      await publishMutation.mutateAsync({
-        engagementId,
-        procedureId: procedure.id,
-        comment: publishComment || undefined,
-      });
-      setPublishDialogOpen(false);
-      setPublishComment("");
-    } catch {
-      // Error handled by mutation state
-    }
-  };
-
-  const handleTransition = async (transitionId: string) => {
+  const handleTransition = async (
+    transitionId: string,
+    comment?: string,
+    nextAssigneeId?: string,
+  ) => {
     try {
       await transitionMutation.mutateAsync({
         entityType: "procedure",
         entityId: procedure.id,
         transitionId,
         engagementId,
+        comment,
+        nextAssigneeId,
       });
     } catch {
       // Error handled by mutation state
     }
   };
-
-  // Inline finding form
-  const [showFindingForm, setShowFindingForm] = React.useState(false);
-  const [findingTitle, setFindingTitle] = React.useState("");
-  const [findingRating, setFindingRating] = React.useState("");
 
   // Build initial document content from old fields if no `content` exists
   const initialContent = React.useMemo<JSONContent | null>(() => {
@@ -204,6 +183,7 @@ export function ProcedureWorkpaper({
 
   // Track whether we've already fired the auto-transition this session
   const autoTransitionFired = React.useRef(false);
+  const queryClient = useQueryClient();
 
   // Auto-save: content only (no metadata, no close)
   // Also triggers not_started → in_progress on first save
@@ -223,12 +203,28 @@ export function ProcedureWorkpaper({
         autoTransitionFired.current = true;
         try {
           await autoTransitionApi("procedure", procedure.id, "start");
+          // Refresh transitions, procedure data & versions so UI shows correct status/buttons + new "Bản thảo" version
+          queryClient.invalidateQueries({
+            queryKey: ["approvalTransitions", "procedure", procedure.id],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["engagement", engagementId],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["procedureVersions", engagementId, procedure.id],
+          });
         } catch {
           // Non-critical — don't block auto-save
         }
       }
     },
-    [contentMutation, engagementId, procedure.id, procedure.approvalStatus],
+    [
+      contentMutation,
+      engagementId,
+      procedure.id,
+      procedure.approvalStatus,
+      queryClient,
+    ],
   );
 
   // Full save: content + metadata + close
@@ -286,16 +282,11 @@ export function ProcedureWorkpaper({
           state={state}
           setField={setField}
           procedure={procedure}
-          showFindingForm={showFindingForm}
-          setShowFindingForm={setShowFindingForm}
-          findingTitle={findingTitle}
-          setFindingTitle={setFindingTitle}
-          findingRating={findingRating}
-          setFindingRating={setFindingRating}
+          engagementId={engagementId}
         />
       ),
     }),
-    [state, setField, procedure, showFindingForm, findingTitle, findingRating],
+    [state, setField, procedure, engagementId],
   );
 
   const infoTab = React.useMemo(
@@ -309,10 +300,30 @@ export function ProcedureWorkpaper({
           controlOptions={controlOptions}
           riskOptions={riskOptions}
           objectiveOptions={objectiveOptions}
+          members={members}
+          assignments={procedureAssignees}
+          onAssign={(userId: string) =>
+            onAssign?.("procedure", procedure.id, userId)
+          }
+          onUnassign={(userId: string) =>
+            onUnassign?.("procedure", procedure.id, userId)
+          }
+          entityId={procedure.id}
         />
       ),
     }),
-    [state, setField, controlOptions, riskOptions, objectiveOptions],
+    [
+      state,
+      setField,
+      controlOptions,
+      riskOptions,
+      objectiveOptions,
+      members,
+      procedureAssignees,
+      onAssign,
+      onUnassign,
+      procedure.id,
+    ],
   );
 
   const handleRestore = async (version: number) => {
@@ -340,6 +351,9 @@ export function ProcedureWorkpaper({
         onTitleChange={handleTitleChange}
         onBack={onBack}
         isSaving={form.isSaving || contentMutation.isPending}
+        initialLastSavedAt={
+          procedure.updatedAt ? new Date(procedure.updatedAt) : null
+        }
         headerExtra={(autoSave) => (
           <>
             <StatusBadge status={procedure.approvalStatus} />
@@ -349,28 +363,16 @@ export function ProcedureWorkpaper({
               lastSavedAt={autoSave.lastSavedAt}
             />
 
-            {/* Version link */}
-            {versions.length > 0 && (
-              <Popover>
-                <PopoverTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                  <History className="h-3 w-3" />
-                  Xem phiên bản
-                </PopoverTrigger>
-                <PopoverContent
-                  align="end"
-                  className="w-80 max-h-96 overflow-y-auto p-0"
-                >
-                  <VersionHistoryDropdown
-                    versions={versions}
-                    currentVersion={procedure.currentVersion}
-                    engagementId={engagementId}
-                    procedureId={procedure.id}
-                    onRestore={handleRestore}
-                    isRestoring={restoreMutation.isPending}
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
+            <HistorySheet
+              signoffs={wpSignoffs}
+              versions={versions}
+              entityType="procedure"
+              entityId={procedure.id}
+              currentVersion={procedure.currentVersion}
+              onViewVersion={setViewVersion}
+              onRestoreVersion={(v) => handleRestore(v)}
+              isRestoring={restoreMutation.isPending}
+            />
 
             <div className="flex-1" />
 
@@ -378,20 +380,22 @@ export function ProcedureWorkpaper({
               entityType="procedure"
               entityId={procedure.id}
               members={members}
-              assignments={procedureAssignees}
-              onAdd={(userId: string) =>
-                onAssign?.("procedure", procedure.id, userId)
-              }
-              onRemove={(userId: string) =>
+              assignments={wpAssignments}
+              onAdd={(userId) => onAssign?.("procedure", procedure.id, userId)}
+              onRemove={(userId) =>
                 onUnassign?.("procedure", procedure.id, userId)
               }
+              label=""
             />
+
+            <Separator orientation="vertical" className="h-5 mx-1" />
 
             <WorkpaperActions
               transitions={transitions}
               onTransition={handleTransition}
               isTransitioning={transitionMutation.isPending}
               onViewWorkflow={() => setWorkflowChartOpen(true)}
+              members={members}
             />
           </>
         )}
@@ -439,49 +443,51 @@ export function ProcedureWorkpaper({
         isReplying={addReply.isPending}
       />
 
+      {/* Version detail dialog */}
+      <Dialog
+        open={viewVersion !== null}
+        onOpenChange={(open) => {
+          if (!open) setViewVersion(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Phiên bản {viewVersion}</DialogTitle>
+            {versionDetail?.comment && (
+              <DialogDescription>{versionDetail.comment}</DialogDescription>
+            )}
+          </DialogHeader>
+          {versionDetail?.snapshot ? (
+            <div className="space-y-3 text-sm">
+              {Object.entries(
+                versionDetail.snapshot as Record<string, unknown>,
+              ).map(([key, value]) =>
+                value != null && value !== "" ? (
+                  <div key={key}>
+                    <span className="font-medium text-muted-foreground">
+                      {key}
+                    </span>
+                    <p className="mt-0.5 whitespace-pre-wrap break-words">
+                      {typeof value === "object"
+                        ? JSON.stringify(value, null, 2).slice(0, 500)
+                        : String(value)}
+                    </p>
+                  </div>
+                ) : null,
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Đang tải...</p>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <WorkflowChartDialog
         open={workflowChartOpen}
         onOpenChange={setWorkflowChartOpen}
         entityType="procedure"
         currentStatus={procedure.approvalStatus}
       />
-
-      <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{VL.publishTitle}</DialogTitle>
-            <DialogDescription>{VL.publishDescription}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>{VL.publishComment}</Label>
-            <Textarea
-              value={publishComment}
-              onChange={(e) => setPublishComment(e.target.value)}
-              placeholder={VL.publishCommentPlaceholder}
-              rows={3}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setPublishDialogOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button
-              onClick={handlePublish}
-              disabled={publishMutation.isPending}
-            >
-              {publishMutation.isPending ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Upload className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              {VL.publish}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
@@ -492,22 +498,12 @@ function ConclusionTabContent({
   state,
   setField,
   procedure,
-  showFindingForm,
-  setShowFindingForm,
-  findingTitle,
-  setFindingTitle,
-  findingRating,
-  setFindingRating,
+  engagementId,
 }: {
   state: ReturnType<typeof useProcedureForm>["state"];
   setField: ReturnType<typeof useProcedureForm>["setField"];
   procedure: EngagementProcedure;
-  showFindingForm: boolean;
-  setShowFindingForm: (v: boolean) => void;
-  findingTitle: string;
-  setFindingTitle: (v: string) => void;
-  findingRating: string;
-  setFindingRating: (v: string) => void;
+  engagementId: string;
 }) {
   const [evidenceFiles, setEvidenceFiles] = React.useState<File[]>([]);
   const [wpAttachments, setWpAttachments] = React.useState<File[]>([]);
@@ -572,93 +568,11 @@ function ConclusionTabContent({
 
       <Separator className="my-1" />
 
-      {/* Linked Findings */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Phát hiện liên quan
-        </h3>
-        {procedure.linkedFindings.length > 0 ? (
-          <ul className="space-y-1 pl-1">
-            {procedure.linkedFindings.map((f) => (
-              <li key={f.id} className="flex items-start gap-2 text-sm">
-                <span className="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-red-500" />
-                <span className="text-red-600">{f.title}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-xs text-muted-foreground">Chưa có phát hiện.</p>
-        )}
-
-        {!showFindingForm ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-1"
-            onClick={() => setShowFindingForm(true)}
-          >
-            <Plus className="mr-1.5 h-3 w-3" />
-            Thêm phát hiện
-          </Button>
-        ) : (
-          <div className="mt-2 space-y-2 rounded-md border p-2">
-            <div className="space-y-1">
-              <Label className="text-xs">Tiêu đề</Label>
-              <Input
-                value={findingTitle}
-                onChange={(e) => setFindingTitle(e.target.value)}
-                placeholder="Nhập tiêu đề..."
-                className="h-8 text-sm"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Mức độ rủi ro</Label>
-              <LabeledSelect
-                value={findingRating}
-                onChange={setFindingRating}
-                options={[
-                  { value: "", label: "— Chọn —" },
-                  { value: "low", label: "Thấp" },
-                  { value: "medium", label: "Trung bình" },
-                  { value: "high", label: "Cao" },
-                  { value: "critical", label: "Nghiêm trọng" },
-                ]}
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => {
-                  console.log("Create finding:", {
-                    title: findingTitle,
-                    riskRating: findingRating || null,
-                  });
-                  setFindingTitle("");
-                  setFindingRating("");
-                  setShowFindingForm(false);
-                }}
-                disabled={!findingTitle.trim()}
-              >
-                Lưu
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-xs"
-                onClick={() => {
-                  setFindingTitle("");
-                  setFindingRating("");
-                  setShowFindingForm(false);
-                }}
-              >
-                Hủy
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+      <LinkedFindingsList
+        findings={procedure.linkedFindings}
+        engagementId={engagementId}
+        procedureId={procedure.id}
+      />
     </div>
   );
 }
@@ -671,15 +585,38 @@ function InfoTabContent({
   controlOptions,
   riskOptions,
   objectiveOptions,
+  members,
+  assignments,
+  onAssign,
+  onUnassign,
+  entityId,
 }: {
   state: ReturnType<typeof useProcedureForm>["state"];
   setField: ReturnType<typeof useProcedureForm>["setField"];
   controlOptions: MultiSelectOption[];
   riskOptions: MultiSelectOption[];
   objectiveOptions: MultiSelectOption[];
+  members: EngagementMember[];
+  assignments: WpAssignment[];
+  onAssign?: (userId: string) => void;
+  onUnassign?: (userId: string) => void;
+  entityId: string;
 }) {
   return (
     <div className="space-y-4">
+      <FieldRow label="Người phụ trách">
+        <WpAssigneePicker
+          entityType="procedure"
+          entityId={entityId}
+          members={members}
+          assignments={assignments}
+          onAdd={(userId: string) => onAssign?.(userId)}
+          onRemove={(userId: string) => onUnassign?.(userId)}
+        />
+      </FieldRow>
+
+      <Separator className="my-1" />
+
       <FieldRow label={LP.field.procedureType}>
         <LabeledSelect
           value={state.procedureType ?? ""}
@@ -799,176 +736,6 @@ function stripHtml(html: string): string {
     return div.textContent || div.innerText || "";
   }
   return html.replace(/<[^>]+>/g, "");
-}
-
-// ── Version History Dropdown (Confluence-style, inside Popover) ──
-
-function VersionHistoryDropdown({
-  versions,
-  currentVersion,
-  engagementId,
-  procedureId,
-  onRestore,
-  isRestoring,
-}: {
-  versions: EntityVersionSummary[];
-  currentVersion: number;
-  engagementId: string;
-  procedureId: string;
-  onRestore: (version: number) => Promise<void>;
-  isRestoring: boolean;
-}) {
-  const VL = ENGAGEMENT_LABELS.versioning;
-  const [restoreTarget, setRestoreTarget] = React.useState<number | null>(null);
-  const [viewVersion, setViewVersion] = React.useState<number | null>(null);
-
-  const { data: versionDetail } = useProcedureVersion(
-    engagementId,
-    procedureId,
-    viewVersion,
-  );
-
-  if (versions.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground py-4 text-center">
-        {VL.noVersions}
-      </p>
-    );
-  }
-
-  return (
-    <>
-      <div className="px-3 py-2 border-b">
-        <span className="text-xs font-medium text-muted-foreground">
-          {VL.versionHistory} ({versions.length})
-        </span>
-      </div>
-      <div className="divide-y">
-        {versions.map((v) => (
-          <div
-            key={v.id}
-            className={cn(
-              "px-3 py-2 space-y-0.5",
-              v.version === currentVersion && "bg-primary/5",
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">
-                v{v.version}
-                {v.version === currentVersion && (
-                  <Badge variant="secondary" className="text-[10px] h-4 ml-1.5">
-                    Hiện tại
-                  </Badge>
-                )}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 text-[11px] px-1.5"
-                  onClick={() => setViewVersion(v.version)}
-                  title={VL.viewVersion}
-                >
-                  {VL.viewVersion}
-                </Button>
-                {v.version !== currentVersion && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 text-[11px] px-1.5 text-orange-600 hover:text-orange-700"
-                    onClick={() => setRestoreTarget(v.version)}
-                    title={VL.restoreVersion}
-                  >
-                    {VL.restoreVersion}
-                  </Button>
-                )}
-              </div>
-            </div>
-            {v.comment && (
-              <p className="text-xs text-muted-foreground truncate">
-                {v.comment}
-              </p>
-            )}
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span>{v.publisher.name}</span>
-              <span>·</span>
-              <span>
-                {new Date(v.publishedAt).toLocaleDateString("vi-VN", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Restore confirmation dialog */}
-      <ConfirmDialog
-        open={restoreTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setRestoreTarget(null);
-        }}
-        title={VL.restoreTitle}
-        description={
-          restoreTarget !== null ? VL.restoreDescription(restoreTarget) : ""
-        }
-        variant="confirm"
-        confirmLabel={VL.restoreVersion}
-        onConfirm={async () => {
-          if (restoreTarget !== null) {
-            await onRestore(restoreTarget);
-            setRestoreTarget(null);
-          }
-        }}
-        isLoading={isRestoring}
-      />
-
-      {/* Version detail dialog */}
-      <Dialog
-        open={viewVersion !== null}
-        onOpenChange={(open) => {
-          if (!open) setViewVersion(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {VL.version} {viewVersion}
-            </DialogTitle>
-            {versionDetail?.comment && (
-              <DialogDescription>{versionDetail.comment}</DialogDescription>
-            )}
-          </DialogHeader>
-          {versionDetail?.snapshot ? (
-            <div className="space-y-3 text-sm">
-              {Object.entries(
-                versionDetail.snapshot as Record<string, unknown>,
-              ).map(([key, value]) =>
-                value != null && value !== "" ? (
-                  <div key={key}>
-                    <span className="font-medium text-muted-foreground">
-                      {key}
-                    </span>
-                    <p className="mt-0.5 whitespace-pre-wrap break-words">
-                      {typeof value === "object"
-                        ? JSON.stringify(value, null, 2).slice(0, 500)
-                        : String(value)}
-                    </p>
-                  </div>
-                ) : null,
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Đang tải...</p>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
-  );
 }
 
 // ── Workflow Chart Dialog ──

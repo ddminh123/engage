@@ -35,6 +35,7 @@ import type {
   EntityVersionSummary,
   EntityVersionDetail,
   AvailableTransition,
+  WpSignoff,
 } from './types';
 
 interface ApiResponse<T> {
@@ -530,6 +531,13 @@ export async function updateProcedureAssigneeApi(
   return handleResponse<void>(response);
 }
 
+// ── WP Signoffs (immutable sign-off records) ──
+
+export async function fetchWpSignoffs(engagementId: string): Promise<WpSignoff[]> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_WP_SIGNOFFS(engagementId));
+  return handleResponse<WpSignoff[]>(response);
+}
+
 // ── WP Assignments (multi-assignee) ──
 
 export async function fetchWpAssignments(engagementId: string): Promise<WpAssignment[]> {
@@ -694,11 +702,12 @@ export async function executeTransitionApi(
   entityId: string,
   transitionId: string,
   comment?: string,
+  nextAssigneeId?: string,
 ): Promise<{ newStatus: string; actionType: string }> {
   const response = await fetch(API_ROUTES.APPROVAL_EXECUTE_TRANSITION(entityType, entityId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transitionId, comment }),
+    body: JSON.stringify({ transitionId, comment, nextAssigneeId }),
   });
   return handleResponse<{ newStatus: string; actionType: string }>(response);
 }

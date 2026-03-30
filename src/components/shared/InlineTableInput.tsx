@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 
 interface InlineTableInputProps {
@@ -40,6 +40,15 @@ export function InlineTableInput({
   className,
 }: InlineTableInputProps) {
   const [value, setValue] = useState(initialValue);
+  // Synchronous guard: prevents double-fire before React re-renders
+  const submittedRef = useRef(false);
+  const composingRef = useRef(false);
+
+  const doSubmit = () => {
+    if (submittedRef.current || composingRef.current) return;
+    submittedRef.current = true;
+    onSubmit?.(value);
+  };
 
   return (
     <div className={`flex items-center gap-2 flex-1 ${className ?? ""}`}>
@@ -50,11 +59,19 @@ export function InlineTableInput({
           const v = e.target.value;
           setValue(v);
           onChange?.(v);
+          // Allow re-submission after editing
+          submittedRef.current = false;
+        }}
+        onCompositionStart={() => {
+          composingRef.current = true;
+        }}
+        onCompositionEnd={() => {
+          composingRef.current = false;
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            onSubmit?.(value);
+            if (!composingRef.current) doSubmit();
           }
           if (e.key === "Escape") onCancel?.();
         }}

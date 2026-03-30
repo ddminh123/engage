@@ -268,7 +268,7 @@ export interface EngagementProcedure {
   reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  linkedFindings: { id: string; title: string }[];
+  linkedFindings: { id: string; title: string; riskRating: string | null; description: string | null; evidence: string | null }[];
   linkedControls: { id: string; description: string }[];
   linkedRisks: { id: string; riskDescription: string }[];
   linkedObjectives: { id: string; title: string }[];
@@ -316,6 +316,7 @@ export interface SectionInput {
   title: string;
   description?: string | null;
   addedFrom?: string;
+  phase?: string;
   sortOrder?: number;
 }
 
@@ -328,6 +329,7 @@ export interface ObjectiveInput {
   title: string;
   description?: string | null;
   addedFrom?: string;
+  phase?: string;
   sortOrder?: number;
 }
 
@@ -363,6 +365,7 @@ export interface FindingInput {
   title: string;
   description?: string | null;
   riskRating?: string | null;
+  evidence?: string | null;
   recommendation?: string | null;
   managementResponse?: string | null;
   rootCause?: string | null;
@@ -477,6 +480,8 @@ export interface EntityVersionSummary {
   entityType: string;
   entityId: string;
   version: number;
+  versionType: string | null;
+  actionLabel: string | null;
   comment: string | null;
   publishedBy: string;
   publishedAt: string;
@@ -489,6 +494,32 @@ export interface EntityVersionSummary {
 
 export interface EntityVersionDetail extends EntityVersionSummary {
   snapshot: Record<string, unknown>;
+}
+
+// =============================================================================
+// WP SIGNOFF (immutable sign-off records)
+// =============================================================================
+
+export interface WpSignoff {
+  id: string;
+  engagementId: string;
+  entityType: string;
+  entityId: string;
+  signoffType: 'prepare' | 'review' | 'approve';
+  userId: string;
+  signedAt: string;
+  version: number | null;
+  transitionId: string | null;
+  invalidatedAt: string | null;
+  invalidatedBy: string | null;
+  comment: string | null;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    title: string | null;
+  };
 }
 
 // =============================================================================

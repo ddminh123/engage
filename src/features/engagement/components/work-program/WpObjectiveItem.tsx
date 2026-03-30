@@ -144,7 +144,10 @@ export function WpObjectiveItem({
 
   const objectiveRow = (
     <div
-      className="group/row flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30 cursor-pointer"
+      className={cn(
+        "group/row flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30",
+        dragHandleProps.isDragging ? "cursor-grabbing" : "cursor-grab",
+      )}
       onClick={() => onOpenChange(!open)}
       {...dragHandleProps.attributes}
       {...dragHandleProps.listeners}
@@ -249,7 +252,7 @@ export function WpObjectiveItem({
 
       {/* ── Collapsible content: procedures ── */}
       <CollapsibleContent>
-        <div className="pl-10 space-y-0">
+        <div className="pl-12 space-y-0">
           {objective.procedures.length > 0 && (
             <SortableList
               items={objective.procedures}

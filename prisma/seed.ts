@@ -162,7 +162,7 @@ async function main() {
   // 6. Default Planning Step Configs
   // =========================================================================
   const planningSteps = [
-    { key: 'scope',         title: 'Phạm vi & Thông tin chung', icon: 'FileText',     step_type: 'fixed',    sort_order: 0, is_active: true },
+    { key: 'scope',         title: 'Phạm vi kiểm toán',          icon: 'FileText',     step_type: 'fixed',    sort_order: 0, is_active: true },
     { key: 'objectives',    title: 'Mục tiêu kiểm toán',        icon: 'Target',       step_type: 'fixed',    sort_order: 1, is_active: true },
     { key: 'understanding', title: 'Tìm hiểu đối tượng',        icon: 'BookOpen',     step_type: 'fixed',    sort_order: 2, is_active: true },
     { key: 'rcm',           title: 'Rủi ro & Kiểm soát (RACM)', icon: 'ShieldCheck',  step_type: 'fixed',    sort_order: 3, is_active: true },
@@ -172,7 +172,7 @@ async function main() {
   for (const step of planningSteps) {
     await prisma.planningStepConfig.upsert({
       where: { key: step.key },
-      update: { is_active: step.is_active },
+      update: { title: step.title, icon: step.icon, is_active: step.is_active },
       create: step,
     });
   }

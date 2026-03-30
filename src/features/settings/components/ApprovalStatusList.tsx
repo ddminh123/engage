@@ -542,21 +542,30 @@ function ArchiveStatusDialog({
 }) {
   const archiveMutation = useDeleteApprovalStatus();
 
+  const handleClose = () => {
+    archiveMutation.reset();
+    onClose();
+  };
+
   if (!status) return null;
 
   return (
     <ConfirmDialog
       open={!!status}
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open) handleClose();
       }}
       title="Lưu trữ trạng thái"
-      description={`Lưu trữ trạng thái "${status.label}"? Trạng thái sẽ bị ẩn khỏi cấu hình nhưng vẫn hiển thị cho dữ liệu lịch sử. Bạn có thể khôi phục sau.`}
+      description={
+        archiveMutation.isError
+          ? archiveMutation.error.message
+          : `Lưu trữ trạng thái "${status.label}"? Trạng thái sẽ bị ẩn khỏi cấu hình nhưng vẫn hiển thị cho dữ liệu lịch sử. Bạn có thể khôi phục sau.`
+      }
       confirmLabel="Lưu trữ"
       variant="destructive"
       isLoading={archiveMutation.isPending}
       onConfirm={() => {
-        archiveMutation.mutate(status.id, { onSuccess: onClose });
+        archiveMutation.mutate(status.id, { onSuccess: handleClose });
       }}
     />
   );

@@ -147,7 +147,10 @@ export function WpProcedureItem({
 
   const procedureRow = (
     <div
-      className="group/row flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30"
+      className={cn(
+        "group/row flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30",
+        dragHandleProps.isDragging ? "cursor-grabbing" : "cursor-grab",
+      )}
       {...dragHandleProps.attributes}
       {...dragHandleProps.listeners}
     >

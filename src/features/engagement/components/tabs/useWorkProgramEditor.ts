@@ -112,11 +112,11 @@ export function useWorkProgramEditor(
       const t = title.trim();
       if (!t || createSection.isPending) return;
       createSection.mutate(
-        { engagementId, data: { title: t } },
+        { engagementId, data: { title: t, phase: mode } },
         { onSuccess: () => dispatch({ type: "CANCEL_ADD_TOP" }) },
       );
     },
-    [createSection, engagementId],
+    [createSection, engagementId, mode],
   );
 
   const handleUpdateSection = useCallback(
@@ -150,18 +150,18 @@ export function useWorkProgramEditor(
       if (sectionId) {
         // Objective inside a section
         createObjective.mutate(
-          { engagementId, sectionId, data: { title: t } },
+          { engagementId, sectionId, data: { title: t, phase: mode } },
           { onSuccess: () => dispatch({ type: "CANCEL_ADD" }) },
         );
       } else {
         // Standalone objective (top-level)
         createStandaloneObjective.mutate(
-          { engagementId, data: { title: t } },
+          { engagementId, data: { title: t, phase: mode } },
           { onSuccess: () => dispatch({ type: "CANCEL_ADD_TOP" }) },
         );
       }
     },
-    [createObjective, createStandaloneObjective, engagementId],
+    [createObjective, createStandaloneObjective, engagementId, mode],
   );
 
   const handleUpdateObjective = useCallback(

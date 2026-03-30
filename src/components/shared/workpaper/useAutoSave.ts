@@ -19,6 +19,8 @@ interface UseAutoSaveOptions {
   onSave: (content: JSONContent) => Promise<void>;
   /** If true, auto-save is disabled (e.g. read-only mode) */
   disabled?: boolean;
+  /** Initial "last saved" timestamp (e.g. entity's updatedAt) so indicator doesn't show "Chưa lưu" on load */
+  initialLastSavedAt?: Date | null;
 }
 
 interface UseAutoSaveReturn {
@@ -40,6 +42,7 @@ export function useAutoSave({
   storageKey,
   onSave,
   disabled = false,
+  initialLastSavedAt,
 }: UseAutoSaveOptions): UseAutoSaveReturn {
   const { data: intervalMs } = useSystemSetting<number>(
     "editor.autoSaveIntervalMs",
@@ -47,7 +50,7 @@ export function useAutoSave({
   const debounceMs = intervalMs ?? DEFAULT_INTERVAL_MS;
 
   const [status, setStatus] = useState<AutoSaveStatus>("idle");
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(initialLastSavedAt ?? null);
   const latestContent = useRef<JSONContent | null>(null);
   const lastSavedContent = useRef<string>("");
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);

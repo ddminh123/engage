@@ -120,7 +120,7 @@ export const ENGAGEMENT_LABELS = {
     } as Record<string, string>,
   },
   planning: {
-    scopeBasics: 'Phạm vi & Thông tin chung',
+    scopeBasics: 'Phạm vi kiểm toán',
     understanding: 'Tìm hiểu đối tượng',
     understandingEdit: 'Chỉnh sửa nội dung tìm hiểu',
     riskControl: 'Rủi ro & Kiểm soát (RACM)',

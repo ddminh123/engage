@@ -43,6 +43,7 @@ import {
   updateEngagementMemberApi,
   removeEngagementMemberApi,
   updateProcedureAssigneeApi,
+  fetchWpSignoffs,
   fetchWpAssignments,
   addWpAssignmentApi,
   removeWpAssignmentApi,
@@ -773,6 +774,18 @@ export function useUpdateProcedureAssignee() {
   });
 }
 
+// ── WP Signoffs (immutable sign-off records) ──
+
+const wpSignoffsKey = (engagementId: string) => ['wp-signoffs', engagementId] as const;
+
+export function useWpSignoffs(engagementId: string) {
+  return useQuery({
+    queryKey: wpSignoffsKey(engagementId),
+    queryFn: () => fetchWpSignoffs(engagementId),
+    enabled: !!engagementId,
+  });
+}
+
 // ── WP Assignments (multi-assignee) ──
 
 const wpAssignmentsKey = (engagementId: string) => ['wp-assignments', engagementId] as const;
@@ -1006,17 +1019,20 @@ export function useExecuteTransition() {
       entityId,
       transitionId,
       comment,
+      nextAssigneeId,
       engagementId,
     }: {
       entityType: string;
       entityId: string;
       transitionId: string;
       comment?: string;
+      nextAssigneeId?: string;
       engagementId: string;
-    }) => executeTransitionApi(entityType, entityId, transitionId, comment),
+    }) => executeTransitionApi(entityType, entityId, transitionId, comment, nextAssigneeId),
     onSuccess: (_, { entityType, entityId, engagementId }) => {
       qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId) });
       qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+      qc.invalidateQueries({ queryKey: wpSignoffsKey(engagementId) });
     },
   });
 }

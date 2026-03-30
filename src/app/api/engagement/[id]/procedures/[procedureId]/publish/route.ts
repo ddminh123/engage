@@ -33,7 +33,7 @@ export const POST = withAccess(
         snapshot,
         session.user.id,
         session.user.name,
-        comment,
+        { comment, versionType: 'manual' },
       );
 
       // 4. Update procedure's version tracking fields

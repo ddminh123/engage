@@ -161,7 +161,10 @@ export function WpSectionCard({
 
   const cardHeader = (
     <div
-      className="group/header flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
+      className={cn(
+        "group/header flex items-center gap-2 px-3 py-2 select-none",
+        dragHandleProps.isDragging ? "cursor-grabbing" : "cursor-grab",
+      )}
       onClick={() => !isEditingHeader && onOpenChange(!open)}
       {...dragHandleProps.attributes}
       {...dragHandleProps.listeners}
@@ -316,7 +319,7 @@ export function WpSectionCard({
 
         {/* ── Card body ── */}
         <CollapsibleContent>
-          <div className="border-t px-3 py-2 space-y-1">
+          <div className="border-t px-3 pl-8 py-2 space-y-1">
             {/* Objectives (with their procedures nested) */}
             {section.objectives.length > 0 && (
               <SortableList

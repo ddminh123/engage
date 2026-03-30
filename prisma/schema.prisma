@@ -140,6 +140,7 @@ model User {
   team_memberships TeamMember[]
   engagement_memberships EngagementMember[] @relation("EngagementMembers")
   wp_assignments         WpAssignment[]    @relation("WpAssignments")
+  wp_signoffs            WpSignoff[]       @relation("WpSignoffs")
   wp_comments            WpComment[]       @relation("WpCommentAuthor")
   wp_thread_creators     WpCommentThread[] @relation("WpThreadCreator")
   created_templates      Template[]        @relation("TemplateCreator")
@@ -664,6 +665,7 @@ model Engagement {
   risks              EngagementRisk[]
   members             EngagementMember[]
   wp_assignments      WpAssignment[]
+  wp_signoffs         WpSignoff[]
   owner_units         EngagementOwner[]
   participating_units EngagementParticipant[]
   contact_points      EngagementContactPoint[]
@@ -750,6 +752,30 @@ model WpAssignment {
   @@index([engagement_id])
   @@index([entity_type, entity_id])
   @@map("wp_assignment")
+}
+
+// Immutable sign-off records: formal audit trail of who prepared/reviewed/approved
+model WpSignoff {
+  id              String    @id @default(cuid())
+  engagement_id   String
+  entity_type     String    // 'procedure' | 'planning_workpaper' | 'work_program'
+  entity_id       String
+  signoff_type    String    // 'prepare' | 'review' | 'approve'
+  user_id         String
+  signed_at       DateTime  @default(now())
+  version         Int?      // entity version at time of sign-off (links to EntityVersion)
+  transition_id   String?   // which ApprovalTransition triggered this
+  invalidated_at  DateTime?
+  invalidated_by  String?
+  comment         String?   @db.Text
+
+  engagement Engagement @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  user       User       @relation("WpSignoffs", fields: [user_id], references: [id])
+
+  @@index([engagement_id])
+  @@index([entity_type, entity_id])
+  @@index([signoff_type])
+  @@map("wp_signoff")
 }
 
 // Planning-level audit objectives (distinct from execution EngagementObjective)
@@ -956,6 +982,7 @@ model DraftFinding {
   title         String
   description   String?   @db.Text
   risk_rating   String?   // low | medium | high | critical
+  evidence      String?   @db.Text
   status        String    @default("draft") // draft | to_review | reviewed | accepted | rejected
   recommendation String?  @db.Text
   management_response String? @db.Text
@@ -1098,8 +1125,10 @@ model EntityVersion {
   entity_type   String   // "procedure" | "understanding" | future...
   entity_id     String   // FK to the actual record (polymorphic)
   version       Int      // auto-increment per entity (1, 2, 3...)
+  version_type  String?  // "transition" | "manual" | "auto" (future-proof)
+  action_label  String?  // e.g., "Gửi soát xét", "Phê duyệt" — from transition
   snapshot      Json     @db.Json  // full entity state at publish time
-  comment       String?  @db.Text  // optional version comment
+  comment       String?  @db.Text  // optional version comment (= transition comment)
   published_by  String   // user who published
   published_at  DateTime @default(now())
 

@@ -51,6 +51,7 @@ export const API_ROUTES = {
   ENGAGEMENT_PLANNING_WORKPAPERS: (id: string) => `/api/engagement/${id}/planning-workpapers`,
   ENGAGEMENT_PLANNING_WORKPAPER_BY_ID: (id: string, wpId: string) => `/api/engagement/${id}/planning-workpapers/${wpId}`,
   ENGAGEMENT_WP_ASSIGNMENTS: (id: string) => `/api/engagement/${id}/wp-assignments`,
+  ENGAGEMENT_WP_SIGNOFFS: (id: string) => `/api/engagement/${id}/wp-signoffs`,
   ENGAGEMENT_WP_COMMENTS: (id: string) => `/api/engagement/${id}/wp-comments`,
   ENGAGEMENT_WP_COMMENT_THREAD: (id: string, threadId: string) => `/api/engagement/${id}/wp-comments/${threadId}`,
 

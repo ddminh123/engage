@@ -8,13 +8,26 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type { AvailableTransition } from "@/features/engagement/types";
+import type {
+  AvailableTransition,
+  EngagementMember,
+} from "@/features/engagement/types";
+import {
+  TransitionConfirmContent,
+  needsConfirmation,
+} from "./TransitionDialog";
 
 interface WorkpaperActionsProps {
   transitions: AvailableTransition[];
-  onTransition: (transitionId: string) => void;
+  onTransition: (
+    transitionId: string,
+    comment?: string,
+    nextAssigneeId?: string,
+  ) => void;
   isTransitioning?: boolean;
   onViewWorkflow?: () => void;
+  /** Engagement members for the next-person picker */
+  members?: EngagementMember[];
 }
 
 export function WorkpaperActions({
@@ -22,8 +35,11 @@ export function WorkpaperActions({
   onTransition,
   isTransitioning = false,
   onViewWorkflow,
+  members = [],
 }: WorkpaperActionsProps) {
-  const [open, setOpen] = React.useState(false);
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+  const [confirmTransition, setConfirmTransition] =
+    React.useState<AvailableTransition | null>(null);
 
   if (transitions.length === 0 && !onViewWorkflow) return null;
 
@@ -31,6 +47,23 @@ export function WorkpaperActions({
   const primary = transitions[0] ?? null;
   const secondary = transitions.slice(1);
   const hasDropdown = secondary.length > 0 || !!onViewWorkflow;
+
+  const handleSelectTransition = (t: AvailableTransition) => {
+    if (needsConfirmation(t)) {
+      setConfirmTransition(t);
+    } else {
+      onTransition(t.id);
+    }
+  };
+
+  const handleConfirm = (params: {
+    transitionId: string;
+    comment?: string;
+    nextAssigneeId?: string;
+  }) => {
+    onTransition(params.transitionId, params.comment, params.nextAssigneeId);
+    setConfirmTransition(null);
+  };
 
   if (!primary && onViewWorkflow) {
     return (
@@ -45,19 +78,48 @@ export function WorkpaperActions({
 
   return (
     <div className="flex items-stretch">
-      <Button
-        onClick={() => onTransition(primary.id)}
-        disabled={isTransitioning}
-        className={hasDropdown ? "rounded-r-none" : ""}
+      {/* Confirmation popover — anchored to the primary button */}
+      <Popover
+        open={confirmTransition !== null}
+        onOpenChange={(o) => {
+          if (!o) setConfirmTransition(null);
+        }}
       >
-        {isTransitioning && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-        {primary.actionLabel}
-      </Button>
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              title={primary.actionLabel}
+              onClick={() => handleSelectTransition(primary)}
+              disabled={isTransitioning}
+              className={`group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-primary text-sm font-medium text-primary-foreground whitespace-nowrap transition-all outline-none select-none h-8 gap-1.5 px-2.5 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 ${hasDropdown ? "rounded-r-none border-r-0" : ""}`}
+            />
+          }
+        >
+          {isTransitioning && (
+            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+          )}
+          {primary.actionLabel}
+        </PopoverTrigger>
 
+        {confirmTransition && (
+          <PopoverContent align="end" className="w-80 p-0">
+            <TransitionConfirmContent
+              transition={confirmTransition}
+              members={members}
+              onConfirm={handleConfirm}
+              onCancel={() => setConfirmTransition(null)}
+              isLoading={isTransitioning}
+            />
+          </PopoverContent>
+        )}
+      </Popover>
+
+      {/* Dropdown for secondary actions */}
       {hasDropdown && (
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
           <PopoverTrigger
-            className="inline-flex items-center justify-center rounded-l-none rounded-r-md border-l border-l-primary-foreground/20 bg-primary px-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+            className="inline-flex h-8 items-center justify-center rounded-l-none rounded-r-lg border-l border-l-primary-foreground/20 bg-primary px-2 text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
             disabled={isTransitioning}
             title="Thêm hành động"
           >
@@ -70,8 +132,8 @@ export function WorkpaperActions({
                 type="button"
                 className="flex w-full items-center rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
                 onClick={() => {
-                  onTransition(t.id);
-                  setOpen(false);
+                  handleSelectTransition(t);
+                  setDropdownOpen(false);
                 }}
               >
                 {t.actionLabel}
@@ -87,7 +149,7 @@ export function WorkpaperActions({
                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                   onClick={() => {
                     onViewWorkflow();
-                    setOpen(false);
+                    setDropdownOpen(false);
                   }}
                 >
                   <Workflow className="h-3.5 w-3.5" />

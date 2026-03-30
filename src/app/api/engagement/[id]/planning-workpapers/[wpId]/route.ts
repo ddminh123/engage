@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { withAccess, type Session } from '@/server/middleware/withAccess';
 import { updatePlanningWorkpaper } from '@/server/actions/planningWorkpaper';
+import { invalidateSignoffs } from '@/server/actions/approvalEngine';
 import { logAudit } from '@/server/actions/teams';
 
 export const PATCH = withAccess(
@@ -10,6 +11,9 @@ export const PATCH = withAccess(
       const { wpId } = await ctx.params;
       const body = await req.json();
       const data = await updatePlanningWorkpaper(wpId, body);
+
+      // Invalidate review/approve sign-offs when planning workpaper content changes
+      await invalidateSignoffs('planning_workpaper', wpId, session.user.id);
 
       await logAudit({
         userId: session.user.id,

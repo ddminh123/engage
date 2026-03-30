@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useCallback } from "react";
 import { Target, ClipboardList, Check, X, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InlineTableInput } from "@/components/shared/InlineTableInput";
@@ -25,6 +26,17 @@ export function WpInlineAdd({
   placeholder,
   onOpenForm,
 }: WpInlineAddProps) {
+  // Synchronous guard shared between Enter key and Check button
+  const submittedRef = useRef(false);
+  const guardedSubmit = useCallback(
+    (v: string) => {
+      if (submittedRef.current) return;
+      submittedRef.current = true;
+      onSubmit(v);
+    },
+    [onSubmit],
+  );
+
   const icon =
     type === "objective" ? (
       <Target className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
@@ -40,8 +52,11 @@ export function WpInlineAdd({
       {icon}
       <InlineTableInput
         placeholder={placeholder ?? defaultPlaceholder}
-        onChange={onChange}
-        onSubmit={onSubmit}
+        onChange={(v) => {
+          onChange(v);
+          submittedRef.current = false;
+        }}
+        onSubmit={guardedSubmit}
         onCancel={onCancel}
         autoFocus
       />
@@ -49,7 +64,7 @@ export function WpInlineAdd({
         type="button"
         variant="ghost"
         size="icon-sm"
-        onClick={() => onSubmit(textRef.current)}
+        onClick={() => guardedSubmit(textRef.current)}
         disabled={isSaving}
       >
         <Check className="h-3.5 w-3.5" />

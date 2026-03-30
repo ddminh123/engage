@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { logAudit } from './teams';
+import { invalidateSignoffs, hasAuditRelevantChanges } from './approvalEngine';
 import { z } from 'zod';
 
 // =============================================================================
@@ -55,11 +56,13 @@ export const updateEngagementSchema = createEngagementSchema
 export type UpdateEngagementInput = z.infer<typeof updateEngagementSchema>;
 
 const ADDED_FROM = ['planning', 'execution'] as const;
+const PHASE = ['planning', 'execution'] as const;
 
 export const createSectionSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().nullable().optional(),
   addedFrom: z.enum(ADDED_FROM).optional(),
+  phase: z.enum(PHASE).optional(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -72,6 +75,7 @@ export const createObjectiveSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().nullable().optional(),
   addedFrom: z.enum(ADDED_FROM).optional(),
+  phase: z.enum(PHASE).optional(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -117,6 +121,7 @@ export const createFindingSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().nullable().optional(),
   riskRating: z.enum(RISK_RATINGS).nullable().optional(),
+  evidence: z.string().nullable().optional(),
   recommendation: z.string().nullable().optional(),
   managementResponse: z.string().nullable().optional(),
   rootCause: z.string().nullable().optional(),
@@ -193,7 +198,7 @@ const engagementListInclude = {
 } as const;
 
 const procedureInclude = {
-  findings: { include: { finding: { select: { id: true, title: true } } } },
+  findings: { include: { finding: { select: { id: true, title: true, risk_rating: true, description: true, evidence: true } } } },
   ref_controls: { include: { control: { select: { id: true, description: true } } } },
   ref_risks: { include: { risk: { select: { id: true, risk_description: true } } } },
   ref_objectives: { include: { rcmObjective: { select: { id: true, title: true } } } },
@@ -362,6 +367,9 @@ function mapProcedure(p: any) {
     linkedFindings: (p.findings ?? []).map((f: any) => ({
       id: f.finding.id,
       title: f.finding.title,
+      riskRating: f.finding.risk_rating ?? null,
+      description: f.finding.description ?? null,
+      evidence: f.finding.evidence ?? null,
     })),
     linkedControls: (p.ref_controls ?? []).map((r: any) => ({
       id: r.control.id,
@@ -908,6 +916,7 @@ export async function createSection(
       title: parsed.title,
       description: parsed.description ?? null,
       added_from: parsed.addedFrom ?? 'execution',
+      phase: parsed.phase ?? 'planning',
       sort_order: parsed.sortOrder ?? (maxOrder._max.sort_order ?? 0) + 1,
     },
     include: {
@@ -1013,6 +1022,7 @@ export async function createObjective(
       title: parsed.title,
       description: parsed.description ?? null,
       added_from: parsed.addedFrom ?? 'execution',
+      phase: parsed.phase ?? section.phase,
       sort_order: parsed.sortOrder ?? (maxOrder._max.sort_order ?? 0) + 1,
     },
     include: { procedures: { orderBy: { sort_order: 'asc' } } },
@@ -1055,6 +1065,7 @@ export async function createStandaloneObjective(
       title: parsed.title,
       description: parsed.description ?? null,
       added_from: parsed.addedFrom ?? 'execution',
+      phase: parsed.phase ?? 'planning',
       sort_order: parsed.sortOrder ?? nextOrder,
     },
     include: { procedures: { orderBy: { sort_order: 'asc' } } },
@@ -1263,6 +1274,12 @@ export async function updateProcedure(
     include: procedureInclude,
   });
 
+  // Invalidate review/approve sign-offs if audit-relevant fields changed
+  const changedDbFields = Object.keys(data);
+  if (hasAuditRelevantChanges(changedDbFields)) {
+    await invalidateSignoffs('procedure', procedureId, userId);
+  }
+
   if (Object.keys(changes).length > 0) {
     await logAudit({
       userId, userName, action: 'update',
@@ -1316,6 +1333,7 @@ export async function createFinding(
       title: parsed.title,
       description: parsed.description ?? null,
       risk_rating: parsed.riskRating ?? null,
+      evidence: parsed.evidence ?? null,
       recommendation: parsed.recommendation ?? null,
       management_response: parsed.managementResponse ?? null,
       root_cause: parsed.rootCause ?? null,
@@ -1365,6 +1383,7 @@ export async function updateFinding(
   if (parsed.description !== undefined) data.description = parsed.description ?? null;
   if (parsed.riskRating !== undefined) data.risk_rating = parsed.riskRating ?? null;
   if (parsed.status !== undefined) data.status = parsed.status;
+  if (parsed.evidence !== undefined) data.evidence = parsed.evidence ?? null;
   if (parsed.recommendation !== undefined) data.recommendation = parsed.recommendation ?? null;
   if (parsed.managementResponse !== undefined) data.management_response = parsed.managementResponse ?? null;
   if (parsed.rootCause !== undefined) data.root_cause = parsed.rootCause ?? null;
@@ -3056,6 +3075,9 @@ export async function updateProcedureContent(
     where: { id: procedureId },
     data: { content: content as any },
   });
+
+  // Invalidate review/approve sign-offs when content changes
+  await invalidateSignoffs('procedure', procedureId, userId);
 
   await logAudit({
     userId,

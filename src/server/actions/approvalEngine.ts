@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { logAudit } from './teams';
+import { publishEntity, buildProcedureSnapshot } from './entityVersion';
 
 // =============================================================================
 // TYPES
@@ -137,6 +138,7 @@ export async function executeTransition(
   userName: string,
   engagementId: string,
   comment?: string | null,
+  nextAssigneeId?: string | null,
 ): Promise<{ newStatus: string; actionType: string }> {
   // 1. Load the transition
   const transition = await prisma.approvalTransition.findUnique({
@@ -200,7 +202,42 @@ export async function executeTransition(
 
   await updateEntityStatus(entityType, entityId, updateData);
 
-  // 4. Audit log
+  // 4. Create version snapshot on every transition
+  // "start" actions get labeled "Bản thảo" (Draft) for the first version
+  const versionLabel = transition.action_type === 'start' ? 'Bản thảo' : transition.action_label;
+  await createTransitionVersion(entityType, entityId, userId, userName, {
+    comment: comment ?? null,
+    actionLabel: versionLabel,
+  });
+
+  // 5. Create sign-off record for submit/review/approve actions
+  const signoffType = ACTION_TYPE_TO_SIGNOFF[transition.action_type];
+  if (signoffType) {
+    await createSignoff({
+      engagementId,
+      entityType,
+      entityId,
+      signoffType,
+      userId,
+      version: currentEntity.currentVersion,
+      transitionId,
+      comment: comment ?? null,
+    });
+
+    // Backward compat: populate inline fields from sign-off
+    await populateInlineSignoffFields(entityType, entityId, signoffType, userId);
+  }
+
+  // 5b. Handle assignment changes
+  if (nextAssigneeId) {
+    // When a next person is picked, replace all current assignees with the next person
+    await replaceAssignees(engagementId, entityType, entityId, nextAssigneeId);
+  } else {
+    // No next person — just auto-assign the acting user
+    await upsertAssignment(engagementId, entityType, entityId, userId);
+  }
+
+  // 6. Audit log
   await logAudit({
     userId,
     userName,
@@ -274,6 +311,25 @@ export async function executeAutoTransition(
   await updateEntityStatus(entityType, entityId, {
     approval_status: transition.to_status,
   });
+
+  // 3b. Create "Bản thảo" version snapshot for start transitions
+  if (transition.action_type === 'start') {
+    await createTransitionVersion(entityType, entityId, userId, userName, {
+      comment: null,
+      actionLabel: 'Bản thảo',
+    });
+  }
+
+  // 3c. Auto-assign WpAssignment for procedure entities on start
+  if (transition.action_type === 'start' && entityType === 'procedure') {
+    const proc = await prisma.engagementProcedure.findUnique({
+      where: { id: entityId },
+      select: { engagement_id: true },
+    });
+    if (proc) {
+      await upsertAssignment(proc.engagement_id, entityType, entityId, userId);
+    }
+  }
 
   // 4. Audit log
   await logAudit({
@@ -394,5 +450,239 @@ async function updateEntityStatus(
       break;
     default:
       throw new Error(`Unsupported entity type: ${entityType}`);
+  }
+}
+
+// =============================================================================
+// SIGNOFF — Immutable sign-off records
+// =============================================================================
+
+// Maps workflow action_type → signoff_type. Only these actions create sign-offs.
+const ACTION_TYPE_TO_SIGNOFF: Record<string, string> = {
+  submit: 'prepare',
+  review: 'review',
+  approve: 'approve',
+};
+
+// Audit-relevant fields on procedures — changes to these invalidate review/approve sign-offs
+const AUDIT_RELEVANT_FIELDS = new Set([
+  'content', 'observations', 'conclusion', 'effectiveness',
+  'sample_size', 'exceptions', 'procedures', 'description',
+]);
+
+async function createSignoff(params: {
+  engagementId: string;
+  entityType: string;
+  entityId: string;
+  signoffType: string;
+  userId: string;
+  version: number;
+  transitionId: string;
+  comment: string | null;
+}) {
+  await prisma.wpSignoff.create({
+    data: {
+      engagement_id: params.engagementId,
+      entity_type: params.entityType,
+      entity_id: params.entityId,
+      signoff_type: params.signoffType,
+      user_id: params.userId,
+      version: params.version || null,
+      transition_id: params.transitionId,
+      comment: params.comment,
+    },
+  });
+}
+
+/**
+ * Populate legacy inline fields (performed_by, reviewed_by, approved_by) from sign-off data.
+ * This keeps backward compatibility while WpSignoff is the source of truth.
+ */
+async function populateInlineSignoffFields(
+  entityType: string,
+  entityId: string,
+  signoffType: string,
+  userId: string,
+) {
+  if (entityType === 'procedure') {
+    const fieldMap: Record<string, { userField: string; dateField: string }> = {
+      prepare: { userField: 'performed_by', dateField: 'performed_at' },
+      review: { userField: 'reviewed_by', dateField: 'reviewed_at' },
+      // approve is already handled by executeTransition's approved_by logic
+    };
+    const mapping = fieldMap[signoffType];
+    if (mapping) {
+      await prisma.engagementProcedure.update({
+        where: { id: entityId },
+        data: {
+          [mapping.userField]: userId,
+          [mapping.dateField]: new Date(),
+        },
+      });
+    }
+  }
+}
+
+/**
+ * Upsert a WpAssignment (auto-assign user to entity on transition).
+ * Only for entity types that support assignments (procedure, section, objective).
+ */
+async function upsertAssignment(
+  engagementId: string,
+  entityType: string,
+  entityId: string,
+  userId: string,
+) {
+  const WP_ENTITY_TYPES = ['section', 'objective', 'procedure'];
+  if (!WP_ENTITY_TYPES.includes(entityType)) return;
+
+  await prisma.wpAssignment.upsert({
+    where: {
+      user_id_entity_type_entity_id: {
+        user_id: userId,
+        entity_type: entityType,
+        entity_id: entityId,
+      },
+    },
+    create: {
+      engagement_id: engagementId,
+      user_id: userId,
+      entity_type: entityType,
+      entity_id: entityId,
+    },
+    update: {}, // already assigned — no-op
+  });
+}
+
+/**
+ * Replace all current assignees for an entity with a single new assignee.
+ * Used when a transition includes a next-person pick (e.g. submit → reviewer).
+ */
+async function replaceAssignees(
+  engagementId: string,
+  entityType: string,
+  entityId: string,
+  newUserId: string,
+) {
+  const WP_ENTITY_TYPES = ['section', 'objective', 'procedure'];
+  if (!WP_ENTITY_TYPES.includes(entityType)) return;
+
+  // Delete all existing assignments for this entity
+  await prisma.wpAssignment.deleteMany({
+    where: {
+      entity_type: entityType,
+      entity_id: entityId,
+    },
+  });
+
+  // Create the single new assignment
+  await prisma.wpAssignment.create({
+    data: {
+      engagement_id: engagementId,
+      user_id: newUserId,
+      entity_type: entityType,
+      entity_id: entityId,
+    },
+  });
+}
+
+/**
+ * Invalidate review and approve sign-offs when content changes after sign-off.
+ * Called from content-save endpoints.
+ */
+export async function invalidateSignoffs(
+  entityType: string,
+  entityId: string,
+  invalidatedBy: string,
+) {
+  await prisma.wpSignoff.updateMany({
+    where: {
+      entity_type: entityType,
+      entity_id: entityId,
+      signoff_type: { in: ['review', 'approve'] },
+      invalidated_at: null, // only invalidate non-invalidated ones
+    },
+    data: {
+      invalidated_at: new Date(),
+      invalidated_by: invalidatedBy,
+    },
+  });
+}
+
+/**
+ * Check whether a set of changed fields contains audit-relevant fields.
+ * Used to decide whether to call invalidateSignoffs.
+ */
+export function hasAuditRelevantChanges(changedFields: string[]): boolean {
+  return changedFields.some((f) => AUDIT_RELEVANT_FIELDS.has(f));
+}
+
+/**
+ * Get sign-offs for an entity, ordered by signed_at.
+ */
+export async function getSignoffs(entityType: string, entityId: string) {
+  return prisma.wpSignoff.findMany({
+    where: { entity_type: entityType, entity_id: entityId },
+    include: {
+      user: {
+        select: { id: true, name: true, email: true, avatar_url: true, title: true },
+      },
+    },
+    orderBy: { signed_at: 'asc' },
+  });
+}
+
+/**
+ * Get sign-offs for all entities in an engagement.
+ */
+export async function getEngagementSignoffs(engagementId: string) {
+  return prisma.wpSignoff.findMany({
+    where: { engagement_id: engagementId },
+    include: {
+      user: {
+        select: { id: true, name: true, email: true, avatar_url: true, title: true },
+      },
+    },
+    orderBy: { signed_at: 'asc' },
+  });
+}
+
+// =============================================================================
+// CREATE VERSION ON TRANSITION — Snapshot entity state at transition time
+// =============================================================================
+
+async function createTransitionVersion(
+  entityType: string,
+  entityId: string,
+  userId: string,
+  userName: string,
+  options: { comment: string | null; actionLabel: string },
+): Promise<void> {
+  switch (entityType) {
+    case 'procedure': {
+      const procedure = await prisma.engagementProcedure.findUnique({
+        where: { id: entityId },
+      });
+      if (!procedure) return;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const snapshot = buildProcedureSnapshot(procedure as any);
+      const result = await publishEntity(entityType, entityId, snapshot, userId, userName, {
+        comment: options.comment,
+        versionType: 'transition',
+        actionLabel: options.actionLabel,
+      });
+
+      // Update current_version on the procedure
+      await prisma.engagementProcedure.update({
+        where: { id: entityId },
+        data: { current_version: result.version },
+      });
+      break;
+    }
+    // Future entity types (planning_workpaper, etc.) can be added here
+    default:
+      // No snapshot builder for this entity type yet — skip silently
+      break;
   }
 }

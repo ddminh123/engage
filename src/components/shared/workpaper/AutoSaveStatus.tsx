@@ -1,30 +1,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, Check, AlertCircle, Cloud } from "lucide-react";
+import { Loader2, AlertCircle, Cloud } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { formatTimeAgo } from "@/lib/dateUtils";
 import type { AutoSaveStatus as Status } from "./useAutoSave";
 
 interface AutoSaveStatusProps {
   status: Status;
   lastSavedAt?: Date | null;
   className?: string;
-}
-
-function formatRelativeTime(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 5) return "vừa xong";
-  if (seconds < 60) return `${seconds} giây trước`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} phút trước`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours} giờ trước`;
+  /** Name of who last saved (defaults to "bạn") */
+  lastSavedBy?: string;
 }
 
 export function AutoSaveIndicator({
   status,
   lastSavedAt,
   className,
+  lastSavedBy = "bạn",
 }: AutoSaveStatusProps) {
   // Tick every 15s to refresh relative time
   const [, setTick] = useState(0);
@@ -38,11 +37,11 @@ export function AutoSaveIndicator({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 text-xs text-muted-foreground",
+          "inline-flex items-center gap-1.5 text-sm text-muted-foreground",
           className,
         )}
       >
-        <Loader2 className="h-3 w-3 animate-spin" />
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
         Đang lưu...
       </span>
     );
@@ -52,33 +51,57 @@ export function AutoSaveIndicator({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 text-xs text-destructive",
+          "inline-flex items-center gap-1.5 text-sm text-destructive",
           className,
         )}
       >
-        <AlertCircle className="h-3 w-3" />
+        <AlertCircle className="h-3.5 w-3.5" />
         Lưu thất bại
       </span>
     );
   }
 
-  // idle or saved — show last saved time
+  // idle or saved — clickable popover with detail
   if (lastSavedAt) {
     return (
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 text-xs text-muted-foreground",
-          status === "saved" && "text-green-600",
-          className,
-        )}
-      >
-        {status === "saved" ? (
-          <Check className="h-3 w-3" />
-        ) : (
-          <Cloud className="h-3 w-3" />
-        )}
-        Đã lưu {formatRelativeTime(lastSavedAt)}
-      </span>
+      <Popover>
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              title="Chi tiết lưu tự động"
+              className={cn(
+                "inline-flex items-center gap-1.5 text-sm text-foreground/70 hover:text-foreground transition-colors cursor-pointer",
+                className,
+              )}
+            />
+          }
+        >
+          <Cloud className="h-3.5 w-3.5" />
+          <span>Đã lưu</span>
+        </PopoverTrigger>
+        <PopoverContent
+          className="w-auto max-w-[240px] p-3 text-xs"
+          align="start"
+        >
+          <div className="space-y-1">
+            <div className="font-medium text-sm">Đã lưu tự động</div>
+            <div className="text-muted-foreground">
+              {formatTimeAgo(lastSavedAt)} bởi {lastSavedBy}
+            </div>
+            <div className="text-muted-foreground">
+              {lastSavedAt.toLocaleDateString("vi-VN", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
     );
   }
 
@@ -86,11 +109,12 @@ export function AutoSaveIndicator({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 text-xs text-muted-foreground/50",
+        "inline-flex items-center gap-1.5 text-sm text-muted-foreground",
         className,
       )}
     >
-      <Cloud className="h-3 w-3" />
+      <Cloud className="h-3.5 w-3.5" />
+      Chưa lưu
     </span>
   );
 }

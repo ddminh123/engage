@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   Plus,
   Pencil,
   Trash2,
-  ChevronDown,
   ChevronRight,
   Target,
   ShieldAlert,
@@ -15,7 +15,6 @@ import {
   Check,
   X,
   Shield,
-  ChevronsUpDown,
   Layers,
   ArrowUpToLine,
 } from "lucide-react";
@@ -23,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -47,6 +45,7 @@ import { OrgUnitCardPopover } from "@/features/settings/components/OrgUnitCard";
 import { ContactCardPopoverById } from "@/features/settings/components/ContactCard";
 import { usePlanningEditor } from "../../hooks/usePlanningEditor";
 import { useIsReviewMode } from "@/features/settings/hooks/useApprovalStatuses";
+import { StatusBadge } from "@/components/shared/workpaper/StatusBadge";
 import { useSyncRcmToWorkProgram } from "../../hooks/useEngagements";
 import { usePlanningSteps } from "@/features/settings/hooks/usePlanningSteps";
 import { usePlanningWorkpapers } from "../../hooks/usePlanningWorkpapers";
@@ -81,6 +80,8 @@ const LO = ENGAGEMENT_LABELS.objective;
 
 interface PlanningTabProps {
   engagement: EngagementDetail;
+  section?: string; // If provided, only render this specific section
+  onOpenWorkpaper?: (procedureId: string) => void;
 }
 
 // Icon map: string name → Lucide component
@@ -98,14 +99,14 @@ function StepIcon({ name }: { name: string | null | undefined }) {
   return Icon ? <Icon className="h-4 w-4" /> : <FileText className="h-4 w-4" />;
 }
 
-export function PlanningTab({ engagement }: PlanningTabProps) {
+export function PlanningTab({
+  engagement,
+  section,
+  onOpenWorkpaper,
+}: PlanningTabProps) {
   const {
     state,
     dispatch,
-    collapsed,
-    toggleCollapse,
-    expandAll,
-    collapseAll,
     handleAddObjective,
     handleUpdateObjective,
     handleAddRisk,
@@ -148,13 +149,14 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
     [engagement.standaloneObjectives],
   );
 
-  // Active steps sorted by sort_order
+  // Active steps sorted by sort_order, filtered by section if provided
   const activeSteps = useMemo(
     () =>
       (stepConfigs ?? [])
         .filter((s) => s.isActive)
+        .filter((s) => !section || s.key === section)
         .sort((a, b) => a.sortOrder - b.sortOrder),
-    [stepConfigs],
+    [stepConfigs, section],
   );
 
   // Map workpapers by stepConfigId for quick lookup
@@ -168,23 +170,6 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
     }
     return map;
   }, [planningWorkpapers]);
-
-  const isCollapsed = (key: string) => collapsed.has(key);
-
-  // Build section keys from steps for collapse/expand all
-  const sectionKeys = useMemo(
-    () =>
-      activeSteps.map((s) =>
-        s.key === "rcm"
-          ? "racm_table"
-          : s.key === "work_program"
-            ? "procedures"
-            : s.key,
-      ),
-    [activeSteps],
-  );
-  const allCollapsed =
-    sectionKeys.length > 0 && sectionKeys.every((k) => collapsed.has(k));
 
   // Review mode: read-only when WP is in a review/done category
   const isReviewMode = useIsReviewMode(engagement.wpApprovalStatus);
@@ -212,61 +197,71 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
 
   return (
     <div className="space-y-3">
-      {/* ── Expand / Collapse all ── */}
-      <div className="flex justify-end">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            if (allCollapsed) {
-              expandAll();
-            } else {
-              collapseAll(sectionKeys);
-            }
-          }}
-        >
-          <ChevronsUpDown className="mr-1.5 h-3.5 w-3.5" />
-          {allCollapsed ? "Mở rộng tất cả" : "Thu gọn tất cả"}
-        </Button>
-      </div>
-
       {/* ── Dynamic step rendering ── */}
       {activeSteps.map((step) => {
         switch (step.key) {
           case "scope": {
             const scopeWp = wpByStep.get(step.id);
+            const scopeHeaderRight = cardHeaderRight(
+              "planning_workpaper",
+              scopeWp?.id,
+              scopeWp?.approvalStatus ?? "not_started",
+            );
+
+            // Section page view: show header + content directly
+            if (section) {
+              return (
+                <div key={step.key}>
+                  <SectionPageHeader
+                    title={step.title}
+                    icon={<StepIcon name={step.icon} />}
+                    headerRight={scopeHeaderRight}
+                  />
+                  <ScopeSection engagement={engagement} />
+                </div>
+              );
+            }
+
+            // Main view: show navigable card
             return (
-              <CollapsibleCard
+              <NavigableCard
                 key={step.key}
                 title={step.title}
                 icon={<StepIcon name={step.icon} />}
-                collapsed={isCollapsed("scope")}
-                onToggle={() => toggleCollapse("scope")}
-                headerRight={cardHeaderRight(
-                  "planning_workpaper",
-                  scopeWp?.id,
-                  scopeWp?.approvalStatus ?? "not_started",
-                )}
-              >
-                <ScopeSection engagement={engagement} />
-              </CollapsibleCard>
+                href={`/engagement/${engagement.id}?tab=planning&section=${step.key}`}
+                headerRight={scopeHeaderRight}
+              />
             );
           }
 
-          case "objectives":
+          case "objectives": {
+            const objHeaderRight = cardHeaderRight(
+              "work_program",
+              undefined,
+              "not_started",
+            );
+
+            // Main view: show navigable card
+            if (!section) {
+              return (
+                <NavigableCard
+                  key={step.key}
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  href={`/engagement/${engagement.id}?tab=planning&section=${step.key}`}
+                  headerRight={objHeaderRight}
+                />
+              );
+            }
+
+            // Section page view: show header + content directly
             return (
-              <CollapsibleCard
-                key={step.key}
-                title={step.title}
-                icon={<StepIcon name={step.icon} />}
-                collapsed={isCollapsed("objectives")}
-                onToggle={() => toggleCollapse("objectives")}
-                headerRight={cardHeaderRight(
-                  "work_program",
-                  undefined,
-                  "not_started",
-                )}
-              >
+              <div key={step.key}>
+                <SectionPageHeader
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  headerRight={objHeaderRight}
+                />
                 {!isReviewMode && (
                   <div className="flex justify-end mb-2">
                     <Button
@@ -392,24 +387,39 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
                     />
                   </div>
                 )}
-              </CollapsibleCard>
+              </div>
             );
+          }
 
           case "understanding": {
             const undWp = wpByStep.get(step.id);
+            const undHeaderRight = cardHeaderRight(
+              "planning_workpaper",
+              undWp?.id,
+              undWp?.approvalStatus ?? "not_started",
+            );
+
+            // Main view: show navigable card
+            if (!section) {
+              return (
+                <NavigableCard
+                  key={step.key}
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  href={`/engagement/${engagement.id}?tab=planning&section=${step.key}`}
+                  headerRight={undHeaderRight}
+                />
+              );
+            }
+
+            // Section page view: show header + content directly
             return (
-              <CollapsibleCard
-                key={step.key}
-                title={step.title}
-                icon={<StepIcon name={step.icon} />}
-                collapsed={isCollapsed("understanding")}
-                onToggle={() => toggleCollapse("understanding")}
-                headerRight={cardHeaderRight(
-                  "planning_workpaper",
-                  undWp?.id,
-                  undWp?.approvalStatus ?? "not_started",
-                )}
-              >
+              <div key={step.key}>
+                <SectionPageHeader
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  headerRight={undHeaderRight}
+                />
                 {!isReviewMode && !state.understandingEditorOpen && (
                   <div className="flex justify-end mb-2">
                     <Button
@@ -437,45 +447,74 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
                   }
                   isSaving={isSavingUnderstanding}
                 />
-              </CollapsibleCard>
+              </div>
             );
           }
 
-          case "rcm":
+          case "rcm": {
+            const rcmHeaderRight = cardHeaderRight(
+              "work_program",
+              undefined,
+              "not_started",
+            );
+
+            // Main view: show navigable card
+            if (!section) {
+              return (
+                <NavigableCard
+                  key={step.key}
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  href={`/engagement/${engagement.id}?tab=planning&section=${step.key}`}
+                  headerRight={rcmHeaderRight}
+                />
+              );
+            }
+
+            // Section page view: show header + content directly
             return (
-              <CollapsibleCard
-                key={step.key}
-                title={step.title}
-                icon={<StepIcon name={step.icon} />}
-                collapsed={isCollapsed("racm_table")}
-                onToggle={() => toggleCollapse("racm_table")}
-                headerRight={cardHeaderRight(
-                  "work_program",
-                  undefined,
-                  "not_started",
-                )}
-              >
+              <div key={step.key}>
+                <SectionPageHeader
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  headerRight={rcmHeaderRight}
+                />
                 <RcmDataTable
                   engagementId={engagement.id}
                   rcmObjectives={engagement.rcmObjectives}
                 />
-              </CollapsibleCard>
+              </div>
+            );
+          }
+
+          case "work_program": {
+            const wpHeaderRight = cardHeaderRight(
+              "work_program",
+              engagement.id,
+              engagement.wpApprovalStatus,
             );
 
-          case "work_program":
+            // Main view: show navigable card
+            if (!section) {
+              return (
+                <NavigableCard
+                  key={step.key}
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  href={`/engagement/${engagement.id}?tab=planning&section=${step.key}`}
+                  headerRight={wpHeaderRight}
+                />
+              );
+            }
+
+            // Section page view: show header + content directly
             return (
-              <CollapsibleCard
-                key={step.key}
-                title={step.title}
-                icon={<StepIcon name={step.icon} />}
-                collapsed={isCollapsed("procedures")}
-                onToggle={() => toggleCollapse("procedures")}
-                headerRight={cardHeaderRight(
-                  "work_program",
-                  engagement.id,
-                  engagement.wpApprovalStatus,
-                )}
-              >
+              <div key={step.key}>
+                <SectionPageHeader
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  headerRight={wpHeaderRight}
+                />
                 {!isReviewMode && (
                   <div className="flex justify-end mb-2">
                     <Button
@@ -513,27 +552,43 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
                   rcmObjectives={engagement.rcmObjectives}
                   members={engagement.members}
                   readOnly={isReviewMode}
+                  onOpenWorkpaper={onOpenWorkpaper}
                 />
-              </CollapsibleCard>
+              </div>
             );
+          }
 
           default: {
             // Custom workpaper step
             if (step.stepType !== "workpaper") return null;
             const wp = wpByStep.get(step.id);
+            const customHeaderRight = cardHeaderRight(
+              "planning_workpaper",
+              wp?.id,
+              wp?.approvalStatus ?? "not_started",
+            );
+
+            // Main view: show navigable card
+            if (!section) {
+              return (
+                <NavigableCard
+                  key={step.key}
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  href={`/engagement/${engagement.id}?tab=planning&section=${step.key}`}
+                  headerRight={customHeaderRight}
+                />
+              );
+            }
+
+            // Section page view: show header + content directly
             return (
-              <CollapsibleCard
-                key={step.key}
-                title={step.title}
-                icon={<StepIcon name={step.icon} />}
-                collapsed={isCollapsed(step.key)}
-                onToggle={() => toggleCollapse(step.key)}
-                headerRight={cardHeaderRight(
-                  "planning_workpaper",
-                  wp?.id,
-                  wp?.approvalStatus ?? "not_started",
-                )}
-              >
+              <div key={step.key}>
+                <SectionPageHeader
+                  title={step.title}
+                  icon={<StepIcon name={step.icon} />}
+                  headerRight={customHeaderRight}
+                />
                 <PlanningWorkpaperCard
                   engagementId={engagement.id}
                   stepConfigId={step.id}
@@ -548,7 +603,7 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
                       : null
                   }
                 />
-              </CollapsibleCard>
+              </div>
             );
           }
         }
@@ -608,48 +663,8 @@ export function PlanningTab({ engagement }: PlanningTabProps) {
 // Sub-components
 // ════════════════════════════════════════════════════════════════════════════════
 
-const STATIC_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  draft: {
-    label: "Bản nháp",
-    color: "bg-slate-100 text-slate-700 border-slate-200",
-  },
-  waiting_review: {
-    label: "Chờ soát xét",
-    color: "bg-amber-50 text-amber-700 border-amber-200",
-  },
-  needs_modification: {
-    label: "Cần chỉnh sửa",
-    color: "bg-red-50 text-red-700 border-red-200",
-  },
-  reviewed: {
-    label: "Đã soát xét",
-    color: "bg-blue-50 text-blue-700 border-blue-200",
-  },
-  waiting_approval: {
-    label: "Chờ phê duyệt",
-    color: "bg-purple-50 text-purple-700 border-purple-200",
-  },
-  approved: {
-    label: "Đã phê duyệt",
-    color: "bg-green-50 text-green-700 border-green-200",
-  },
-};
-
 function StaticStatusBadge({ status }: { status: string }) {
-  const info = STATIC_STATUS_MAP[status] ?? {
-    label: status,
-    color: "bg-slate-100 text-slate-700 border-slate-200",
-  };
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium",
-        info.color,
-      )}
-    >
-      {info.label}
-    </span>
-  );
+  return <StatusBadge status={status} />;
 }
 
 function MemberAvatarGroup({
@@ -691,33 +706,26 @@ function MemberAvatarGroup({
 
 // ── Collapsible Card ──
 
-function CollapsibleCard({
+// Clickable card that navigates to a section page (used in main view)
+function NavigableCard({
   title,
   icon,
-  collapsed,
-  onToggle,
+  href,
   headerRight,
-  children,
 }: {
   title: string;
   icon?: React.ReactNode;
-  collapsed: boolean;
-  onToggle: () => void;
+  href: string;
   headerRight?: React.ReactNode;
-  children: React.ReactNode;
 }) {
   return (
     <Card className="overflow-hidden">
-      <div
-        className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none"
-        onClick={onToggle}
+      <Link
+        href={href}
+        className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none hover:bg-muted/50 transition-colors"
       >
         <span className="shrink-0 rounded p-0.5">
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronDown className="h-4 w-4" />
-          )}
+          <ChevronRight className="h-4 w-4" />
         </span>
         {icon}
         <span className="flex-1 text-sm font-semibold">{title}</span>
@@ -729,213 +737,63 @@ function CollapsibleCard({
             {headerRight}
           </span>
         )}
-      </div>
-      {!collapsed && (
-        <div className="px-4 pb-4">
-          <Separator className="mb-3" />
-          {children}
-        </div>
-      )}
+      </Link>
     </Card>
   );
 }
 
-// ── Scope Section ──
-
-function ScopeSection({ engagement }: { engagement: EngagementDetail }) {
+// Header for section page view (no card wrapper)
+function SectionPageHeader({
+  title,
+  icon,
+  headerRight,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  headerRight?: React.ReactNode;
+}) {
   return (
-    <div className="text-sm">
-      {/* 2-column grid for all fields */}
-      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-        {/* Row 1 */}
-        <ScopeField label={L.field.entity}>
-          <span className="font-medium">
-            {engagement.entity?.name ?? "—"}
-            {engagement.entity?.entityType && (
-              <span className="ml-1 text-xs text-muted-foreground">
-                ({engagement.entity.entityType.name})
-              </span>
-            )}
-          </span>
-        </ScopeField>
-        <ScopeField label={L.field.schedule}>
-          <span className="font-medium">
-            {new Date(engagement.startDate).toLocaleDateString("vi-VN")} —{" "}
-            {new Date(engagement.endDate).toLocaleDateString("vi-VN")}
-          </span>
-        </ScopeField>
-
-        {/* Row 2 */}
-        {engagement.estimatedDays != null && (
-          <ScopeField label={L.field.estimatedDays}>
-            <span className="font-medium">{engagement.estimatedDays} ngày</span>
-          </ScopeField>
-        )}
-        {engagement.priority && (
-          <ScopeField label={L.field.priority}>
-            <span className="font-medium">
-              {L.priority[engagement.priority] ?? engagement.priority}
-            </span>
-          </ScopeField>
-        )}
-
-        {/* Risk row */}
-        {engagement.entity?.inherentRiskLevel && (
-          <ScopeField label="Rủi ro vốn có">
-            <span className="font-medium">
-              {engagement.entity.inherentRiskLevel}
-            </span>
-          </ScopeField>
-        )}
-        {engagement.entity?.riskLevel && (
-          <ScopeField label="Mức rủi ro tổng hợp">
-            <span className="font-medium">{engagement.entity.riskLevel}</span>
-          </ScopeField>
-        )}
-
-        {/* Linked plan */}
-        {engagement.plannedAudit?.plan && (
-          <ScopeField label={L.field.linkedPlan}>
-            <span className="font-medium">
-              {engagement.plannedAudit.plan.title}
-            </span>
-          </ScopeField>
-        )}
-
-        {/* Areas */}
-        <ScopeField label={LP.areas}>
-          <div className="flex flex-wrap gap-1.5">
-            {engagement.entity?.areas && engagement.entity.areas.length > 0 ? (
-              engagement.entity.areas.map((a) => (
-                <Badge key={a.id} variant="secondary">
-                  {a.name}
-                </Badge>
-              ))
-            ) : (
-              <span className="text-muted-foreground">{LP.noAreas}</span>
-            )}
-          </div>
-        </ScopeField>
-
-        {/* Owner units */}
-        <ScopeField label="Đơn vị chủ quản">
-          <div className="flex flex-wrap gap-1.5">
-            {engagement.ownerUnits.length > 0 ? (
-              engagement.ownerUnits.map((u) => (
-                <Badge
-                  key={u.id}
-                  variant="secondary"
-                  className="text-xs font-normal"
-                >
-                  <OrgUnitCardPopover id={u.id}>
-                    <Building2 className="inline h-3 w-3 mr-1" />
-                    {u.name}
-                  </OrgUnitCardPopover>
-                </Badge>
-              ))
-            ) : (
-              <span className="text-muted-foreground">—</span>
-            )}
-          </div>
-        </ScopeField>
-
-        {/* Participating units */}
-        <ScopeField label="Đơn vị phối hợp">
-          <div className="flex flex-wrap gap-1.5">
-            {engagement.participatingUnits.length > 0 ? (
-              engagement.participatingUnits.map((u) => (
-                <Badge
-                  key={u.id}
-                  variant="secondary"
-                  className="text-xs font-normal"
-                >
-                  <OrgUnitCardPopover id={u.id}>
-                    <Building2 className="inline h-3 w-3 mr-1" />
-                    {u.name}
-                  </OrgUnitCardPopover>
-                </Badge>
-              ))
-            ) : (
-              <span className="text-muted-foreground">—</span>
-            )}
-          </div>
-        </ScopeField>
-
-        {/* Auditee reps */}
-        <ScopeField label="Đại diện đơn vị kiểm toán">
-          <div className="flex flex-wrap gap-1.5">
-            {engagement.auditeeReps.length > 0 ? (
-              engagement.auditeeReps.map((c) => (
-                <Badge
-                  key={c.id}
-                  variant="secondary"
-                  className="text-xs font-normal"
-                >
-                  <ContactCardPopoverById id={c.id}>
-                    <User className="inline h-3 w-3 mr-1" />
-                    {c.name}
-                    {c.position && ` · ${c.position}`}
-                  </ContactCardPopoverById>
-                </Badge>
-              ))
-            ) : (
-              <span className="text-muted-foreground">—</span>
-            )}
-          </div>
-        </ScopeField>
-
-        {/* Contact points */}
-        <ScopeField label="Đầu mối liên hệ">
-          <div className="flex flex-wrap gap-1.5">
-            {engagement.contactPoints.length > 0 ? (
-              engagement.contactPoints.map((c) => (
-                <Badge
-                  key={c.id}
-                  variant="secondary"
-                  className="text-xs font-normal"
-                >
-                  <ContactCardPopoverById id={c.id}>
-                    <User className="inline h-3 w-3 mr-1" />
-                    {c.name}
-                    {c.position && ` · ${c.position}`}
-                  </ContactCardPopoverById>
-                </Badge>
-              ))
-            ) : (
-              <span className="text-muted-foreground">—</span>
-            )}
-          </div>
-        </ScopeField>
-      </div>
-
-      {/* Full-width fields below */}
-      {engagement.objective && (
-        <div className="mt-3">
-          <div className="text-muted-foreground mb-1">{L.field.objective}</div>
-          <div className="whitespace-pre-wrap">{engagement.objective}</div>
-        </div>
-      )}
-      {engagement.scope && (
-        <div className="mt-3">
-          <div className="text-muted-foreground mb-1">{L.field.scope}</div>
-          <div className="whitespace-pre-wrap">{engagement.scope}</div>
-        </div>
+    <div className="flex items-center gap-2 mb-4">
+      {icon}
+      <h2 className="flex-1 text-lg font-semibold">{title}</h2>
+      {headerRight && (
+        <div className="flex items-center gap-2">{headerRight}</div>
       )}
     </div>
   );
 }
 
-function ScopeField({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+// ── Scope Section (simplified - general info moved to OverviewTab) ──
+
+function ScopeSection({ engagement }: { engagement: EngagementDetail }) {
+  const hasContent = engagement.objective || engagement.scope;
+
+  if (!hasContent) {
+    return (
+      <p className="text-sm text-muted-foreground py-2">
+        Chưa có thông tin phạm vi kiểm toán.
+      </p>
+    );
+  }
+
   return (
-    <div>
-      <div className="text-muted-foreground text-xs">{label}</div>
-      <div className="mt-0.5">{children}</div>
+    <div className="text-sm space-y-4">
+      {engagement.objective && (
+        <div>
+          <div className="text-muted-foreground text-xs mb-1">
+            {L.field.objective}
+          </div>
+          <div className="whitespace-pre-wrap">{engagement.objective}</div>
+        </div>
+      )}
+      {engagement.scope && (
+        <div>
+          <div className="text-muted-foreground text-xs mb-1">
+            {L.field.scope}
+          </div>
+          <div className="whitespace-pre-wrap">{engagement.scope}</div>
+        </div>
+      )}
     </div>
   );
 }
