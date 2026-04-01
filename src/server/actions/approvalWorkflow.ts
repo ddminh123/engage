@@ -30,18 +30,22 @@ export const createTransitionSchema = z.object({
   fromStatus: z.string().min(1),
   toStatus: z.string().min(1),
   actionLabel: z.string().min(1),
-  actionType: z.enum(['start', 'submit', 'approve', 'reject', 'revise']),
+  actionType: z.enum(['start', 'submit', 'review', 'approve', 'reject', 'revise']),
   allowedRoles: z.array(z.string()).min(1),
   sortOrder: z.number().int().optional().default(0),
+  generatesSignoff: z.boolean().optional().default(false),
+  signoffType: z.enum(['prepare', 'review', 'approve']).nullable().optional().default(null),
 });
 
 export const updateTransitionSchema = z.object({
   fromStatus: z.string().min(1).optional(),
   toStatus: z.string().min(1).optional(),
   actionLabel: z.string().min(1).optional(),
-  actionType: z.enum(['start', 'submit', 'approve', 'reject', 'revise']).optional(),
+  actionType: z.enum(['start', 'submit', 'review', 'approve', 'reject', 'revise']).optional(),
   allowedRoles: z.array(z.string()).min(1).optional(),
   sortOrder: z.number().int().optional(),
+  generatesSignoff: z.boolean().optional(),
+  signoffType: z.enum(['prepare', 'review', 'approve']).nullable().optional(),
 });
 
 // =============================================================================
@@ -169,6 +173,8 @@ export async function addTransition(workflowId: string, input: unknown) {
       action_type: parsed.actionType,
       allowed_roles: parsed.allowedRoles,
       sort_order: parsed.sortOrder,
+      generates_signoff: parsed.generatesSignoff,
+      signoff_type: parsed.signoffType ?? null,
     },
   });
 
@@ -188,6 +194,8 @@ export async function updateTransition(id: string, input: unknown) {
   if (parsed.actionType !== undefined) data.action_type = parsed.actionType;
   if (parsed.allowedRoles !== undefined) data.allowed_roles = parsed.allowedRoles;
   if (parsed.sortOrder !== undefined) data.sort_order = parsed.sortOrder;
+  if (parsed.generatesSignoff !== undefined) data.generates_signoff = parsed.generatesSignoff;
+  if (parsed.signoffType !== undefined) data.signoff_type = parsed.signoffType;
 
   const transition = await prisma.approvalTransition.update({
     where: { id },
@@ -330,5 +338,7 @@ function mapTransition(t: TransitionRow) {
     actionType: t.action_type,
     allowedRoles: t.allowed_roles as string[],
     sortOrder: t.sort_order,
+    generatesSignoff: t.generates_signoff,
+    signoffType: t.signoff_type,
   };
 }

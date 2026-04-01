@@ -37,6 +37,8 @@ interface WorkpaperEditorProps {
   ) => void;
   readOnly?: boolean;
   className?: string;
+  /** Override the editor content area class (default: fullscreen overlay height) */
+  editorClassName?: string;
 }
 
 export const WorkpaperEditor = forwardRef<
@@ -51,6 +53,7 @@ export const WorkpaperEditor = forwardRef<
     onAddComment,
     readOnly = false,
     className,
+    editorClassName,
   },
   ref,
 ) {
@@ -140,7 +143,7 @@ export const WorkpaperEditor = forwardRef<
       onChange={onChange}
       readOnly={readOnly}
       className={className}
-      editorClassName="min-h-[calc(100vh-200px)]"
+      editorClassName={editorClassName ?? "min-h-[calc(100vh-200px)]"}
       extraExtensions={extraExtensions}
       onAddComment={handleAddComment}
     />

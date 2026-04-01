@@ -46,7 +46,7 @@ export const ENGAGEMENT_LABELS = {
   },
   section: {
     title: 'Phần hành',
-    createTitle: 'Thêm phần hành',
+    createTitle: 'Phần hành',
     editTitle: 'Chỉnh sửa phần hành',
     deleteTitle: 'Xóa phần hành',
     deleteDescription: (name: string) =>
@@ -59,7 +59,7 @@ export const ENGAGEMENT_LABELS = {
   },
   objective: {
     title: 'Mục tiêu',
-    createTitle: 'Thêm mục tiêu',
+    createTitle: 'Mục tiêu',
     editTitle: 'Chỉnh sửa mục tiêu',
     deleteTitle: 'Xóa mục tiêu',
     deleteDescription: (name: string) =>
@@ -72,7 +72,7 @@ export const ENGAGEMENT_LABELS = {
   },
   procedure: {
     title: 'Thủ tục kiểm toán',
-    createTitle: 'Thêm thủ tục',
+    createTitle: 'Thủ tục',
     editTitle: 'Chỉnh sửa thủ tục',
     deleteTitle: 'Xóa thủ tục',
     deleteDescription: (name: string) =>

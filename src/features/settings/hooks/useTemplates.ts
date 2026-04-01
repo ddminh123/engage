@@ -9,11 +9,24 @@ import {
   deleteTemplateApi,
   fetchTemplateCategories,
   createTemplateCategoryApi,
+  fetchTemplateBindingsApi,
+  upsertTemplateBindingApi,
+  deleteTemplateBindingApi,
+  fetchTemplateForEntityApi,
 } from "../api";
-import type { Template, TemplateInput, TemplateCategory, TemplateCategoryInput } from "../types";
+import type {
+  Template,
+  TemplateInput,
+  TemplateCategory,
+  TemplateCategoryInput,
+  TemplateEntityBinding,
+  TemplateEntityBindingInput,
+  TemplateForEntity,
+} from "../types";
 
 const TEMPLATES_KEY = ["templates"];
 const CATEGORIES_KEY = ["template-categories"];
+const TEMPLATE_BINDINGS_KEY = ["template-bindings"];
 
 // ── Categories ──
 
@@ -83,5 +96,44 @@ export function useDeleteTemplate() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: TEMPLATES_KEY });
     },
+  });
+}
+
+// ── Template Entity Bindings ──
+
+export function useTemplateBindings() {
+  return useQuery<TemplateEntityBinding[]>({
+    queryKey: TEMPLATE_BINDINGS_KEY,
+    queryFn: () => fetchTemplateBindingsApi(),
+  });
+}
+
+export function useUpsertTemplateBinding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: TemplateEntityBindingInput) => upsertTemplateBindingApi(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TEMPLATE_BINDINGS_KEY });
+    },
+  });
+}
+
+export function useDeleteTemplateBinding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entityType: string) => deleteTemplateBindingApi(entityType),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TEMPLATE_BINDINGS_KEY });
+    },
+  });
+}
+
+// ── Template for Entity (used by WP editors) ──
+
+export function useTemplateForEntity(entityType: string | null) {
+  return useQuery<TemplateForEntity | null>({
+    queryKey: ["template-for-entity", entityType],
+    queryFn: () => fetchTemplateForEntityApi(entityType!),
+    enabled: !!entityType,
   });
 }

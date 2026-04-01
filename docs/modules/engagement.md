@@ -8,17 +8,18 @@
 
 ## Schema (`prisma/schema.prisma`)
 
-| Model                  | Key Fields                                                                                           | Notes                                    |
-| ---------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `Engagement`           | `id`, `title`, `entity_id`, `planned_audit_id`, `status`, `scope`, `start_date`, `end_date`          | Engagement header                        |
-| `Engagement` (WP appr) | `wp_approval_status`, `wp_approved_by`, `wp_approved_at`, `wp_approved_version`                      | WP-level approval fields                 |
-| `EngagementMember`     | `id`, `engagement_id`, `user_id`, `role`                                                             | Assigned auditors                        |
-| `EngagementSection`    | `id`, `engagement_id`, `title`, `phase`, `planning_ref_id`, `source`, `sort_order`                   | Work program section                     |
-| `EngagementObjective`  | `id`, `section_id`, `title`, `phase`, `planning_ref_id`, `source`, `sort_order`                      | Objective under section or standalone    |
-| `EngagementProcedure`  | `id`, `objective_id`, `section_id`, `title`, `phase`, `planning_ref_id`, `source`, `approval_status` | Testing procedure with workpaper         |
-| `PlanningStepConfig`   | `id`, `key`, `title`, `icon`, `step_type`, `is_active`, `sort_order`                                 | System-level configurable planning steps |
-| `PlanningWorkpaper`    | `id`, `engagement_id`, `step_config_id`, `content` (JSON), `approval_status`, `current_version`      | Custom workpaper for planning steps      |
-| `DraftFinding`         | `id`, `engagement_id`, `procedure_id`, `title`, `description`, `status`                              | Draft before confirming                  |
+| Model                  | Key Fields                                                                                                                                                                                                   | Notes                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| `Engagement`           | `id`, `title`, `entity_id`, `planned_audit_id`, `status`, `scope`, `start_date`, `end_date`                                                                                                                  | Engagement header                        |
+| `Engagement` (WP appr) | `wp_approval_status`, `wp_approved_by`, `wp_approved_at`, `wp_approved_version`                                                                                                                              | WP-level approval fields                 |
+| `EngagementMember`     | `id`, `engagement_id`, `user_id`, `role`                                                                                                                                                                     | Assigned auditors                        |
+| `EngagementSection`    | `id`, `engagement_id`, `title`, `phase`, `planning_ref_id`, `source`, `sort_order`                                                                                                                           | Work program section                     |
+| `EngagementObjective`  | `id`, `section_id`, `title`, `phase`, `planning_ref_id`, `source`, `sort_order`                                                                                                                              | Objective under section or standalone    |
+| `EngagementProcedure`  | `id`, `objective_id`, `section_id`, `title`, `phase`, `planning_ref_id`, `source`, `approval_status`                                                                                                         | Testing procedure with workpaper         |
+| `PlanningStepConfig`   | `id`, `key`, `title`, `icon`, `step_type`, `is_active`, `sort_order`                                                                                                                                         | System-level configurable planning steps |
+| `PlanningWorkpaper`    | `id`, `engagement_id`, `step_config_id`, `content` (JSON), `approval_status`, `current_version`                                                                                                              | Custom workpaper for planning steps      |
+| `DraftFinding`         | `id`, `engagement_id`, `procedure_id`, `title`, `description`, `status`                                                                                                                                      | Draft before confirming                  |
+| `WpSignoff`            | `id`, `engagement_id`, `entity_type`, `entity_id`, `signoff_type`, `signoff_order`, `user_id`, `signed_at`, `version`, `transition_id`, `invalidated_at`, `invalidated_by`, `invalidation_reason`, `comment` | Append-only signoff records              |
 
 ### WP Phase Separation
 
@@ -35,17 +36,21 @@
 
 ## API Routes (`src/app/api/engagement/`)
 
-| Method | Path                                              | Permission          | Description                                  |
-| ------ | ------------------------------------------------- | ------------------- | -------------------------------------------- |
-| GET    | `/api/engagement`                                 | `engagement:read`   | List engagements                             |
-| GET    | `/api/engagement/:id`                             | `engagement:read`   | Get with full work program + approval status |
-| POST   | `/api/engagement`                                 | `engagement:create` | Create (manual/from plan/duplicate/template) |
-| PATCH  | `/api/engagement/:id`                             | `engagement:update` | Update details                               |
-| DELETE | `/api/engagement/:id`                             | `engagement:delete` | Delete draft                                 |
-| POST   | `/api/engagement/:id/sync-planning-to-execution`  | `engagement:update` | Clone planning-phase WP items to execution   |
-| POST   | `/api/engagement/:id/sync-rcm-to-wp`              | `engagement:update` | Create WP items from RCM                     |
-| GET    | `/api/approval/:entityType/:entityId/transitions` | `engagement:read`   | Available approval transitions               |
-| POST   | `/api/approval/:entityType/:entityId/execute`     | `engagement:update` | Execute an approval transition               |
+| Method | Path                                              | Permission          | Description                                   |
+| ------ | ------------------------------------------------- | ------------------- | --------------------------------------------- |
+| GET    | `/api/engagement`                                 | `engagement:read`   | List engagements                              |
+| GET    | `/api/engagement/:id`                             | `engagement:read`   | Get with full work program + approval status  |
+| POST   | `/api/engagement`                                 | `engagement:create` | Create (manual/from plan/duplicate/template)  |
+| PATCH  | `/api/engagement/:id`                             | `engagement:update` | Update details                                |
+| DELETE | `/api/engagement/:id`                             | `engagement:delete` | Delete draft                                  |
+| POST   | `/api/engagement/:id/sync-planning-to-execution`  | `engagement:update` | Clone planning-phase WP items to execution    |
+| POST   | `/api/engagement/:id/sync-rcm-to-wp`              | `engagement:update` | Create WP items from RCM                      |
+| GET    | `/api/approval/:entityType/:entityId/transitions` | `engagement:read`   | Available approval transitions                |
+| POST   | `/api/approval/:entityType/:entityId/execute`     | `engagement:update` | Execute an approval transition                |
+| POST   | `/api/approval/:entityType/:entityId/sign`        | `engagement:update` | Manual signoff (respects sequential order)    |
+| POST   | `/api/approval/:entityType/:entityId/unsign`      | `engagement:update` | Invalidate a signoff (ownership + lock check) |
+| GET    | `/api/engagement/:id/wp-signoffs`                 | `engagement:read`   | All signoffs for an engagement                |
+| GET    | `/api/engagement/:id/workflow-signoff-types`      | `engagement:read`   | Signoff slot config from workflow             |
 
 **Entity types for approval:** `procedure`, `work_program`, `planning_workpaper`
 
@@ -63,10 +68,14 @@
 
 ### Approval Engine (`src/server/actions/approvalEngine.ts`)
 
-| Function                    | Description                                         |
-| --------------------------- | --------------------------------------------------- |
-| `getAvailableTransitions()` | Returns allowed actions based on role + status      |
-| `executeTransition()`       | Validate & execute status change with audit logging |
+| Function                    | Description                                                           |
+| --------------------------- | --------------------------------------------------------------------- |
+| `getAvailableTransitions()` | Returns allowed actions based on role + status                        |
+| `executeTransition()`       | Validate & execute status change with audit logging                   |
+| `getWorkflowSignoffTypes()` | Counts signoff slots from transitions with `generates_signoff = true` |
+| `manualSign()`              | Create signoff record with sequential order enforcement               |
+| `unsignSignoff()`           | Invalidate signoff with ownership + lock checks                       |
+| `deriveSignoffOrder()`      | Compute 1-based signoff order from workflow forward path              |
 
 ---
 
@@ -132,3 +141,25 @@ When `wpApprovalStatus` is `waiting_review` or `waiting_approval`:
 - WP approval uses the generic approval engine (`ApprovalWorkflow` + `ApprovalTransition`)
 - `PlanningStepConfig` with `step_type: "fixed"` cannot be deleted, only hidden
 - Custom steps (`step_type: "workpaper"`) store Tiptap JSON content in `PlanningWorkpaper`
+
+### Signoff System
+
+- **Signoff slots** are determined by transitions with `generates_signoff = true` on `ApprovalTransition`
+- **Signoff type** is explicit via `signoff_type` field on `ApprovalTransition` (`prepare` | `review` | `approve`). When `generates_signoff = true`, admin selects the signoff type in the form.
+- **Sequential enforcement**: lower-level signoffs (prepare) must exist before higher-level (review/approve) can be signed
+- **Unsign lock**: cannot unsign if a higher-level signoff is active on the same entity
+- **Append-only**: signoffs are never deleted, only invalidated with `invalidated_at` + `invalidation_reason`
+- **Manual sign**: `WpSignoffBar` provides sign/unsign buttons per slot; signoff type derived from workflow config
+- **Auto-sign**: `executeTransition()` also creates signoff records when `generates_signoff = true` + `signoff_type` is set
+
+### `action_type` Clarification
+
+`action_type` on `ApprovalTransition` has **only two special behaviors**:
+
+| `action_type`                                       | Special behavior                                               |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| `start`                                             | Creates "Bản thảo" version label + auto-assigns `WpAssignment` |
+| `approve`                                           | Stamps `approved_by/at/version` fields + blocks self-approval  |
+| All others (`submit`, `review`, `reject`, `revise`) | No special behavior — purely label/categorization              |
+
+Signoff configuration is **fully decoupled** from `action_type` via the explicit `generates_signoff` + `signoff_type` fields.

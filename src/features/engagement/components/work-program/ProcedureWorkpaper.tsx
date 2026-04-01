@@ -9,16 +9,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { LabeledSelect } from "@/components/shared/LabeledSelect";
 import { StatusBadge } from "@/components/shared/workpaper/StatusBadge";
-import { AutoSaveIndicator } from "@/components/shared/workpaper/AutoSaveStatus";
 import { WorkpaperActions } from "@/components/shared/workpaper/WorkpaperActions";
 import { HistorySheet } from "@/components/shared/workpaper/HistorySheet";
+import { WpSignoffBar } from "@/components/shared/workpaper/WpSignoffBar";
 import {
   MultiSelectCommand,
   type MultiSelectOption,
 } from "@/components/shared/MultiSelectCommand";
 import { FileInput } from "@/components/shared/FileInput";
-import { WorkflowFlowChart } from "@/components/shared/WorkflowFlowChart";
-import { useApprovalWorkflows } from "@/features/settings/hooks/useApprovalWorkflows";
 import {
   Dialog,
   DialogContent,
@@ -26,26 +24,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { WorkflowChartDialog } from "@/components/shared/workpaper/WorkflowChartDialog";
 import { WorkpaperDocument } from "@/components/shared/workpaper/WorkpaperDocument";
+import { useWorkpaperShell } from "@/components/shared/workpaper/useWorkpaperShell";
 import { FieldRow } from "@/components/shared/workpaper/WorkpaperFieldsTab";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
 import { cn } from "@/lib/utils";
 import { useProcedureForm } from "./useProcedureForm";
 import { WpAssigneePicker } from "./WpAssigneePicker";
 import { LinkedFindingsList } from "./LinkedFindingsList";
-import {
-  useCommentThreads,
-  useCreateCommentThread,
-  useAddCommentReply,
-  useUpdateThreadStatus,
-  useDeleteCommentThread,
-  useUpdateProcedureContent,
-  useProcedureVersions,
-  useProcedureVersion,
-  useRestoreProcedureVersion,
-  useAvailableTransitions,
-  useExecuteTransition,
-} from "../../hooks/useEngagements";
 import type {
   EngagementProcedure,
   EngagementMember,
@@ -53,8 +40,6 @@ import type {
   WpSignoff,
 } from "../../types";
 import type { JSONContent } from "@tiptap/react";
-import { autoTransitionApi } from "../../api";
-import { useQueryClient } from "@tanstack/react-query";
 
 const LP = ENGAGEMENT_LABELS.procedure;
 
@@ -119,123 +104,24 @@ export function ProcedureWorkpaper({
   const form = useProcedureForm(engagementId, procedure);
   const { state, setField } = form;
 
-  const contentMutation = useUpdateProcedureContent();
-
-  // Comments
-  const { data: threads = [] } = useCommentThreads(
+  // ── Generic workpaper shell (comments, versions, transitions, auto-save) ──
+  const shell = useWorkpaperShell({
+    entityType: "procedure",
+    entityId: procedure.id,
     engagementId,
-    "procedure",
-    procedure.id,
-  );
-  const createThread = useCreateCommentThread();
-  const addReply = useAddCommentReply();
-  const updateStatus = useUpdateThreadStatus();
-  const deleteThread = useDeleteCommentThread();
-
-  // Versioning & Approval
-  const { data: versions = [] } = useProcedureVersions(
-    engagementId,
-    procedure.id,
-  );
-  const { data: transitions = [] } = useAvailableTransitions(
-    "procedure",
-    procedure.id,
-  );
-  const transitionMutation = useExecuteTransition();
-  const restoreMutation = useRestoreProcedureVersion();
-
-  const [workflowChartOpen, setWorkflowChartOpen] = React.useState(false);
-  const [viewVersion, setViewVersion] = React.useState<number | null>(null);
-
-  const { data: versionDetail } = useProcedureVersion(
-    engagementId,
-    procedure.id,
-    viewVersion,
-  );
-
-  const handleTransition = async (
-    transitionId: string,
-    comment?: string,
-    nextAssigneeId?: string,
-  ) => {
-    try {
-      await transitionMutation.mutateAsync({
-        entityType: "procedure",
-        entityId: procedure.id,
-        transitionId,
-        engagementId,
-        comment,
-        nextAssigneeId,
-      });
-    } catch {
-      // Error handled by mutation state
-    }
-  };
-
-  // Build initial document content from old fields if no `content` exists
-  const initialContent = React.useMemo<JSONContent | null>(() => {
-    if (procedure.content) {
-      return procedure.content as JSONContent;
-    }
-    // Migrate from old fields
-    return buildInitialContent(procedure);
-  }, [procedure]);
-
-  // Track whether we've already fired the auto-transition this session
-  const autoTransitionFired = React.useRef(false);
-  const queryClient = useQueryClient();
-
-  // Auto-save: content only (no metadata, no close)
-  // Also triggers not_started → in_progress on first save
-  const handleAutoSave = React.useCallback(
-    async (content: JSONContent) => {
-      await contentMutation.mutateAsync({
-        engagementId,
-        procedureId: procedure.id,
-        content,
-      });
-
-      // Auto-transition: not_started → in_progress on first edit
-      if (
-        !autoTransitionFired.current &&
-        procedure.approvalStatus === "not_started"
-      ) {
-        autoTransitionFired.current = true;
-        try {
-          await autoTransitionApi("procedure", procedure.id, "start");
-          // Refresh transitions, procedure data & versions so UI shows correct status/buttons + new "Bản thảo" version
-          queryClient.invalidateQueries({
-            queryKey: ["approvalTransitions", "procedure", procedure.id],
-          });
-          queryClient.invalidateQueries({
-            queryKey: ["engagement", engagementId],
-          });
-          queryClient.invalidateQueries({
-            queryKey: ["procedureVersions", engagementId, procedure.id],
-          });
-        } catch {
-          // Non-critical — don't block auto-save
-        }
-      }
-    },
-    [
-      contentMutation,
-      engagementId,
-      procedure.id,
-      procedure.approvalStatus,
-      queryClient,
-    ],
-  );
+    approvalStatus: procedure.approvalStatus,
+    currentVersion: procedure.currentVersion,
+    content: procedure.content ? (procedure.content as JSONContent) : null,
+    updatedAt: procedure.updatedAt,
+    templateEntityType: procedure.content ? null : "procedure",
+    fallbackContent: procedure.content ? null : buildInitialContent(procedure),
+  });
 
   // Full save: content + metadata + close
   const handleSave = async (content: JSONContent) => {
     try {
       await Promise.all([
-        contentMutation.mutateAsync({
-          engagementId,
-          procedureId: procedure.id,
-          content,
-        }),
+        shell.handleAutoSave(content),
         form.handleSaveAsync(),
       ]);
       onBack();
@@ -246,26 +132,6 @@ export function ProcedureWorkpaper({
 
   const handleTitleChange = (newTitle: string) => {
     setField("title", newTitle);
-  };
-
-  const handleCreateThread = async (data: {
-    quote: string;
-    comment: string;
-    threadType: import("../../types").WpThreadType;
-  }): Promise<string | undefined> => {
-    try {
-      const thread = await createThread.mutateAsync({
-        engagementId,
-        entityType: "procedure",
-        entityId: procedure.id,
-        threadType: data.threadType,
-        quote: data.quote,
-        comment: data.comment,
-      });
-      return thread.id;
-    } catch {
-      return undefined;
-    }
   };
 
   const procedureAssignees = wpAssignments.filter(
@@ -326,18 +192,6 @@ export function ProcedureWorkpaper({
     ],
   );
 
-  const handleRestore = async (version: number) => {
-    try {
-      await restoreMutation.mutateAsync({
-        engagementId,
-        procedureId: procedure.id,
-        version,
-      });
-    } catch {
-      // Error handled by mutation state
-    }
-  };
-
   return (
     <>
       <WorkpaperDocument
@@ -345,36 +199,35 @@ export function ProcedureWorkpaper({
         entityId={procedure.id}
         engagementId={engagementId}
         title={state.title}
-        content={initialContent}
-        onAutoSave={handleAutoSave}
+        content={shell.initialContent}
+        onAutoSave={shell.handleAutoSave}
         onSave={handleSave}
         onTitleChange={handleTitleChange}
         onBack={onBack}
-        isSaving={form.isSaving || contentMutation.isPending}
-        initialLastSavedAt={
-          procedure.updatedAt ? new Date(procedure.updatedAt) : null
+        isSaving={form.isSaving || shell.isSavingContent}
+        initialLastSavedAt={shell.initialLastSavedAt}
+        signoffBar={
+          <WpSignoffBar
+            entityType="procedure"
+            entityId={procedure.id}
+            engagementId={engagementId}
+            signoffs={wpSignoffs}
+            currentVersion={procedure.currentVersion}
+            onViewVersion={shell.setViewVersion}
+            actions={
+              <WorkpaperActions
+                transitions={shell.transitions}
+                onTransition={shell.handleTransition}
+                isTransitioning={shell.isTransitioning}
+                onViewWorkflow={() => shell.setWorkflowChartOpen(true)}
+                members={members}
+              />
+            }
+          />
         }
         headerExtra={(autoSave) => (
           <>
             <StatusBadge status={procedure.approvalStatus} />
-
-            <AutoSaveIndicator
-              status={autoSave.status}
-              lastSavedAt={autoSave.lastSavedAt}
-            />
-
-            <HistorySheet
-              signoffs={wpSignoffs}
-              versions={versions}
-              entityType="procedure"
-              entityId={procedure.id}
-              currentVersion={procedure.currentVersion}
-              onViewVersion={setViewVersion}
-              onRestoreVersion={(v) => handleRestore(v)}
-              isRestoring={restoreMutation.isPending}
-            />
-
-            <div className="flex-1" />
 
             <WpAssigneePicker
               entityType="procedure"
@@ -388,79 +241,52 @@ export function ProcedureWorkpaper({
               label=""
             />
 
-            <Separator orientation="vertical" className="h-5 mx-1" />
+            <div className="flex-1" />
 
-            <WorkpaperActions
-              transitions={transitions}
-              onTransition={handleTransition}
-              isTransitioning={transitionMutation.isPending}
-              onViewWorkflow={() => setWorkflowChartOpen(true)}
-              members={members}
+            <HistorySheet
+              versions={shell.versions}
+              currentVersion={procedure.currentVersion}
+              onViewVersion={shell.setViewVersion}
+              onRestoreVersion={(v) => shell.handleRestore(v)}
+              isRestoring={shell.isRestoring}
+              autoSaveStatus={autoSave.status}
+              autoSaveLastSavedAt={autoSave.lastSavedAt}
             />
           </>
         )}
         tabs={[conclusionTab, infoTab]}
         defaultTab="conclusion"
         commentsTabLabel="Soát xét"
-        threads={threads}
-        onCreateThread={handleCreateThread}
-        onReplyToThread={(threadId, content) =>
-          addReply.mutate({
-            engagementId,
-            threadId,
-            content,
-            entityType: "procedure",
-            entityId: procedure.id,
-          })
-        }
-        onResolveThread={(threadId) =>
-          updateStatus.mutate({
-            engagementId,
-            threadId,
-            status: "resolved",
-            entityType: "procedure",
-            entityId: procedure.id,
-          })
-        }
-        onReopenThread={(threadId) =>
-          updateStatus.mutate({
-            engagementId,
-            threadId,
-            status: "open",
-            entityType: "procedure",
-            entityId: procedure.id,
-          })
-        }
-        onDeleteThread={(threadId) =>
-          deleteThread.mutate({
-            engagementId,
-            threadId,
-            entityType: "procedure",
-            entityId: procedure.id,
-          })
-        }
-        isCreatingThread={createThread.isPending}
-        isReplying={addReply.isPending}
+        threads={shell.threads}
+        onCreateThread={shell.handleCreateThread}
+        onReplyToThread={shell.handleReplyToThread}
+        onResolveThread={shell.handleResolveThread}
+        onReopenThread={shell.handleReopenThread}
+        onDeleteThread={shell.handleDeleteThread}
+        isCreatingThread={shell.isCreatingThread}
+        isReplying={shell.isReplying}
       />
 
       {/* Version detail dialog */}
       <Dialog
-        open={viewVersion !== null}
+        open={shell.viewVersion !== null}
         onOpenChange={(open) => {
-          if (!open) setViewVersion(null);
+          if (!open) shell.setViewVersion(null);
         }}
       >
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Phiên bản {viewVersion}</DialogTitle>
-            {versionDetail?.comment && (
-              <DialogDescription>{versionDetail.comment}</DialogDescription>
+            <DialogTitle>Phiên bản {shell.viewVersion}</DialogTitle>
+            {shell.versionDetail?.comment && (
+              <DialogDescription>
+                {shell.versionDetail.comment}
+              </DialogDescription>
             )}
           </DialogHeader>
-          {versionDetail?.snapshot ? (
+          {shell.versionDetail?.snapshot ? (
             <div className="space-y-3 text-sm">
               {Object.entries(
-                versionDetail.snapshot as Record<string, unknown>,
+                shell.versionDetail.snapshot as Record<string, unknown>,
               ).map(([key, value]) =>
                 value != null && value !== "" ? (
                   <div key={key}>
@@ -483,8 +309,8 @@ export function ProcedureWorkpaper({
       </Dialog>
 
       <WorkflowChartDialog
-        open={workflowChartOpen}
-        onOpenChange={setWorkflowChartOpen}
+        open={shell.workflowChartOpen}
+        onOpenChange={shell.setWorkflowChartOpen}
         entityType="procedure"
         currentStatus={procedure.approvalStatus}
       />
@@ -738,51 +564,4 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, "");
 }
 
-// ── Workflow Chart Dialog ──
-
-function WorkflowChartDialog({
-  open,
-  onOpenChange,
-  entityType,
-  currentStatus,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  entityType: string;
-  currentStatus: string;
-}) {
-  const { data: workflows = [] } = useApprovalWorkflows();
-
-  // Find the workflow bound to this entity type, or fall back to default
-  const workflow = React.useMemo(() => {
-    const bound = workflows.find((w) =>
-      w.entityBindings.some((b) => b.entityType === entityType),
-    );
-    if (bound) return bound;
-    return workflows.find((w) => w.isDefault && w.isActive) ?? null;
-  }, [workflows, entityType]);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Quy trình phê duyệt</DialogTitle>
-          <DialogDescription>
-            {workflow?.name ?? "Không tìm thấy quy trình"}
-          </DialogDescription>
-        </DialogHeader>
-        {workflow ? (
-          <WorkflowFlowChart
-            transitions={workflow.transitions}
-            highlightStatus={currentStatus}
-            showLabel={false}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground py-4">
-            Chưa có quy trình nào được gán cho loại thực thể này.
-          </p>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
+// WorkflowChartDialog is now shared from @/components/shared/workpaper/WorkflowChartDialog

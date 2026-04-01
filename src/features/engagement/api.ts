@@ -687,6 +687,116 @@ export async function restoreProcedureVersionApi(
   return handleResponse<{ success: boolean; restoredVersion: number }>(response);
 }
 
+// ── Generic Workpaper Content ──
+
+/**
+ * Route resolver: given entityType + IDs, returns the correct content-save URL.
+ * Each entity keeps its own route structure (Option B).
+ */
+function workpaperContentUrl(entityType: string, engagementId: string, entityId: string): string {
+  switch (entityType) {
+    case 'procedure':
+      return API_ROUTES.ENGAGEMENT_PROCEDURE_BY_ID(engagementId, entityId);
+    case 'planning_workpaper':
+      return API_ROUTES.ENGAGEMENT_PLANNING_WORKPAPER_BY_ID(engagementId, entityId);
+    default:
+      throw new Error(`Unknown workpaper entity type: ${entityType}`);
+  }
+}
+
+export async function saveWorkpaperContentApi(
+  entityType: string,
+  engagementId: string,
+  entityId: string,
+  content: unknown,
+): Promise<void> {
+  const url = workpaperContentUrl(entityType, engagementId, entityId);
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  return handleResponse<void>(response);
+}
+
+// ── Generic Workpaper Versions ──
+
+function workpaperVersionsUrl(entityType: string, engagementId: string, entityId: string): string {
+  switch (entityType) {
+    case 'procedure':
+      return API_ROUTES.ENGAGEMENT_PROCEDURE_VERSIONS(engagementId, entityId);
+    case 'planning_workpaper':
+      return API_ROUTES.ENGAGEMENT_PLANNING_WORKPAPER_VERSIONS(engagementId, entityId);
+    default:
+      throw new Error(`Unknown workpaper entity type: ${entityType}`);
+  }
+}
+
+function workpaperVersionUrl(entityType: string, engagementId: string, entityId: string, version: number): string {
+  switch (entityType) {
+    case 'procedure':
+      return API_ROUTES.ENGAGEMENT_PROCEDURE_VERSION_BY_NUM(engagementId, entityId, version);
+    case 'planning_workpaper':
+      return API_ROUTES.ENGAGEMENT_PLANNING_WORKPAPER_VERSION_BY_NUM(engagementId, entityId, version);
+    default:
+      throw new Error(`Unknown workpaper entity type: ${entityType}`);
+  }
+}
+
+function workpaperVersionRestoreUrl(entityType: string, engagementId: string, entityId: string, version: number): string {
+  switch (entityType) {
+    case 'procedure':
+      return API_ROUTES.ENGAGEMENT_PROCEDURE_VERSION_RESTORE(engagementId, entityId, version);
+    case 'planning_workpaper':
+      return API_ROUTES.ENGAGEMENT_PLANNING_WORKPAPER_VERSION_RESTORE(engagementId, entityId, version);
+    default:
+      throw new Error(`Unknown workpaper entity type: ${entityType}`);
+  }
+}
+
+export async function fetchWorkpaperVersionsApi(
+  entityType: string,
+  engagementId: string,
+  entityId: string,
+): Promise<EntityVersionSummary[]> {
+  const response = await fetch(workpaperVersionsUrl(entityType, engagementId, entityId));
+  return handleResponse<EntityVersionSummary[]>(response);
+}
+
+export async function fetchWorkpaperVersionApi(
+  entityType: string,
+  engagementId: string,
+  entityId: string,
+  version: number,
+): Promise<EntityVersionDetail> {
+  const response = await fetch(workpaperVersionUrl(entityType, engagementId, entityId, version));
+  return handleResponse<EntityVersionDetail>(response);
+}
+
+export async function restoreWorkpaperVersionApi(
+  entityType: string,
+  engagementId: string,
+  entityId: string,
+  version: number,
+): Promise<{ success: boolean; restoredVersion: number }> {
+  const response = await fetch(workpaperVersionRestoreUrl(entityType, engagementId, entityId, version), {
+    method: 'POST',
+  });
+  return handleResponse<{ success: boolean; restoredVersion: number }>(response);
+}
+
+// ── Approval Signoff Types ──
+
+export interface SignoffTypeInfo {
+  type: string;
+  count: number;
+}
+
+export async function fetchWorkflowSignoffTypes(entityType: string): Promise<SignoffTypeInfo[]> {
+  const response = await fetch(API_ROUTES.APPROVAL_SIGNOFF_TYPES(entityType));
+  return handleResponse<SignoffTypeInfo[]>(response);
+}
+
 // ── Approval Transitions ──
 
 export async function fetchAvailableTransitionsApi(
@@ -723,4 +833,34 @@ export async function autoTransitionApi(
     body: JSON.stringify({ actionType }),
   });
   return handleResponse<{ newStatus: string } | null>(response);
+}
+
+// ── Manual Sign / Unsign ──
+
+export async function manualSignApi(
+  entityType: string,
+  entityId: string,
+  signoffType: string,
+  signoffOrder: number,
+): Promise<{ ok: true }> {
+  const response = await fetch(API_ROUTES.APPROVAL_SIGN(entityType, entityId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ signoffType, signoffOrder }),
+  });
+  return handleResponse<{ ok: true }>(response);
+}
+
+export async function unsignApi(
+  entityType: string,
+  entityId: string,
+  signoffType: string,
+  signoffOrder: number,
+): Promise<{ ok: true }> {
+  const response = await fetch(API_ROUTES.APPROVAL_UNSIGN(entityType, entityId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ signoffType, signoffOrder }),
+  });
+  return handleResponse<{ ok: true }>(response);
 }

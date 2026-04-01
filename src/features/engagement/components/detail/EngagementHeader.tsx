@@ -12,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LabeledSelect } from "@/components/shared/LabeledSelect";
 import { TeamAvatarManager } from "@/components/shared/TeamAvatarManager";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EngagementForm } from "../EngagementForm";
@@ -37,11 +36,6 @@ const TAB_LABELS: Record<string, string> = {
   findings: L.tab.findings,
   reporting: L.tab.reporting,
 };
-
-const STATUS_OPTIONS = Object.entries(L.status).map(([value, label]) => ({
-  value,
-  label,
-}));
 
 interface EngagementHeaderProps {
   engagement: EngagementDetail;
@@ -70,11 +64,6 @@ export function EngagementHeader({ engagement }: EngagementHeaderProps) {
     const step = stepConfigs.find((s) => s.key === currentSection);
     return step?.title ?? null;
   }, [currentSection, stepConfigs]);
-
-  const handleStatusChange = (newStatus: string) => {
-    if (newStatus === engagement.status) return;
-    updateMutation.mutate({ id: engagement.id, data: { status: newStatus } });
-  };
 
   const handleEdit = (data: EngagementInput) => {
     updateMutation.mutate(
@@ -165,14 +154,6 @@ export function EngagementHeader({ engagement }: EngagementHeaderProps) {
               onRemove={(userId) =>
                 removeMember.mutate({ engagementId: engagement.id, userId })
               }
-            />
-
-            {/* Status Select */}
-            <LabeledSelect
-              value={engagement.status}
-              onChange={handleStatusChange}
-              options={STATUS_OPTIONS}
-              placeholder="Trạng thái"
             />
 
             {/* Actions Dropdown */}

@@ -2,7 +2,16 @@
 
 import { useRef, useEffect, useMemo, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, Target, Plus, Check, X, ChevronsUpDown } from "lucide-react";
+import {
+  Layers,
+  Target,
+  ClipboardList,
+  Plus,
+  Check,
+  X,
+  ChevronsUpDown,
+  ChevronDown,
+} from "lucide-react";
 import {
   useBatchAction,
   useWpAssignments,
@@ -36,7 +45,14 @@ import {
 } from "../../hooks/useEngagements";
 import { WpSectionCard } from "./WpSectionCard";
 import { WpObjectiveCard } from "./WpObjectiveCard";
+import { WpProcedureCard } from "./WpProcedureCard";
 import { WpBatchBar } from "./WpBatchBar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ── Props ──
 
@@ -44,6 +60,7 @@ interface WorkProgramV2Props {
   engagementId: string;
   sections: EngagementSection[];
   standaloneObjectives?: EngagementObjective[];
+  standaloneProcedures?: EngagementProcedure[];
   findingCount?: number;
   mode: WpMode;
   rcmObjectives?: RcmObjective[];
@@ -58,6 +75,7 @@ export function WorkProgramV2({
   engagementId,
   sections,
   standaloneObjectives = [],
+  standaloneProcedures = [],
   findingCount = 0,
   mode,
   rcmObjectives = [],
@@ -71,6 +89,7 @@ export function WorkProgramV2({
     standaloneObjectives,
     findingCount,
     mode,
+    standaloneProcedures,
   );
 
   // ── WP Assignments ──
@@ -151,6 +170,7 @@ export function WorkProgramV2({
     handleTextChange,
     handleAddSection,
     handleAddObjective,
+    handleAddTopProcedure,
     handleConfirmDelete,
     handleReorderTopNodes,
     deleteTitle,
@@ -158,6 +178,7 @@ export function WorkProgramV2({
     isDeleting,
     isCreatingSection,
     isCreatingObjective,
+    isCreatingProcedure,
   } = editor;
 
   // ── Selection state ──
@@ -221,8 +242,11 @@ export function WorkProgramV2({
       map.set(obj.id, "objective");
       for (const proc of obj.procedures) map.set(proc.id, "procedure");
     }
+    for (const proc of standaloneProcedures) {
+      map.set(proc.id, "procedure");
+    }
     return map;
-  }, [sections, standaloneObjectives]);
+  }, [sections, standaloneObjectives, standaloneProcedures]);
 
   // Derive valid selection — auto-discards stale IDs when data changes
   const validSelectedIds = useMemo(() => {
@@ -250,6 +274,7 @@ export function WorkProgramV2({
     for (const obj of standaloneObjectives) {
       for (const proc of obj.procedures) map.set(proc.id, obj.id);
     }
+    // standaloneProcedures have no parent — no entries needed
     return map;
   }, [sections, standaloneObjectives]);
 
@@ -498,26 +523,33 @@ export function WorkProgramV2({
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between">
         {!readOnly && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="default"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => dispatch({ type: "START_ADD_SECTION" })}
-            >
-              <Plus className="mr-1 h-3 w-3" />
-              {WP_LABELS.addSection}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => dispatch({ type: "START_ADD_TOP_OBJECTIVE" })}
-            >
-              <Target className="mr-1 h-3 w-3" />
-              {WP_LABELS.addObjective}
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground shadow-xs hover:bg-primary/90 h-7">
+              <Plus className="h-3 w-3" />
+              Thêm
+              <ChevronDown className="h-3 w-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onClick={() => dispatch({ type: "START_ADD_SECTION" })}
+              >
+                <Layers className="mr-2 h-4 w-4 text-blue-600" />
+                {WP_LABELS.addSection}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => dispatch({ type: "START_ADD_TOP_OBJECTIVE" })}
+              >
+                <Target className="mr-2 h-4 w-4 text-emerald-600" />
+                {WP_LABELS.addObjective}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => dispatch({ type: "START_ADD_TOP_PROCEDURE" })}
+              >
+                <ClipboardList className="mr-2 h-4 w-4 text-violet-600" />
+                {WP_LABELS.addProcedure}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         {readOnly && <div />}
         {topNodes.length > 0 && (
@@ -608,6 +640,24 @@ export function WorkProgramV2({
                 />
               );
             }
+            if (node.type === "procedure" && node.procedure) {
+              return (
+                <WpProcedureCard
+                  procedure={node.procedure}
+                  editor={editor}
+                  dragHandleProps={dragHandleProps}
+                  isSelected={validSelectedIds.has(node.id)}
+                  onToggleSelect={toggleSelect}
+                  onViewItem={handleViewItem}
+                  onOpenForm={handleOpenForm}
+                  wpAssignments={wpAssignments}
+                  members={members}
+                  onAssign={handleAssignUser}
+                  onUnassign={handleUnassignUser}
+                  readOnly={readOnly}
+                />
+              );
+            }
             return null;
           }}
         />
@@ -673,6 +723,39 @@ export function WorkProgramV2({
               size="icon-sm"
               onClick={() => dispatch({ type: "CANCEL_ADD_TOP" })}
               disabled={isCreatingObjective}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!readOnly && state.addingTopType === "procedure" && (
+        <div ref={addFormRef} className="rounded-lg border bg-muted/30 p-3">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 shrink-0 text-violet-600" />
+            <InlineTableInput
+              placeholder="Tên thủ tục..."
+              onChange={handleTextChange}
+              onSubmit={(v) => handleAddTopProcedure(v)}
+              onCancel={() => dispatch({ type: "CANCEL_ADD_TOP" })}
+              autoFocus
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => handleAddTopProcedure(textRef.current)}
+              disabled={isCreatingProcedure}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => dispatch({ type: "CANCEL_ADD_TOP" })}
+              disabled={isCreatingProcedure}
             >
               <X className="h-3.5 w-3.5" />
             </Button>

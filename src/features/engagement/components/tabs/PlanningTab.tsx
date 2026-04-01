@@ -35,10 +35,8 @@ import {
   DragHandle,
   type DragHandleRenderProps,
 } from "@/components/shared/SortableList";
-import {
-  RichTextEditor,
-  RichTextDisplay,
-} from "@/components/shared/RichTextEditor";
+import { RichTextDisplay } from "@/components/shared/RichTextEditor";
+import { InlineWorkpaperViewer } from "./InlineWorkpaperViewer";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
 import { Building2, User } from "lucide-react";
 import { OrgUnitCardPopover } from "@/features/settings/components/OrgUnitCard";
@@ -46,6 +44,8 @@ import { ContactCardPopoverById } from "@/features/settings/components/ContactCa
 import { usePlanningEditor } from "../../hooks/usePlanningEditor";
 import { useIsReviewMode } from "@/features/settings/hooks/useApprovalStatuses";
 import { StatusBadge } from "@/components/shared/workpaper/StatusBadge";
+import { HistorySheet } from "@/components/shared/workpaper/HistorySheet";
+import { useWorkpaperVersions } from "@/hooks/useWorkpaper";
 import { useSyncRcmToWorkProgram } from "../../hooks/useEngagements";
 import { usePlanningSteps } from "@/features/settings/hooks/usePlanningSteps";
 import { usePlanningWorkpapers } from "../../hooks/usePlanningWorkpapers";
@@ -82,6 +82,7 @@ interface PlanningTabProps {
   engagement: EngagementDetail;
   section?: string; // If provided, only render this specific section
   onOpenWorkpaper?: (procedureId: string) => void;
+  onOpenPlanningWp?: (stepConfigId: string) => void;
 }
 
 // Icon map: string name → Lucide component
@@ -103,6 +104,7 @@ export function PlanningTab({
   engagement,
   section,
   onOpenWorkpaper,
+  onOpenPlanningWp,
 }: PlanningTabProps) {
   const {
     state,
@@ -120,8 +122,6 @@ export function PlanningTab({
     handleAddProcedure,
     handleUpdateProcedure,
     handleConfirmDelete,
-    handleSaveUnderstanding,
-    isSavingUnderstanding,
     handleReorderAuditObjectives,
     handleMoveToTopAuditObjective,
   } = usePlanningEditor(engagement);
@@ -147,6 +147,13 @@ export function PlanningTab({
         (o) => o.phase === "planning",
       ),
     [engagement.standaloneObjectives],
+  );
+  const planningProcedures = useMemo(
+    () =>
+      (engagement.ungroupedProcedures ?? []).filter(
+        (p) => p.addedFrom === "planning",
+      ),
+    [engagement.ungroupedProcedures],
   );
 
   // Active steps sorted by sort_order, filtered by section if provided
@@ -393,10 +400,11 @@ export function PlanningTab({
 
           case "understanding": {
             const undWp = wpByStep.get(step.id);
+            const undStatus = undWp?.approvalStatus ?? "not_started";
             const undHeaderRight = cardHeaderRight(
               "planning_workpaper",
               undWp?.id,
-              undWp?.approvalStatus ?? "not_started",
+              undStatus,
             );
 
             // Main view: show navigable card
@@ -412,41 +420,65 @@ export function PlanningTab({
               );
             }
 
-            // Section page view: show header + content directly
+            // Section page: version info right-aligned
+            const undSectionHeaderRight = undWp ? (
+              <ViewerVersionInfo
+                entityType="planning_workpaper"
+                entityId={undWp.id}
+                engagementId={engagement.id}
+                currentVersion={undWp.currentVersion}
+                updatedAt={undWp.updatedAt}
+              />
+            ) : null;
+
+            const undEditButton = !isReviewMode ? (
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => onOpenPlanningWp?.(step.id)}
+              >
+                <Pencil className="mr-1 h-3 w-3" />
+                Chỉnh sửa
+              </Button>
+            ) : null;
+
+            // Section page view: show header + inline viewer
             return (
               <div key={step.key}>
                 <SectionPageHeader
                   title={step.title}
                   icon={<StepIcon name={step.icon} />}
-                  headerRight={undHeaderRight}
+                  titleExtra={<StatusBadge status={undStatus} />}
+                  headerRight={undSectionHeaderRight}
                 />
-                {!isReviewMode && !state.understandingEditorOpen && (
-                  <div className="flex justify-end mb-2">
+                {undWp?.content ? (
+                  <InlineWorkpaperViewer
+                    engagementId={engagement.id}
+                    entityId={undWp.id}
+                    content={undWp.content}
+                    approvalStatus={undWp.approvalStatus}
+                    currentVersion={undWp.currentVersion}
+                    members={engagement.members}
+                    editButton={undEditButton}
+                  />
+                ) : engagement.understanding ? (
+                  <RichTextDisplay content={engagement.understanding} />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-6">
+                    <BookOpen className="h-8 w-8 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground">
+                      {LP.noUnderstanding}
+                    </p>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="h-7 text-xs"
-                      onClick={() =>
-                        dispatch({ type: "OPEN_UNDERSTANDING_EDITOR" })
-                      }
+                      onClick={() => onOpenPlanningWp?.(step.id)}
                     >
-                      <Pencil className="mr-1 h-3 w-3" />
-                      {engagement.understanding ? "Sửa" : "Thêm"}
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Thêm nội dung
                     </Button>
                   </div>
                 )}
-                <UnderstandingSection
-                  content={engagement.understanding ?? ""}
-                  isEditing={state.understandingEditorOpen}
-                  onSave={handleSaveUnderstanding}
-                  onCancel={() =>
-                    dispatch({ type: "CLOSE_UNDERSTANDING_EDITOR" })
-                  }
-                  onStartEdit={() =>
-                    dispatch({ type: "OPEN_UNDERSTANDING_EDITOR" })
-                  }
-                  isSaving={isSavingUnderstanding}
-                />
               </div>
             );
           }
@@ -547,6 +579,7 @@ export function PlanningTab({
                   engagementId={engagement.id}
                   sections={planningSections}
                   standaloneObjectives={planningObjectives}
+                  standaloneProcedures={planningProcedures}
                   findingCount={engagement.findings?.length ?? 0}
                   mode="planning"
                   rcmObjectives={engagement.rcmObjectives}
@@ -746,20 +779,56 @@ function NavigableCard({
 function SectionPageHeader({
   title,
   icon,
+  titleExtra,
   headerRight,
 }: {
   title: string;
   icon?: React.ReactNode;
+  /** Rendered immediately after the title (e.g. StatusBadge) */
+  titleExtra?: React.ReactNode;
   headerRight?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-2 mb-4">
       {icon}
-      <h2 className="flex-1 text-lg font-semibold">{title}</h2>
+      <h2 className="text-lg font-semibold">{title}</h2>
+      {titleExtra}
+      <div className="flex-1" />
       {headerRight && (
         <div className="flex items-center gap-2">{headerRight}</div>
       )}
     </div>
+  );
+}
+
+// ── Viewer Version Info (self-sustained sub-component for section view) ──
+
+function ViewerVersionInfo({
+  entityType,
+  entityId,
+  engagementId,
+  currentVersion,
+  updatedAt,
+}: {
+  entityType: string;
+  entityId: string;
+  engagementId: string;
+  currentVersion: number;
+  updatedAt?: string | null;
+}) {
+  const { data: versions = [] } = useWorkpaperVersions(
+    entityType,
+    engagementId,
+    entityId,
+  );
+
+  return (
+    <HistorySheet
+      versions={versions}
+      currentVersion={currentVersion}
+      autoSaveStatus="idle"
+      autoSaveLastSavedAt={updatedAt ? new Date(updatedAt) : null}
+    />
   );
 }
 
@@ -1328,61 +1397,6 @@ function ControlRow({
       </Button>
     </div>
   );
-}
-
-// ── Understanding Section (inline editor) ──
-
-function UnderstandingSection({
-  content,
-  isEditing,
-  onSave,
-  onCancel,
-  onStartEdit,
-  isSaving,
-}: {
-  content: string;
-  isEditing: boolean;
-  onSave: (html: string) => void;
-  onCancel: () => void;
-  onStartEdit: () => void;
-  isSaving: boolean;
-}) {
-  const [html, setHtml] = useState(content);
-
-  if (isEditing) {
-    return (
-      <div className="space-y-2">
-        <RichTextEditor
-          content={content}
-          onChange={setHtml}
-          placeholder="Nhập nội dung tìm hiểu đối tượng kiểm toán..."
-        />
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            Hủy
-          </Button>
-          <Button size="sm" onClick={() => onSave(html)} disabled={isSaving}>
-            {isSaving ? "Đang lưu..." : "Lưu"}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!content) {
-    return (
-      <div className="flex flex-col items-center gap-2 py-6">
-        <BookOpen className="h-8 w-8 text-muted-foreground/50" />
-        <p className="text-sm text-muted-foreground">{LP.noUnderstanding}</p>
-        <Button variant="outline" size="sm" onClick={onStartEdit}>
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          Thêm nội dung
-        </Button>
-      </div>
-    );
-  }
-
-  return <RichTextDisplay content={content} />;
 }
 
 // ── Work Program Section (Section → Objective → Procedure) ──

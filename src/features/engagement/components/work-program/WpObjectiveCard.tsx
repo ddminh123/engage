@@ -140,7 +140,7 @@ export function WpObjectiveCard({
     <div
       className={cn(
         "group/header flex items-center gap-2 px-3 py-2 select-none",
-        dragHandleProps.isDragging ? "cursor-grabbing" : "cursor-grab",
+        dragHandleProps.isDragging ? "cursor-grabbing" : "cursor-pointer",
       )}
       onClick={() => !isEditingHeader && onOpenChange(!open)}
       {...dragHandleProps.attributes}

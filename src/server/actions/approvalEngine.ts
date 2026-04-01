@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { logAudit } from './teams';
-import { publishEntity, buildProcedureSnapshot } from './entityVersion';
+import { createTransitionVersion } from './workpaperContent';
 
 // =============================================================================
 // TYPES
@@ -19,6 +19,58 @@ const STATUS_ALIASES: Record<string, string[]> = {
   reviewed: ['approved'],
   approved: ['reviewed'],
 };
+
+// =============================================================================
+// GET WORKFLOW SIGNOFF TYPES — Which sign-off levels does the workflow support?
+// =============================================================================
+
+const SIGNOFF_ORDER: readonly string[] = ['prepare', 'review', 'approve'];
+
+export interface SignoffTypeInfo {
+  type: string;
+  count: number;
+}
+
+export async function getWorkflowSignoffTypes(entityType: string): Promise<SignoffTypeInfo[]> {
+  // 1. Load bound workflow (or default)
+  const binding = await prisma.approvalEntityBinding.findUnique({
+    where: { entity_type: entityType },
+    select: { workflow_id: true },
+  });
+
+  let wfId = binding?.workflow_id;
+
+  if (wfId) {
+    const wf = await prisma.approvalWorkflow.findUnique({ where: { id: wfId }, select: { is_active: true } });
+    if (!wf?.is_active) return [];
+  } else {
+    const wf = await prisma.approvalWorkflow.findFirst({ where: { is_default: true, is_active: true }, select: { id: true } });
+    if (!wf) return [];
+    wfId = wf.id;
+  }
+
+  // 2. Query only transitions explicitly flagged to generate signoffs, sorted by sort_order.
+  const flagged = await prisma.approvalTransition.findMany({
+    where: { workflow_id: wfId, generates_signoff: true, signoff_type: { not: null } },
+    select: { signoff_type: true, sort_order: true },
+    orderBy: { sort_order: 'asc' },
+  });
+
+  // 3. Count signoff slots per type (read directly from signoff_type).
+  const typeCounters = new Map<string, number>();
+  for (const t of flagged) {
+    const st = t.signoff_type!;
+    typeCounters.set(st, (typeCounters.get(st) ?? 0) + 1);
+  }
+
+  // 4. Return in canonical order (prepare → review → approve)
+  const result: SignoffTypeInfo[] = [];
+  for (const type of SIGNOFF_ORDER) {
+    const count = typeCounters.get(type);
+    if (count) result.push({ type, count });
+  }
+  return result;
+}
 
 // =============================================================================
 // GET AVAILABLE TRANSITIONS — Returns actions the current user can perform
@@ -210,14 +262,22 @@ export async function executeTransition(
     actionLabel: versionLabel,
   });
 
-  // 5. Create sign-off record for submit/review/approve actions
-  const signoffType = ACTION_TYPE_TO_SIGNOFF[transition.action_type];
+  // 5. Create sign-off record if transition is flagged to generate signoff
+  const signoffType = transition.generates_signoff && transition.signoff_type ? transition.signoff_type : null;
   if (signoffType) {
+    // Derive signoff_order from the forward path of the workflow
+    const signoffOrder = await deriveSignoffOrder(
+      transition.workflow_id,
+      signoffType,
+      transition.to_status,
+    );
+
     await createSignoff({
       engagementId,
       entityType,
       entityId,
       signoffType,
+      signoffOrder,
       userId,
       version: currentEntity.currentVersion,
       transitionId,
@@ -457,12 +517,8 @@ async function updateEntityStatus(
 // SIGNOFF — Immutable sign-off records
 // =============================================================================
 
-// Maps workflow action_type → signoff_type. Only these actions create sign-offs.
-const ACTION_TYPE_TO_SIGNOFF: Record<string, string> = {
-  submit: 'prepare',
-  review: 'review',
-  approve: 'approve',
-};
+// Legacy mapping kept for reference. Signoff type is now explicit via `signoff_type` field on ApprovalTransition.
+// action_type only has special behavior for: 'start' (draft version + auto-assign) and 'approve' (stamps approval fields + self-approval check).
 
 // Audit-relevant fields on procedures — changes to these invalidate review/approve sign-offs
 const AUDIT_RELEVANT_FIELDS = new Set([
@@ -470,14 +526,98 @@ const AUDIT_RELEVANT_FIELDS = new Set([
   'sample_size', 'exceptions', 'procedures', 'description',
 ]);
 
+/**
+ * Derive the signoff_order for a given transition by counting flagged transitions
+ * of the same signoff_type. Returns the 1-based position.
+ *
+ * When multiple transitions share the same sort_order, we break the tie using
+ * the BFS flow-order of their from_status so that transitions earlier in the
+ * workflow path receive lower signoff orders.
+ */
+async function deriveSignoffOrder(
+  workflowId: string,
+  signoffType: string,
+  toStatus: string,
+): Promise<number> {
+  const flagged = await prisma.approvalTransition.findMany({
+    where: { workflow_id: workflowId, generates_signoff: true, signoff_type: signoffType },
+    select: { from_status: true, to_status: true, sort_order: true },
+    orderBy: { sort_order: 'asc' },
+  });
+
+  if (flagged.length <= 1) {
+    return 1;
+  }
+
+  // Build flow-order map (BFS from start) to break sort_order ties
+  const flowOrder = await resolveFlowOrder(workflowId);
+
+  const sorted = [...flagged].sort((a, b) => {
+    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+    return (flowOrder.get(a.from_status) ?? Infinity) - (flowOrder.get(b.from_status) ?? Infinity);
+  });
+
+  const idx = sorted.findIndex((t) => t.to_status === toStatus);
+  return idx >= 0 ? idx + 1 : Math.max(sorted.length, 1);
+}
+
+/**
+ * BFS traversal of the workflow graph following only forward transitions
+ * (start, submit, review, approve). Returns a Map<status, bfsOrder>.
+ */
+async function resolveFlowOrder(workflowId: string): Promise<Map<string, number>> {
+  const transitions = await prisma.approvalTransition.findMany({
+    where: { workflow_id: workflowId },
+    select: { from_status: true, to_status: true, action_type: true },
+    orderBy: { sort_order: 'asc' },
+  });
+
+  const FORWARD_TYPES = new Set(['start', 'submit', 'review', 'approve']);
+  const edges = new Map<string, string[]>();
+  const startStatuses: string[] = [];
+
+  for (const t of transitions) {
+    if (!FORWARD_TYPES.has(t.action_type)) continue;
+    const list = edges.get(t.from_status) ?? [];
+    list.push(t.to_status);
+    edges.set(t.from_status, list);
+    if (t.action_type === 'start') {
+      startStatuses.push(t.from_status);
+    }
+  }
+
+  // BFS from start statuses
+  const order = new Map<string, number>();
+  const queue = [...new Set(startStatuses)];
+  let pos = 0;
+
+  for (const s of queue) {
+    if (!order.has(s)) order.set(s, pos++);
+  }
+
+  let head = 0;
+  while (head < queue.length) {
+    const current = queue[head++];
+    for (const next of edges.get(current) ?? []) {
+      if (!order.has(next)) {
+        order.set(next, pos++);
+        queue.push(next);
+      }
+    }
+  }
+
+  return order;
+}
+
 async function createSignoff(params: {
   engagementId: string;
   entityType: string;
   entityId: string;
   signoffType: string;
+  signoffOrder: number;
   userId: string;
   version: number;
-  transitionId: string;
+  transitionId?: string | null;
   comment: string | null;
 }) {
   await prisma.wpSignoff.create({
@@ -486,9 +626,10 @@ async function createSignoff(params: {
       entity_type: params.entityType,
       entity_id: params.entityId,
       signoff_type: params.signoffType,
+      signoff_order: params.signoffOrder,
       user_id: params.userId,
       version: params.version || null,
-      transition_id: params.transitionId,
+      transition_id: params.transitionId ?? null,
       comment: params.comment,
     },
   });
@@ -600,11 +741,12 @@ export async function invalidateSignoffs(
       entity_type: entityType,
       entity_id: entityId,
       signoff_type: { in: ['review', 'approve'] },
-      invalidated_at: null, // only invalidate non-invalidated ones
+      invalidated_at: null,
     },
     data: {
       invalidated_at: new Date(),
       invalidated_by: invalidatedBy,
+      invalidation_reason: 'content_changed',
     },
   });
 }
@@ -648,41 +790,151 @@ export async function getEngagementSignoffs(engagementId: string) {
 }
 
 // =============================================================================
-// CREATE VERSION ON TRANSITION — Snapshot entity state at transition time
+// MANUAL SIGN / UNSIGN — Direct signoff actions from the signoff bar
 // =============================================================================
 
-async function createTransitionVersion(
-  entityType: string,
-  entityId: string,
-  userId: string,
-  userName: string,
-  options: { comment: string | null; actionLabel: string },
-): Promise<void> {
-  switch (entityType) {
-    case 'procedure': {
-      const procedure = await prisma.engagementProcedure.findUnique({
-        where: { id: entityId },
-      });
-      if (!procedure) return;
+const SIGNOFF_LEVEL: Record<string, number> = { prepare: 0, review: 1, approve: 2 };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const snapshot = buildProcedureSnapshot(procedure as any);
-      const result = await publishEntity(entityType, entityId, snapshot, userId, userName, {
-        comment: options.comment,
-        versionType: 'transition',
-        actionLabel: options.actionLabel,
-      });
+/**
+ * Manual sign: user clicks signoff bar to sign a specific stage.
+ * Enforces order between levels (prepare < review < approve).
+ * Flexible within the same level (review 1 and review 2 can be signed in any order).
+ */
+export async function manualSign(params: {
+  entityType: string;
+  entityId: string;
+  engagementId: string;
+  signoffType: string;
+  signoffOrder: number;
+  userId: string;
+}): Promise<void> {
+  const { entityType, entityId, engagementId, signoffType, signoffOrder, userId } = params;
 
-      // Update current_version on the procedure
-      await prisma.engagementProcedure.update({
-        where: { id: entityId },
-        data: { current_version: result.version },
-      });
-      break;
+  // 1. Check no active duplicate
+  const existing = await prisma.wpSignoff.findFirst({
+    where: {
+      entity_type: entityType,
+      entity_id: entityId,
+      signoff_type: signoffType,
+      signoff_order: signoffOrder,
+      invalidated_at: null,
+    },
+  });
+  if (existing) throw new Error('This stage is already signed');
+
+  // 2. Enforce order between levels — all lower-level stages must be signed
+  const currentLevel = SIGNOFF_LEVEL[signoffType] ?? 0;
+  if (currentLevel > 0) {
+    // Get the workflow signoff stages to know what lower stages exist
+    const allStages = await getWorkflowSignoffTypes(entityType);
+    for (const stage of allStages) {
+      const stageLevel = SIGNOFF_LEVEL[stage.type] ?? 0;
+      if (stageLevel >= currentLevel) continue;
+      // Check all rounds of this lower-level type are signed
+      for (let order = 1; order <= stage.count; order++) {
+        const lowerSigned = await prisma.wpSignoff.findFirst({
+          where: {
+            entity_type: entityType,
+            entity_id: entityId,
+            signoff_type: stage.type,
+            signoff_order: order,
+            invalidated_at: null,
+          },
+        });
+        if (!lowerSigned) {
+          throw new Error(`Cần ký "${stage.type}" trước khi ký "${signoffType}"`);
+        }
+      }
     }
-    // Future entity types (planning_workpaper, etc.) can be added here
-    default:
-      // No snapshot builder for this entity type yet — skip silently
-      break;
   }
+
+  // 3. Get entity version
+  const entity = await getEntityStatus(entityType, entityId);
+  if (!entity) throw new Error('Entity not found');
+
+  // 4. Create signoff
+  await createSignoff({
+    engagementId,
+    entityType,
+    entityId,
+    signoffType,
+    signoffOrder,
+    userId,
+    version: entity.currentVersion,
+    transitionId: null,
+    comment: null,
+  });
+
+  // Backward compat: populate inline fields
+  await populateInlineSignoffFields(entityType, entityId, signoffType, userId);
 }
+
+/**
+ * Unsign: remove a signoff by invalidating it.
+ * Rules:
+ * 1. Can only unsign your own signoff (unless admin — future).
+ * 2. Locked if any higher-level signoff is active.
+ */
+export async function unsignSignoff(params: {
+  entityType: string;
+  entityId: string;
+  signoffType: string;
+  signoffOrder: number;
+  userId: string;
+}): Promise<void> {
+  const { entityType, entityId, signoffType, signoffOrder, userId } = params;
+
+  // 1. Find the active signoff for this stage
+  const signoff = await prisma.wpSignoff.findFirst({
+    where: {
+      entity_type: entityType,
+      entity_id: entityId,
+      signoff_type: signoffType,
+      signoff_order: signoffOrder,
+      invalidated_at: null,
+    },
+  });
+  if (!signoff) throw new Error('No active signoff found for this stage');
+
+  // 2. Check ownership
+  if (signoff.user_id !== userId) {
+    throw new Error('Bạn chỉ có thể gỡ chữ ký của chính mình');
+  }
+
+  // 3. Lock check — no higher-level signoff may be active
+  const currentLevel = SIGNOFF_LEVEL[signoffType] ?? 0;
+  const higherSignoffs = await prisma.wpSignoff.findMany({
+    where: {
+      entity_type: entityType,
+      entity_id: entityId,
+      invalidated_at: null,
+      NOT: {
+        signoff_type: signoffType,
+        signoff_order: signoffOrder,
+      },
+    },
+  });
+
+  for (const hs of higherSignoffs) {
+    const hsLevel = SIGNOFF_LEVEL[hs.signoff_type] ?? 0;
+    if (hsLevel > currentLevel) {
+      throw new Error('Cần gỡ chữ ký cấp cao hơn trước');
+    }
+    // Same level, higher order → also blocks
+    if (hsLevel === currentLevel && hs.signoff_order > signoffOrder) {
+      throw new Error('Cần gỡ chữ ký cấp cao hơn trước');
+    }
+  }
+
+  // 4. Invalidate
+  await prisma.wpSignoff.update({
+    where: { id: signoff.id },
+    data: {
+      invalidated_at: new Date(),
+      invalidated_by: userId,
+      invalidation_reason: 'user_unsign',
+    },
+  });
+}
+
+// createTransitionVersion is now in workpaperContent.ts (shared across entity types)

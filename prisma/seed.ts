@@ -243,6 +243,8 @@ async function main() {
       action_type: 'start',
       allowed_roles: ['*'],
       sort_order: 0,
+      generates_signoff: false,
+      signoff_type: null,
     },
     {
       from_status: 'in_progress',
@@ -251,14 +253,18 @@ async function main() {
       action_type: 'submit',
       allowed_roles: ['*'],
       sort_order: 1,
+      generates_signoff: true,
+      signoff_type: 'prepare',
     },
     {
       from_status: 'waiting_review',
-      to_status: 'approved',
-      action_label: 'Phê duyệt',
-      action_type: 'approve',
+      to_status: 'reviewed',
+      action_label: 'Soát xét xong',
+      action_type: 'review',
       allowed_roles: ['reviewer', 'lead', 'audit_manager', 'audit_director', 'cae'],
       sort_order: 2,
+      generates_signoff: true,
+      signoff_type: 'review',
     },
     {
       from_status: 'waiting_review',
@@ -267,6 +273,8 @@ async function main() {
       action_type: 'reject',
       allowed_roles: ['reviewer', 'lead', 'audit_manager', 'audit_director', 'cae'],
       sort_order: 3,
+      generates_signoff: false,
+      signoff_type: null,
     },
     {
       from_status: 'needs_modification',
@@ -275,6 +283,8 @@ async function main() {
       action_type: 'submit',
       allowed_roles: ['*'],
       sort_order: 4,
+      generates_signoff: false,
+      signoff_type: null,
     },
   ];
 
@@ -287,14 +297,40 @@ async function main() {
           to_status: t.to_status,
         },
       },
-      update: { action_label: t.action_label, allowed_roles: t.allowed_roles, sort_order: t.sort_order },
+      update: {
+        action_label: t.action_label,
+        allowed_roles: t.allowed_roles,
+        sort_order: t.sort_order,
+        generates_signoff: t.generates_signoff,
+        signoff_type: t.signoff_type,
+      },
       create: {
         workflow_id: defaultWorkflow.id,
         ...t,
       },
     });
   }
+  // Cleanup: remove stale waiting_review → approved transition (replaced by waiting_review → reviewed)
+  await prisma.approvalTransition.deleteMany({
+    where: {
+      workflow_id: defaultWorkflow.id,
+      from_status: 'waiting_review',
+      to_status: 'approved',
+    },
+  });
   console.log('✅ Default approval workflow seeded');
+
+  // --- Entity binding: planning_workpaper → default workflow ---
+  await prisma.approvalEntityBinding.upsert({
+    where: { entity_type: 'planning_workpaper' },
+    update: { workflow_id: defaultWorkflow.id },
+    create: {
+      entity_type: 'planning_workpaper',
+      workflow_id: defaultWorkflow.id,
+      label: 'Giấy tờ kế hoạch',
+    },
+  });
+  console.log('✅ Planning workpaper entity binding seeded');
 
   // --- 7b. Procedure-specific workflow (existing, with review step) ---
   const procedureWorkflow = await prisma.approvalWorkflow.upsert({
@@ -328,6 +364,8 @@ async function main() {
       action_type: 'start',
       allowed_roles: ['*'],
       sort_order: 0,
+      generates_signoff: false,
+      signoff_type: null,
     },
     {
       from_status: 'in_progress',
@@ -336,6 +374,8 @@ async function main() {
       action_type: 'submit',
       allowed_roles: ['*'],
       sort_order: 1,
+      generates_signoff: true,
+      signoff_type: 'prepare',
     },
     {
       from_status: 'waiting_review',
@@ -344,6 +384,8 @@ async function main() {
       action_type: 'approve',
       allowed_roles: ['reviewer', 'lead', 'audit_manager', 'audit_director', 'cae'],
       sort_order: 2,
+      generates_signoff: true,
+      signoff_type: 'approve',
     },
     {
       from_status: 'waiting_review',
@@ -352,6 +394,8 @@ async function main() {
       action_type: 'reject',
       allowed_roles: ['reviewer', 'lead', 'audit_manager', 'audit_director', 'cae'],
       sort_order: 3,
+      generates_signoff: false,
+      signoff_type: null,
     },
     {
       from_status: 'needs_modification',
@@ -360,6 +404,8 @@ async function main() {
       action_type: 'submit',
       allowed_roles: ['*'],
       sort_order: 4,
+      generates_signoff: false,
+      signoff_type: null,
     },
   ];
 
@@ -372,7 +418,13 @@ async function main() {
           to_status: t.to_status,
         },
       },
-      update: { action_label: t.action_label, allowed_roles: t.allowed_roles, sort_order: t.sort_order },
+      update: {
+        action_label: t.action_label,
+        allowed_roles: t.allowed_roles,
+        sort_order: t.sort_order,
+        generates_signoff: t.generates_signoff,
+        signoff_type: t.signoff_type,
+      },
       create: {
         workflow_id: procedureWorkflow.id,
         ...t,

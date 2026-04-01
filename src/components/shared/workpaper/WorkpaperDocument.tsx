@@ -46,6 +46,8 @@ export interface WorkpaperDocumentConfig {
   readOnly?: boolean;
   /** Initial "last saved" timestamp (e.g. entity's updatedAt) so indicator shows correct time on load */
   initialLastSavedAt?: Date | null;
+  /** Mini signoff info bar rendered below the header */
+  signoffBar?: React.ReactNode;
   /** Configurable tabs for the right task pane (comments tab is always appended) */
   tabs?: WorkpaperTab[];
   /** Label for the comments tab (default: "Soát xét") */
@@ -90,6 +92,7 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     onReopenThread,
     onDeleteThread,
     initialLastSavedAt,
+    signoffBar,
     isCreatingThread = false,
     isReplying = false,
   } = config;
@@ -317,6 +320,9 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
           </Button>
         </div>
       </div>
+
+      {/* ── Signoff bar (optional) ── */}
+      {signoffBar}
 
       {/* ── Body: Editor (left) + Task Pane (right) ── */}
       <div className="flex flex-1 overflow-hidden">

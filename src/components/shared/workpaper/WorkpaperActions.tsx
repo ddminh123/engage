@@ -28,6 +28,8 @@ interface WorkpaperActionsProps {
   onViewWorkflow?: () => void;
   /** Engagement members for the next-person picker */
   members?: EngagementMember[];
+  /** Use smaller, outline-style buttons (for inline/section views) */
+  compact?: boolean;
 }
 
 export function WorkpaperActions({
@@ -36,6 +38,7 @@ export function WorkpaperActions({
   isTransitioning = false,
   onViewWorkflow,
   members = [],
+  compact = false,
 }: WorkpaperActionsProps) {
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const [confirmTransition, setConfirmTransition] =
@@ -92,7 +95,7 @@ export function WorkpaperActions({
               title={primary.actionLabel}
               onClick={() => handleSelectTransition(primary)}
               disabled={isTransitioning}
-              className={`group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-primary text-sm font-medium text-primary-foreground whitespace-nowrap transition-all outline-none select-none h-8 gap-1.5 px-2.5 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 ${hasDropdown ? "rounded-r-none border-r-0" : ""}`}
+              className={`group/button inline-flex shrink-0 items-center justify-center rounded-lg border whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 ${compact ? "h-7 gap-1 px-2 text-xs font-medium border-border bg-background text-foreground hover:bg-accent" : "h-8 gap-1.5 px-2.5 text-sm font-medium border-transparent bg-primary text-primary-foreground"} ${hasDropdown ? "rounded-r-none border-r-0" : ""}`}
             />
           }
         >
@@ -119,7 +122,7 @@ export function WorkpaperActions({
       {hasDropdown && (
         <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
           <PopoverTrigger
-            className="inline-flex h-8 items-center justify-center rounded-l-none rounded-r-lg border-l border-l-primary-foreground/20 bg-primary px-2 text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+            className={`inline-flex items-center justify-center rounded-l-none rounded-r-lg disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${compact ? "h-7 px-1.5 border border-border bg-background text-foreground hover:bg-accent" : "h-8 px-2 border-l border-l-primary-foreground/20 bg-primary text-primary-foreground hover:bg-primary/90"}`}
             disabled={isTransitioning}
             title="Thêm hành động"
           >

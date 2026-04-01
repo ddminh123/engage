@@ -48,9 +48,9 @@ export const PROCEDURE_STATUS_DOT: Record<string, string> = {
   approved: "bg-emerald-500",
 };
 
-// ── Top-level node (section or standalone objective) ──
+// ── Top-level node (section, standalone objective, or standalone procedure) ──
 
-export type TopNodeType = "section" | "objective";
+export type TopNodeType = "section" | "objective" | "procedure";
 
 export interface TopNode {
   id: string;
@@ -58,15 +58,22 @@ export interface TopNode {
   title: string;
   section?: EngagementSection;
   objective?: EngagementObjective;
+  procedure?: EngagementProcedure;
+}
+
+function getTopNodeSortOrder(n: TopNode): number {
+  if (n.type === "section") return n.section?.sortOrder ?? 0;
+  if (n.type === "objective") return n.objective?.sortOrder ?? 0;
+  return n.procedure?.sortOrder ?? 0;
 }
 
 export function buildTopNodes(
   sections: EngagementSection[],
   standaloneObjectives: EngagementObjective[],
+  standaloneProcedures: EngagementProcedure[] = [],
 ): TopNode[] {
   const nodes: TopNode[] = [];
 
-  // Interleave by sortOrder — sections use sortOrder, objectives use sortOrder
   const sectionNodes: TopNode[] = sections.map((s) => ({
     id: s.id,
     type: "section" as const,
@@ -81,15 +88,16 @@ export function buildTopNodes(
     objective: o,
   }));
 
-  // Sort by sortOrder (sections and objectives share the same ordering space)
-  nodes.push(...sectionNodes, ...objectiveNodes);
-  nodes.sort((a, b) => {
-    const orderA =
-      a.type === "section" ? (a.section?.sortOrder ?? 0) : (a.objective?.sortOrder ?? 0);
-    const orderB =
-      b.type === "section" ? (b.section?.sortOrder ?? 0) : (b.objective?.sortOrder ?? 0);
-    return orderA - orderB;
-  });
+  const procedureNodes: TopNode[] = standaloneProcedures.map((p) => ({
+    id: p.id,
+    type: "procedure" as const,
+    title: p.title,
+    procedure: p,
+  }));
+
+  // Sort by sortOrder (all types share the same ordering space)
+  nodes.push(...sectionNodes, ...objectiveNodes, ...procedureNodes);
+  nodes.sort((a, b) => getTopNodeSortOrder(a) - getTopNodeSortOrder(b));
 
   return nodes;
 }
@@ -269,8 +277,8 @@ export interface WpState {
   editingType: "objective" | "procedure" | null;
   // Status editing (execution mode)
   editingStatus: string;
-  // Adding top-level node (section or standalone objective)
-  addingTopType: "section" | "objective" | null;
+  // Adding top-level node (section, standalone objective, or standalone procedure)
+  addingTopType: "section" | "objective" | "procedure" | null;
   addingTopTitle: string;
   // Editing top-level node header
   editingNodeId: string | null;
@@ -313,6 +321,7 @@ export type WpAction =
   // Top-level add
   | { type: "START_ADD_SECTION" }
   | { type: "START_ADD_TOP_OBJECTIVE" }
+  | { type: "START_ADD_TOP_PROCEDURE" }
   | { type: "SET_TOP_TITLE"; title: string }
   | { type: "CANCEL_ADD_TOP" }
   // Top-level edit header
@@ -378,6 +387,12 @@ export function wpReducer(state: WpState, action: WpAction): WpState {
         addingTopType: "objective",
         addingTopTitle: "",
       };
+    case "START_ADD_TOP_PROCEDURE":
+      return {
+        ...wpInitialState,
+        addingTopType: "procedure",
+        addingTopTitle: "",
+      };
     case "SET_TOP_TITLE":
       return { ...state, addingTopTitle: action.title };
     case "CANCEL_ADD_TOP":
@@ -420,6 +435,7 @@ export function computeWpStats(
   sections: EngagementSection[],
   standaloneObjectives: EngagementObjective[],
   findingCount: number,
+  standaloneProcedures: EngagementProcedure[] = [],
 ): WpStats {
   let objectives = 0;
   let procedures = 0;
@@ -441,6 +457,10 @@ export function computeWpStats(
     procedures += obj.procedures.length;
     completed += obj.procedures.filter((p) => p.approvalStatus === "approved" || p.approvalStatus === "reviewed").length;
   }
+
+  // Standalone procedures (no section, no objective)
+  procedures += standaloneProcedures.length;
+  completed += standaloneProcedures.filter((p) => p.approvalStatus === "approved" || p.approvalStatus === "reviewed").length;
 
   return {
     sections: sections.length,

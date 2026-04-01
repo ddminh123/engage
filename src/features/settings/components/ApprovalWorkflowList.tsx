@@ -1,6 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { WorkflowFlowChart as SharedWorkflowFlowChart } from "@/components/shared/WorkflowFlowChart";
 import {
   ArrowRight,
@@ -17,7 +20,16 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +44,8 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { FormDialog } from "@/components/shared/FormDialog";
+import { COMMON_LABELS } from "@/constants/labels";
 import { DataTable } from "@/components/shared/DataTable";
 import { computeReorder } from "@/components/shared/SortableList";
 import {
@@ -54,9 +68,12 @@ import {
   useActiveStatuses,
 } from "../hooks/useApprovalStatuses";
 
+const C = COMMON_LABELS;
+
 const ACTION_TYPES = [
   { value: "start", label: "Bắt đầu" },
   { value: "submit", label: "Gửi" },
+  { value: "review", label: "Soát xét" },
   { value: "approve", label: "Phê duyệt" },
   { value: "reject", label: "Từ chối" },
   { value: "revise", label: "Sửa lại" },
@@ -291,7 +308,7 @@ function WorkflowCard({
 
       {/* Expanded content — flow chart + edit transitions */}
       {isExpanded && (
-        <div className="border-t p-4 space-y-4 min-w-0">
+        <div className="border-t p-4 space-y-4 min-w-0 overflow-hidden">
           {workflow.transitions.length > 0 && (
             <WorkflowFlowChart transitions={workflow.transitions} />
           )}
@@ -544,6 +561,32 @@ function TransitionTable({
 
 // ── Transition Form Dialog ──
 
+const SIGNOFF_TYPES = [
+  { value: "prepare", label: "Thực hiện (Prepare)" },
+  { value: "review", label: "Soát xét (Review)" },
+  { value: "approve", label: "Phê duyệt (Approve)" },
+];
+
+const transitionSchema = z.object({
+  fromStatus: z.string().min(1, "Bắt buộc"),
+  toStatus: z.string().min(1, "Bắt buộc"),
+  actionLabel: z.string().min(1, "Bắt buộc"),
+  actionType: z.enum([
+    "start",
+    "submit",
+    "review",
+    "approve",
+    "reject",
+    "revise",
+  ]),
+  sortOrder: z.number().int().min(0),
+  allowedRoles: z.array(z.string()).min(1, "Chọn ít nhất 1 vai trò"),
+  generatesSignoff: z.boolean(),
+  signoffType: z.string().nullable(),
+});
+
+type TransitionFormValues = z.infer<typeof transitionSchema>;
+
 function TransitionFormDialog({
   open,
   onOpenChange,
@@ -569,206 +612,355 @@ function TransitionFormDialog({
   const updateTransition = useUpdateApprovalTransition();
   const isEdit = transition !== null;
 
-  const [fromStatus, setFromStatus] = React.useState("");
-  const [toStatus, setToStatus] = React.useState("");
-  const [actionLabel, setActionLabel] = React.useState("");
-  const [actionType, setActionType] = React.useState<string>("submit");
-  const [allowedRoles, setAllowedRoles] = React.useState<string[]>(["*"]);
-  const [sortOrder, setSortOrder] = React.useState(0);
+  const form = useForm<TransitionFormValues>({
+    resolver: zodResolver(transitionSchema),
+    defaultValues: {
+      fromStatus: "",
+      toStatus: "",
+      actionLabel: "",
+      actionType: "submit",
+      sortOrder: 0,
+      allowedRoles: ["*"],
+      generatesSignoff: false,
+      signoffType: null,
+    },
+  });
 
   React.useEffect(() => {
-    if (transition) {
-      setFromStatus(transition.fromStatus);
-      setToStatus(transition.toStatus);
-      setActionLabel(transition.actionLabel);
-      setActionType(transition.actionType);
-      setAllowedRoles(transition.allowedRoles);
-      setSortOrder(transition.sortOrder);
-    } else {
-      setFromStatus("");
-      setToStatus("");
-      setActionLabel("");
-      setActionType("submit");
-      setAllowedRoles(["*"]);
-      setSortOrder(0);
+    if (open) {
+      form.reset({
+        fromStatus: transition?.fromStatus ?? "",
+        toStatus: transition?.toStatus ?? "",
+        actionLabel: transition?.actionLabel ?? "",
+        actionType: (transition?.actionType ??
+          "submit") as TransitionFormValues["actionType"],
+        sortOrder: transition?.sortOrder ?? 0,
+        allowedRoles: transition?.allowedRoles ?? ["*"],
+        generatesSignoff: transition?.generatesSignoff ?? false,
+        signoffType: transition?.signoffType ?? null,
+      });
+      addTransition.reset();
+      updateTransition.reset();
     }
-  }, [transition, open]);
-
-  const toggleRole = (role: string) => {
-    setAllowedRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
-    );
-  };
-
-  const handleSubmit = () => {
-    const data: ApprovalTransitionInput = {
-      fromStatus,
-      toStatus,
-      actionLabel,
-      actionType: actionType as ApprovalTransitionInput["actionType"],
-      allowedRoles,
-      sortOrder,
-    };
-
-    if (isEdit && transition) {
-      updateTransition.mutate(
-        { workflowId, transitionId: transition.id, data },
-        { onSuccess: () => onOpenChange(false) },
-      );
-    } else {
-      addTransition.mutate(
-        { workflowId, data },
-        { onSuccess: () => onOpenChange(false) },
-      );
-    }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const isPending = addTransition.isPending || updateTransition.isPending;
-  const isValid =
-    fromStatus &&
-    toStatus &&
-    actionLabel &&
-    actionType &&
-    allowedRoles.length > 0;
+  const mutationError =
+    addTransition.error?.message ?? updateTransition.error?.message ?? null;
+
+  const handleSubmit = async (values: TransitionFormValues) => {
+    const data: ApprovalTransitionInput = {
+      ...values,
+      actionType: values.actionType as ApprovalTransitionInput["actionType"],
+    };
+    try {
+      if (isEdit && transition) {
+        await updateTransition.mutateAsync({
+          workflowId,
+          transitionId: transition.id,
+          data,
+        });
+      } else {
+        await addTransition.mutateAsync({ workflowId, data });
+      }
+      onOpenChange(false);
+    } catch {
+      // Error captured by mutation state
+    }
+  };
+
+  const toggleRole = (role: string) => {
+    const current = form.getValues("allowedRoles");
+    form.setValue(
+      "allowedRoles",
+      current.includes(role)
+        ? current.filter((r) => r !== role)
+        : [...current, role],
+      { shouldValidate: true },
+    );
+  };
+  const watchedRoles = form.watch("allowedRoles");
+  const watchedGeneratesSignoff = form.watch("generatesSignoff");
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Sửa bước chuyển" : "Thêm bước chuyển"}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={isEdit ? "Sửa bước chuyển" : "Thêm bước chuyển"}
+      size="md"
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {C.action.cancel}
+          </Button>
+          <Button type="submit" form="transition-form" disabled={isPending}>
+            {isPending
+              ? C.action.saving
+              : isEdit
+                ? C.action.update
+                : C.action.create}
+          </Button>
+        </>
+      }
+    >
+      <Form {...form}>
+        <form
+          id="transition-form"
+          onSubmit={form.handleSubmit(handleSubmit)}
+          className="space-y-4"
+        >
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Từ trạng thái</Label>
-              <Select
-                value={fromStatus}
-                onValueChange={(v) => v && setFromStatus(v)}
-              >
-                <SelectTrigger className="h-9">
-                  <span
-                    className={cn(
-                      "flex flex-1 text-left truncate",
-                      !fromStatus && "text-muted-foreground",
-                    )}
-                  >
-                    {fromStatus ? sLabel(fromStatus) : "Chọn..."}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((s) => (
-                    <SelectItem key={s.value} value={s.value} label={s.label}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Đến trạng thái</Label>
-              <Select
-                value={toStatus}
-                onValueChange={(v) => v && setToStatus(v)}
-              >
-                <SelectTrigger className="h-9">
-                  <span
-                    className={cn(
-                      "flex flex-1 text-left truncate",
-                      !toStatus && "text-muted-foreground",
-                    )}
-                  >
-                    {toStatus ? sLabel(toStatus) : "Chọn..."}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((s) => (
-                    <SelectItem key={s.value} value={s.value} label={s.label}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Nhãn nút</Label>
-            <Input
-              value={actionLabel}
-              onChange={(e) => setActionLabel(e.target.value)}
-              placeholder="Ví dụ: Gửi soát xét"
-              className="h-9"
+            <FormField
+              control={form.control}
+              name="fromStatus"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Từ trạng thái *</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={(v) => v && field.onChange(v)}
+                    >
+                      <SelectTrigger>
+                        <span
+                          className={cn(
+                            "flex flex-1 text-left truncate",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value ? sLabel(field.value) : "Chọn..."}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptions.map((s) => (
+                          <SelectItem
+                            key={s.value}
+                            value={s.value}
+                            label={s.label}
+                          >
+                            {s.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="toStatus"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Đến trạng thái *</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={(v) => v && field.onChange(v)}
+                    >
+                      <SelectTrigger>
+                        <span
+                          className={cn(
+                            "flex flex-1 text-left truncate",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value ? sLabel(field.value) : "Chọn..."}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptions.map((s) => (
+                          <SelectItem
+                            key={s.value}
+                            value={s.value}
+                            label={s.label}
+                          >
+                            {s.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
 
+          <FormField
+            control={form.control}
+            name="actionLabel"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nhãn nút *</FormLabel>
+                <FormControl>
+                  <Input placeholder="Ví dụ: Gửi soát xét" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Loại hành động</Label>
-              <Select
-                value={actionType}
-                onValueChange={(v) => v && setActionType(v)}
-              >
-                <SelectTrigger className="h-9">
-                  <span className="flex flex-1 text-left truncate">
-                    {ACTION_TYPES.find((a) => a.value === actionType)?.label ??
-                      actionType}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  {ACTION_TYPES.map((a) => (
-                    <SelectItem key={a.value} value={a.value} label={a.label}>
-                      {a.label}
-                    </SelectItem>
+            <FormField
+              control={form.control}
+              name="actionType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Loại hành động *</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={(v) => v && field.onChange(v)}
+                    >
+                      <SelectTrigger>
+                        <span className="flex flex-1 text-left truncate">
+                          {ACTION_TYPES.find((a) => a.value === field.value)
+                            ?.label ?? field.value}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ACTION_TYPES.map((a) => (
+                          <SelectItem
+                            key={a.value}
+                            value={a.value}
+                            label={a.label}
+                          >
+                            {a.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="sortOrder"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Thứ tự</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      value={field.value}
+                      onChange={(e) =>
+                        field.onChange(parseInt(e.target.value, 10) || 0)
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <FormField
+            control={form.control}
+            name="allowedRoles"
+            render={() => (
+              <FormItem>
+                <FormLabel>Vai trò được phép *</FormLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {ROLE_OPTIONS.map((role) => (
+                    <Badge
+                      key={role.value}
+                      variant={
+                        watchedRoles.includes(role.value)
+                          ? "default"
+                          : "outline"
+                      }
+                      className="cursor-pointer text-xs"
+                      onClick={() => toggleRole(role.value)}
+                    >
+                      {role.label}
+                    </Badge>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Thứ tự</Label>
-              <Input
-                type="number"
-                value={sortOrder}
-                onChange={(e) =>
-                  setSortOrder(parseInt(e.target.value, 10) || 0)
-                }
-                className="h-9"
-              />
-            </div>
-          </div>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-          <div className="space-y-1.5">
-            <Label className="text-xs">Vai trò được phép</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {ROLE_OPTIONS.map((role) => (
-                <Badge
-                  key={role.value}
-                  variant={
-                    allowedRoles.includes(role.value) ? "default" : "outline"
-                  }
-                  className="cursor-pointer text-xs"
-                  onClick={() => toggleRole(role.value)}
-                >
-                  {role.label}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </div>
+          <FormField
+            control={form.control}
+            name="generatesSignoff"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-2">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={(v) => {
+                      const checked = !!v;
+                      field.onChange(checked);
+                      if (!checked) form.setValue("signoffType", null);
+                    }}
+                  />
+                </FormControl>
+                <FormLabel className="!mt-0 text-sm font-normal">
+                  Tạo chữ ký (signoff) cho bước này
+                </FormLabel>
+              </FormItem>
+            )}
+          />
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Hủy
-          </Button>
-          <Button onClick={handleSubmit} disabled={isPending || !isValid}>
-            {isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            {isEdit ? "Cập nhật" : "Thêm"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {watchedGeneratesSignoff && (
+            <FormField
+              control={form.control}
+              name="signoffType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Loại chữ ký *</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={(v) => v && field.onChange(v)}
+                    >
+                      <SelectTrigger>
+                        <span
+                          className={cn(
+                            "flex flex-1 text-left truncate",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value
+                            ? (SIGNOFF_TYPES.find(
+                                (s) => s.value === field.value,
+                              )?.label ?? field.value)
+                            : "Chọn loại chữ ký..."}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SIGNOFF_TYPES.map((s) => (
+                          <SelectItem
+                            key={s.value}
+                            value={s.value}
+                            label={s.label}
+                          >
+                            {s.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {mutationError && (
+            <p className="text-sm font-medium text-destructive">
+              {mutationError}
+            </p>
+          )}
+        </form>
+      </Form>
+    </FormDialog>
   );
 }
 

@@ -14,6 +14,9 @@ import type {
   TemplateInput,
   TemplateCategory,
   TemplateCategoryInput,
+  TemplateEntityBinding,
+  TemplateEntityBindingInput,
+  TemplateForEntity,
   ApprovalWorkflow,
   ApprovalWorkflowInput,
   ApprovalWorkflowUpdateInput,
@@ -438,6 +441,36 @@ export async function restoreApprovalStatusApi(id: string): Promise<ApprovalStat
     body: JSON.stringify({ restore: true }),
   });
   return handleResponse<ApprovalStatusItem>(response);
+}
+
+// =============================================================================
+// TEMPLATE ENTITY BINDINGS
+// =============================================================================
+
+export async function fetchTemplateBindingsApi(): Promise<TemplateEntityBinding[]> {
+  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATE_BINDINGS);
+  return handleResponse<TemplateEntityBinding[]>(response);
+}
+
+export async function upsertTemplateBindingApi(data: TemplateEntityBindingInput): Promise<TemplateEntityBinding> {
+  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATE_BINDINGS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<TemplateEntityBinding>(response);
+}
+
+export async function deleteTemplateBindingApi(entityType: string): Promise<{ success: boolean }> {
+  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATE_BINDINGS_BY_ENTITY(entityType), {
+    method: 'DELETE',
+  });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+export async function fetchTemplateForEntityApi(entityType: string): Promise<TemplateForEntity | null> {
+  const response = await fetch(`${API_ROUTES.TEMPLATE_FOR_ENTITY}?entityType=${encodeURIComponent(entityType)}`);
+  return handleResponse<TemplateForEntity | null>(response);
 }
 
 // =============================================================================

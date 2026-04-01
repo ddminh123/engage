@@ -761,12 +761,14 @@ model WpSignoff {
   entity_type     String    // 'procedure' | 'planning_workpaper' | 'work_program'
   entity_id       String
   signoff_type    String    // 'prepare' | 'review' | 'approve'
+  signoff_order   Int       @default(1) // which round (1,2,3...) — matches derived order from workflow
   user_id         String
   signed_at       DateTime  @default(now())
   version         Int?      // entity version at time of sign-off (links to EntityVersion)
-  transition_id   String?   // which ApprovalTransition triggered this
+  transition_id   String?   // which ApprovalTransition triggered this (null for manual signoff)
   invalidated_at  DateTime?
   invalidated_by  String?
+  invalidation_reason String? // 'content_changed' | 'user_unsign' | 'cascade_unsign'
   comment         String?   @db.Text
 
   engagement Engagement @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
@@ -1203,6 +1205,8 @@ model ApprovalTransition {
   action_type   String  // semantic: "submit" | "approve" | "reject" | "revise"
   allowed_roles Json    // ["reviewer","lead","cae"] — engagement member roles + system roles
   sort_order    Int     @default(0)
+  generates_signoff Boolean @default(false) // true → creates a signoff slot
+  signoff_type      String? // 'prepare' | 'review' | 'approve' — required when generates_signoff = true
 
   workflow ApprovalWorkflow @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
 
@@ -1277,7 +1281,7 @@ model Template {
   name        String
   description String?  @db.Text
   content     Json     // Tiptap JSON content
-  entity_type String   // "procedure" | "entity_risk_assessment"
+  entity_type String   // "procedure" | "planning_workpaper" | "entity_risk_assessment"
   category_id String?
   is_active   Boolean  @default(true)
   created_by  String
@@ -1286,9 +1290,25 @@ model Template {
 
   category TemplateCategory? @relation(fields: [category_id], references: [id], onDelete: SetNull)
   creator  User              @relation("TemplateCreator", fields: [created_by], references: [id])
+  bindings TemplateEntityBinding[]
 
   @@index([entity_type])
   @@index([category_id])
   @@index([created_by])
   @@map("template")
+}
+
+// =============================================================================
+// TEMPLATE ENTITY BINDING — Maps entity types to default templates
+// =============================================================================
+
+model TemplateEntityBinding {
+  id          String @id @default(cuid())
+  entity_type String @unique   // "procedure" | "planning_workpaper" | "entity_risk_assessment"
+  template_id String
+
+  template Template @relation(fields: [template_id], references: [id], onDelete: Cascade)
+
+  @@index([template_id])
+  @@map("template_entity_binding")
 }

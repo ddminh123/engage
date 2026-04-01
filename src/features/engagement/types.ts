@@ -506,12 +506,14 @@ export interface WpSignoff {
   entityType: string;
   entityId: string;
   signoffType: 'prepare' | 'review' | 'approve';
+  signoffOrder: number;
   userId: string;
   signedAt: string;
   version: number | null;
   transitionId: string | null;
   invalidatedAt: string | null;
   invalidatedBy: string | null;
+  invalidationReason: string | null;
   comment: string | null;
   user: {
     id: string;

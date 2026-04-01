@@ -470,7 +470,7 @@ function TopNodeCard({
   const columns = useWpColumns(
     editor,
     node.id,
-    node.type,
+    node.type as "section" | "objective",
     onViewItem,
     onOpenForm,
   );

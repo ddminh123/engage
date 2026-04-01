@@ -50,6 +50,9 @@ export const API_ROUTES = {
   ENGAGEMENT_PROCEDURE_ASSIGNEE: (id: string, pId: string) => `/api/engagement/${id}/procedures/${pId}/assignee`,
   ENGAGEMENT_PLANNING_WORKPAPERS: (id: string) => `/api/engagement/${id}/planning-workpapers`,
   ENGAGEMENT_PLANNING_WORKPAPER_BY_ID: (id: string, wpId: string) => `/api/engagement/${id}/planning-workpapers/${wpId}`,
+  ENGAGEMENT_PLANNING_WORKPAPER_VERSIONS: (id: string, wpId: string) => `/api/engagement/${id}/planning-workpapers/${wpId}/versions`,
+  ENGAGEMENT_PLANNING_WORKPAPER_VERSION_BY_NUM: (id: string, wpId: string, v: number) => `/api/engagement/${id}/planning-workpapers/${wpId}/versions/${v}`,
+  ENGAGEMENT_PLANNING_WORKPAPER_VERSION_RESTORE: (id: string, wpId: string, v: number) => `/api/engagement/${id}/planning-workpapers/${wpId}/versions/${v}/restore`,
   ENGAGEMENT_WP_ASSIGNMENTS: (id: string) => `/api/engagement/${id}/wp-assignments`,
   ENGAGEMENT_WP_SIGNOFFS: (id: string) => `/api/engagement/${id}/wp-signoffs`,
   ENGAGEMENT_WP_COMMENTS: (id: string) => `/api/engagement/${id}/wp-comments`,
@@ -60,9 +63,12 @@ export const API_ROUTES = {
   ENGAGEMENT_PROCEDURE_VERSIONS: (id: string, pId: string) => `/api/engagement/${id}/procedures/${pId}/versions`,
   ENGAGEMENT_PROCEDURE_VERSION_BY_NUM: (id: string, pId: string, v: number) => `/api/engagement/${id}/procedures/${pId}/versions/${v}`,
   ENGAGEMENT_PROCEDURE_VERSION_RESTORE: (id: string, pId: string, v: number) => `/api/engagement/${id}/procedures/${pId}/versions/${v}/restore`,
+  APPROVAL_SIGNOFF_TYPES: (entityType: string) => `/api/approval/${entityType}/signoff-types`,
   APPROVAL_TRANSITIONS: (entityType: string, entityId: string) => `/api/approval/${entityType}/${entityId}/transitions`,
   APPROVAL_EXECUTE_TRANSITION: (entityType: string, entityId: string) => `/api/approval/${entityType}/${entityId}/transition`,
   APPROVAL_AUTO_TRANSITION: (entityType: string, entityId: string) => `/api/approval/${entityType}/${entityId}/auto-transition`,
+  APPROVAL_SIGN: (entityType: string, entityId: string) => `/api/approval/${entityType}/${entityId}/sign`,
+  APPROVAL_UNSIGN: (entityType: string, entityId: string) => `/api/approval/${entityType}/${entityId}/unsign`,
 
   // Finding module
   FINDING: "/api/finding",
@@ -107,6 +113,9 @@ export const API_ROUTES = {
   SETTINGS_TEMPLATES: "/api/settings/templates",
   SETTINGS_TEMPLATES_BY_ID: (id: string) => `/api/settings/templates/${id}`,
   SETTINGS_TEMPLATE_CATEGORIES: "/api/settings/template-categories",
+  SETTINGS_TEMPLATE_BINDINGS: "/api/settings/template-bindings",
+  SETTINGS_TEMPLATE_BINDINGS_BY_ENTITY: (entityType: string) => `/api/settings/template-bindings/${entityType}`,
+  TEMPLATE_FOR_ENTITY: "/api/templates/for-entity",
 
   // Document module
   DOCUMENT: "/api/document",

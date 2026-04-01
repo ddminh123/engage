@@ -6,19 +6,16 @@ import { Plus, Pencil, Trash2, FileText } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DataTable, DataTableColumnHeader } from "@/components/shared/DataTable";
+import {
+  DataTable,
+  DataTableColumnHeader,
+} from "@/components/shared/DataTable";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { TemplateForm } from "./TemplateForm";
-import {
-  useTemplates,
-  useDeleteTemplate,
-} from "../hooks/useTemplates";
+import { TemplateEditorOverlay } from "./TemplateEditorOverlay";
+import { useTemplates, useDeleteTemplate } from "../hooks/useTemplates";
+import { templateEntityTypeLabel } from "@/constants/entityTypes";
 import type { Template } from "../types";
-
-const ENTITY_TYPE_LABELS: Record<string, string> = {
-  procedure: "Thủ tục kiểm toán",
-  entity_risk_assessment: "Đánh giá rủi ro",
-};
 
 function useTemplateColumns(
   onEdit: (item: Template) => void,
@@ -52,7 +49,7 @@ function useTemplateColumns(
         ),
         cell: ({ row }) => (
           <Badge variant="secondary" className="text-xs font-normal">
-            {ENTITY_TYPE_LABELS[row.original.entityType] ?? row.original.entityType}
+            {templateEntityTypeLabel(row.original.entityType)}
           </Badge>
         ),
         filterFn: "equals",
@@ -132,12 +129,11 @@ export function TemplateList() {
   const deleteMutation = useDeleteTemplate();
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Template | null>(null);
+  const [overlayTemplate, setOverlayTemplate] = useState<Template | null>(null);
   const [deleting, setDeleting] = useState<Template | null>(null);
 
   const handleEdit = React.useCallback((item: Template) => {
-    setEditing(item);
-    setFormOpen(true);
+    setOverlayTemplate(item);
   }, []);
 
   const handleDeleteClick = React.useCallback((item: Template) => {
@@ -156,6 +152,12 @@ export function TemplateList() {
 
   const columns = useTemplateColumns(handleEdit, handleDeleteClick);
 
+  // After creating a template, open it in the fullscreen overlay
+  const handleCreated = React.useCallback((created: Template) => {
+    setFormOpen(false);
+    setOverlayTemplate(created);
+  }, []);
+
   return (
     <>
       <DataTable
@@ -165,14 +167,7 @@ export function TemplateList() {
         emptyMessage="Chưa có mẫu nào. Thêm mới để bắt đầu."
         searchPlaceholder="Tìm mẫu..."
         actions={
-          <Button
-            size="sm"
-            className="h-8"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
+          <Button size="sm" className="h-8" onClick={() => setFormOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Thêm mẫu
           </Button>
@@ -181,12 +176,16 @@ export function TemplateList() {
 
       <TemplateForm
         open={formOpen}
-        onOpenChange={(open) => {
-          setFormOpen(open);
-          if (!open) setEditing(null);
-        }}
-        initialData={editing}
+        onOpenChange={setFormOpen}
+        onCreated={handleCreated}
       />
+
+      {overlayTemplate && (
+        <TemplateEditorOverlay
+          template={overlayTemplate}
+          onClose={() => setOverlayTemplate(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={!!deleting}

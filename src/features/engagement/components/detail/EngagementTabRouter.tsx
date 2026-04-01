@@ -25,11 +25,13 @@ const ReportingTab = React.lazy(() =>
 interface EngagementTabRouterProps {
   engagement: EngagementDetail;
   onOpenWorkpaper?: (procedureId: string) => void;
+  onOpenPlanningWp?: (stepConfigId: string) => void;
 }
 
 export function EngagementTabRouter({
   engagement,
   onOpenWorkpaper,
+  onOpenPlanningWp,
 }: EngagementTabRouterProps) {
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab");
@@ -49,6 +51,7 @@ export function EngagementTabRouter({
           engagement={engagement}
           section={section}
           onOpenWorkpaper={onOpenWorkpaper}
+          onOpenPlanningWp={onOpenPlanningWp}
         />
       )}
       {tab === "execution" && (

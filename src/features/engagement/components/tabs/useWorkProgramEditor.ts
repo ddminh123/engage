@@ -15,6 +15,7 @@ import {
 import type {
   EngagementSection,
   EngagementObjective,
+  EngagementProcedure,
 } from "../../types";
 import {
   type WpState,
@@ -36,6 +37,7 @@ export function useWorkProgramEditor(
   standaloneObjectives: EngagementObjective[],
   findingCount: number,
   mode: WpMode,
+  standaloneProcedures: EngagementProcedure[] = [],
 ) {
   const [state, dispatch] = useReducer(wpReducer, wpInitialState);
 
@@ -80,15 +82,15 @@ export function useWorkProgramEditor(
   // ── Top-level nodes ──
 
   const topNodes = useMemo(
-    () => buildTopNodes(sections, standaloneObjectives),
-    [sections, standaloneObjectives],
+    () => buildTopNodes(sections, standaloneObjectives, standaloneProcedures),
+    [sections, standaloneObjectives, standaloneProcedures],
   );
 
   // ── Stats ──
 
   const stats = useMemo(
-    () => computeWpStats(sections, standaloneObjectives, findingCount),
-    [sections, standaloneObjectives, findingCount],
+    () => computeWpStats(sections, standaloneObjectives, findingCount, standaloneProcedures),
+    [sections, standaloneObjectives, findingCount, standaloneProcedures],
   );
 
   // ── Tree data per card (memoized map) ──
@@ -229,6 +231,26 @@ export function useWorkProgramEditor(
     [createProcedure, engagementId],
   );
 
+  const handleAddTopProcedure = useCallback(
+    (title: string) => {
+      const t = title.trim();
+      if (!t || createProcedure.isPending) return;
+      createProcedure.mutate(
+        {
+          engagementId,
+          data: {
+            title: t,
+            sectionId: null,
+            objectiveId: null,
+            addedFrom: mode,
+          },
+        },
+        { onSuccess: () => dispatch({ type: "CANCEL_ADD_TOP" }) },
+      );
+    },
+    [createProcedure, engagementId, mode],
+  );
+
   const handleUpdateProcedure = useCallback(
     (procedureId: string, title: string) => {
       const t = title.trim();
@@ -236,6 +258,18 @@ export function useWorkProgramEditor(
       updateProcedure.mutate(
         { engagementId, procedureId, data: { title: t } },
         { onSuccess: () => dispatch({ type: "CANCEL_EDIT" }) },
+      );
+    },
+    [updateProcedure, engagementId],
+  );
+
+  const handleUpdateTopProcedure = useCallback(
+    (procedureId: string, title: string) => {
+      const t = title.trim();
+      if (!t) return;
+      updateProcedure.mutate(
+        { engagementId, procedureId, data: { title: t } },
+        { onSuccess: () => dispatch({ type: "CANCEL_EDIT_NODE" }) },
       );
     },
     [updateProcedure, engagementId],
@@ -276,9 +310,11 @@ export function useWorkProgramEditor(
       // Assign new sortOrders and split by entity type for the API
       const sectionItems: { id: string; sortOrder: number }[] = [];
       const objectiveItems: { id: string; sortOrder: number }[] = [];
+      const procedureItems: { id: string; sortOrder: number }[] = [];
       reordered.forEach((n, i) => {
         if (n.type === "section") sectionItems.push({ id: n.id, sortOrder: i });
-        else objectiveItems.push({ id: n.id, sortOrder: i });
+        else if (n.type === "objective") objectiveItems.push({ id: n.id, sortOrder: i });
+        else procedureItems.push({ id: n.id, sortOrder: i });
       });
 
       if (sectionItems.length > 0) {
@@ -293,6 +329,13 @@ export function useWorkProgramEditor(
           engagementId,
           entityType: "objective",
           items: objectiveItems,
+        });
+      }
+      if (procedureItems.length > 0) {
+        reorderItems.mutate({
+          engagementId,
+          entityType: "procedure",
+          items: procedureItems,
         });
       }
     },
@@ -311,7 +354,7 @@ export function useWorkProgramEditor(
       reordered.unshift(moved);
       reorderItems.mutate({
         engagementId,
-        entityType: node.type === "section" ? "section" : "objective",
+        entityType: node.type,
         items: reordered.map((n, i) => ({ id: n.id, sortOrder: i })),
       });
     },
@@ -364,15 +407,20 @@ export function useWorkProgramEditor(
       reordered.splice(newIdx, 0, moved);
       const sectionItems: { id: string; sortOrder: number }[] = [];
       const objectiveItems: { id: string; sortOrder: number }[] = [];
+      const procedureItems2: { id: string; sortOrder: number }[] = [];
       reordered.forEach((n, i) => {
         if (n.type === "section") sectionItems.push({ id: n.id, sortOrder: i });
-        else objectiveItems.push({ id: n.id, sortOrder: i });
+        else if (n.type === "objective") objectiveItems.push({ id: n.id, sortOrder: i });
+        else procedureItems2.push({ id: n.id, sortOrder: i });
       });
       if (sectionItems.length > 0) {
         reorderItems.mutate({ engagementId, entityType: "section", items: sectionItems });
       }
       if (objectiveItems.length > 0) {
         reorderItems.mutate({ engagementId, entityType: "objective", items: objectiveItems });
+      }
+      if (procedureItems2.length > 0) {
+        reorderItems.mutate({ engagementId, entityType: "procedure", items: procedureItems2 });
       }
       unlock();
     },
@@ -555,7 +603,9 @@ export function useWorkProgramEditor(
     handleUpdateObjective,
     // Procedure handlers
     handleAddProcedure,
+    handleAddTopProcedure,
     handleUpdateProcedure,
+    handleUpdateTopProcedure,
     handleUpdateProcedureStatus,
     // Delete
     handleConfirmDelete,

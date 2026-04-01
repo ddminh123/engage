@@ -149,7 +149,7 @@ export async function getVersion(entityType: string, entityId: string, version: 
 }
 
 // =============================================================================
-// RESTORE VERSION — Overwrite live entity with snapshot
+// RESTORE VERSION — Delegates to shared restoreEntityVersion
 // =============================================================================
 
 export async function restoreProcedureVersion(
@@ -158,76 +158,10 @@ export async function restoreProcedureVersion(
   userId: string,
   userName: string,
 ) {
-  const existing = await prisma.engagementProcedure.findUnique({ where: { id: procedureId } });
-  if (!existing) throw new Error('Procedure not found');
-
-  const versionRecord = await prisma.entityVersion.findUnique({
-    where: {
-      entity_type_entity_id_version: {
-        entity_type: 'procedure',
-        entity_id: procedureId,
-        version,
-      },
-    },
-  });
-  if (!versionRecord) throw new Error('Version not found');
-
-  const snap = versionRecord.snapshot as Record<string, unknown>;
-
-  await prisma.engagementProcedure.update({
-    where: { id: procedureId },
-    data: {
-      title: (snap.title as string) ?? existing.title,
-      description: (snap.description as string) ?? null,
-      procedures: (snap.procedures as string) ?? null,
-      procedure_type: (snap.procedureType as string) ?? null,
-      procedure_category: (snap.procedureCategory as string) ?? null,
-      observations: (snap.observations as string) ?? null,
-      conclusion: (snap.conclusion as string) ?? null,
-      effectiveness: (snap.effectiveness as string) ?? null,
-      sample_size: (snap.sampleSize as number) ?? null,
-      exceptions: (snap.exceptions as number) ?? null,
-      priority: (snap.priority as string) ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      content: (snap.content as any) ?? undefined,
-      review_notes: (snap.reviewNotes as string) ?? null,
-      approval_status: 'draft',
-    },
-  });
-
-  await logAudit({
-    userId,
-    userName,
-    action: 'update',
-    entityType: 'procedure',
-    entityId: procedureId,
-    changes: { restore: { old: null, new: `Restored to version ${version}` } },
-  });
-
-  return { success: true, restoredVersion: version };
+  const { restoreEntityVersion } = await import('./workpaperContent');
+  return restoreEntityVersion('procedure', procedureId, version, userId, userName);
 }
 
-// =============================================================================
-// SNAPSHOT BUILDERS — Per entity type
-// =============================================================================
-
-export function buildProcedureSnapshot(p: Record<string, unknown>): Record<string, unknown> {
-  return {
-    title: p.title,
-    description: p.description,
-    procedures: p.procedures,
-    procedureType: p.procedure_type,
-    procedureCategory: p.procedure_category,
-    status: p.status,
-    observations: p.observations,
-    conclusion: p.conclusion,
-    effectiveness: p.effectiveness,
-    sampleSize: p.sample_size,
-    exceptions: p.exceptions,
-    priority: p.priority,
-    content: p.content,
-    reviewNotes: p.review_notes,
-    performedBy: p.performed_by,
-    reviewedBy: p.reviewed_by,
-  };
-}
+// Snapshot builders moved to workpaperContent.ts
+// Re-export for backward compatibility if needed
+export { buildProcedureSnapshot } from './workpaperContent';

@@ -169,15 +169,41 @@ export interface TemplateInput {
   is_active?: boolean;
 }
 
+// =============================================================================
+// TEMPLATE ENTITY BINDING (Gán mẫu cho loại thực thể)
+// =============================================================================
+
+export interface TemplateEntityBinding {
+  id: string;
+  entityType: string;
+  templateId: string;
+  templateName: string;
+  templateEntityType: string;
+  templateIsActive: boolean;
+}
+
+export interface TemplateEntityBindingInput {
+  entityType: string;
+  templateId: string;
+}
+
+export interface TemplateForEntity {
+  id: string;
+  name: string;
+  content: unknown;
+}
+
 export interface ApprovalWorkflowTransition {
   id: string;
   workflowId: string;
   fromStatus: string;
   toStatus: string;
   actionLabel: string;
-  actionType: 'submit' | 'approve' | 'reject' | 'revise';
+  actionType: 'start' | 'submit' | 'review' | 'approve' | 'reject' | 'revise';
   allowedRoles: string[];
   sortOrder: number;
+  generatesSignoff: boolean;
+  signoffType: string | null;
 }
 
 export interface ApprovalEntityBinding {
@@ -225,9 +251,11 @@ export interface ApprovalTransitionInput {
   fromStatus: string;
   toStatus: string;
   actionLabel: string;
-  actionType: 'submit' | 'approve' | 'reject' | 'revise';
+  actionType: 'start' | 'submit' | 'review' | 'approve' | 'reject' | 'revise';
   allowedRoles: string[];
   sortOrder?: number;
+  generatesSignoff?: boolean;
+  signoffType?: string | null;
 }
 
 // =============================================================================

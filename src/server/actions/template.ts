@@ -218,3 +218,80 @@ export async function updateTemplate(id: string, data: UpdateTemplateInput) {
 export async function deleteTemplate(id: string) {
   await prisma.template.delete({ where: { id } });
 }
+
+// =============================================================================
+// TEMPLATE ENTITY BINDING ACTIONS
+// =============================================================================
+
+export async function listTemplateBindings() {
+  const items = await prisma.templateEntityBinding.findMany({
+    include: {
+      template: { select: { id: true, name: true, entity_type: true, is_active: true } },
+    },
+    orderBy: { entity_type: 'asc' },
+  });
+  return items.map((b) => ({
+    id: b.id,
+    entityType: b.entity_type,
+    templateId: b.template_id,
+    templateName: b.template.name,
+    templateEntityType: b.template.entity_type,
+    templateIsActive: b.template.is_active,
+  }));
+}
+
+export async function upsertTemplateBinding(entityType: string, templateId: string) {
+  const existing = await prisma.templateEntityBinding.findUnique({
+    where: { entity_type: entityType },
+  });
+
+  if (existing) {
+    const item = await prisma.templateEntityBinding.update({
+      where: { entity_type: entityType },
+      data: { template_id: templateId },
+      include: {
+        template: { select: { id: true, name: true, entity_type: true, is_active: true } },
+      },
+    });
+    return {
+      id: item.id,
+      entityType: item.entity_type,
+      templateId: item.template_id,
+      templateName: item.template.name,
+    };
+  }
+
+  const item = await prisma.templateEntityBinding.create({
+    data: { entity_type: entityType, template_id: templateId },
+    include: {
+      template: { select: { id: true, name: true, entity_type: true, is_active: true } },
+    },
+  });
+  return {
+    id: item.id,
+    entityType: item.entity_type,
+    templateId: item.template_id,
+    templateName: item.template.name,
+  };
+}
+
+export async function deleteTemplateBinding(entityType: string) {
+  await prisma.templateEntityBinding.delete({ where: { entity_type: entityType } });
+}
+
+export async function getTemplateForEntity(entityType: string) {
+  const binding = await prisma.templateEntityBinding.findUnique({
+    where: { entity_type: entityType },
+    include: {
+      template: {
+        select: { id: true, name: true, content: true, is_active: true },
+      },
+    },
+  });
+  if (!binding || !binding.template.is_active) return null;
+  return {
+    id: binding.template.id,
+    name: binding.template.name,
+    content: binding.template.content,
+  };
+}

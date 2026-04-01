@@ -2,7 +2,6 @@
 
 import { useReducer, useCallback, useState, useRef, useMemo } from "react";
 import {
-  useUpdateEngagement,
   useCreateAuditObjective,
   useUpdateAuditObjective,
   useDeleteAuditObjective,
@@ -70,8 +69,6 @@ export interface PlanningState {
   editingProcTitle: string;
   // Delete
   deleteTarget: { type: "objective" | "risk" | "control" | "section" | "wp_objective" | "procedure"; id: string; riskId?: string; title: string } | null;
-  // Understanding
-  understandingEditorOpen: boolean;
 }
 
 const initialState: PlanningState = {
@@ -107,7 +104,6 @@ const initialState: PlanningState = {
   editingProcId: null,
   editingProcTitle: "",
   deleteTarget: null,
-  understandingEditorOpen: false,
 };
 
 // ── Actions ──
@@ -163,10 +159,7 @@ export type PlanningAction =
   | { type: "CANCEL_EDIT_PROCEDURE" }
   // Delete
   | { type: "SET_DELETE_TARGET"; target: PlanningState["deleteTarget"] }
-  | { type: "CLEAR_DELETE_TARGET" }
-  // Understanding
-  | { type: "OPEN_UNDERSTANDING_EDITOR" }
-  | { type: "CLOSE_UNDERSTANDING_EDITOR" };
+  | { type: "CLEAR_DELETE_TARGET" };
 
 function reducer(state: PlanningState, action: PlanningAction): PlanningState {
   switch (action.type) {
@@ -277,11 +270,6 @@ function reducer(state: PlanningState, action: PlanningAction): PlanningState {
       return { ...state, deleteTarget: action.target };
     case "CLEAR_DELETE_TARGET":
       return { ...state, deleteTarget: null };
-    // Understanding
-    case "OPEN_UNDERSTANDING_EDITOR":
-      return { ...state, understandingEditorOpen: true };
-    case "CLOSE_UNDERSTANDING_EDITOR":
-      return { ...state, understandingEditorOpen: false };
     default:
       return state;
   }
@@ -311,7 +299,6 @@ export function usePlanningEditor(engagement: EngagementDetail) {
 
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const updateEngagement = useUpdateEngagement();
   const createObjective = useCreateAuditObjective();
   const updateObjective = useUpdateAuditObjective();
   const deleteObjective = useDeleteAuditObjective();
@@ -577,18 +564,6 @@ export function usePlanningEditor(engagement: EngagementDetail) {
     [deleteProc, engagement.id],
   );
 
-  // ── Understanding handler ──
-
-  const handleSaveUnderstanding = useCallback(
-    (html: string) => {
-      updateEngagement.mutate(
-        { id: engagement.id, data: { understanding: html || null } },
-        { onSuccess: () => dispatch({ type: "CLOSE_UNDERSTANDING_EDITOR" }) },
-      );
-    },
-    [updateEngagement, engagement.id],
-  );
-
   // ── Collapse state helpers ──
 
   const toggleCollapse = useCallback((key: string) => {
@@ -677,8 +652,6 @@ export function usePlanningEditor(engagement: EngagementDetail) {
     handleAddProcedure,
     handleUpdateProcedure,
     handleConfirmDelete,
-    handleSaveUnderstanding,
-    isSavingUnderstanding: updateEngagement.isPending,
     handleReorderAuditObjectives,
     handleMoveToTopAuditObjective,
     reorderItems,

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { withAccess, type Session } from '@/server/middleware/withAccess';
 import { executeTransition } from '@/server/actions/approvalEngine';
-import { prisma } from '@/lib/prisma';
+import { resolveEngagementId } from '@/server/actions/resolveEngagement';
 
 export const POST = withAccess(
   'engagement:update',
@@ -45,32 +45,3 @@ export const POST = withAccess(
     }
   },
 );
-
-async function resolveEngagementId(entityType: string, entityId: string): Promise<string | null> {
-  switch (entityType) {
-    case 'procedure': {
-      const p = await prisma.engagementProcedure.findUnique({
-        where: { id: entityId },
-        select: { engagement_id: true },
-      });
-      return p?.engagement_id ?? null;
-    }
-    case 'work_program': {
-      // entityId IS the engagementId for work_program
-      const eng = await prisma.engagement.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
-      return eng?.id ?? null;
-    }
-    case 'planning_workpaper': {
-      const pw = await prisma.planningWorkpaper.findUnique({
-        where: { id: entityId },
-        select: { engagement_id: true },
-      });
-      return pw?.engagement_id ?? null;
-    }
-    default:
-      return null;
-  }
-}

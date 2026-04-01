@@ -59,6 +59,9 @@ import {
   restoreProcedureVersionApi,
   fetchAvailableTransitionsApi,
   executeTransitionApi,
+  fetchWorkflowSignoffTypes,
+  manualSignApi,
+  unsignApi,
 } from '../api';
 import type {
   EngagementDetail,
@@ -998,6 +1001,20 @@ export function usePublishProcedure() {
   });
 }
 
+// ── Workflow Signoff Types ──
+
+const workflowSignoffTypesKey = (entityType: string) =>
+  ['workflowSignoffTypes', entityType];
+
+export function useWorkflowSignoffTypes(entityType: string) {
+  return useQuery({
+    queryKey: workflowSignoffTypesKey(entityType),
+    queryFn: () => fetchWorkflowSignoffTypes(entityType),
+    enabled: !!entityType,
+    staleTime: 5 * 60 * 1000, // signoff types rarely change
+  });
+}
+
 // ── Approval Transitions ──
 
 const approvalTransitionsKey = (entityType: string, entityId: string) =>
@@ -1033,6 +1050,50 @@ export function useExecuteTransition() {
       qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId) });
       qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
       qc.invalidateQueries({ queryKey: wpSignoffsKey(engagementId) });
+    },
+  });
+}
+
+export function useManualSign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      entityType,
+      entityId,
+      signoffType,
+      signoffOrder,
+    }: {
+      entityType: string;
+      entityId: string;
+      signoffType: string;
+      signoffOrder: number;
+      engagementId: string;
+    }) => manualSignApi(entityType, entityId, signoffType, signoffOrder),
+    onSuccess: (_, { entityType, entityId, engagementId }) => {
+      qc.invalidateQueries({ queryKey: wpSignoffsKey(engagementId) });
+      qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId) });
+    },
+  });
+}
+
+export function useUnsign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      entityType,
+      entityId,
+      signoffType,
+      signoffOrder,
+    }: {
+      entityType: string;
+      entityId: string;
+      signoffType: string;
+      signoffOrder: number;
+      engagementId: string;
+    }) => unsignApi(entityType, entityId, signoffType, signoffOrder),
+    onSuccess: (_, { entityType, entityId, engagementId }) => {
+      qc.invalidateQueries({ queryKey: wpSignoffsKey(engagementId) });
+      qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId) });
     },
   });
 }

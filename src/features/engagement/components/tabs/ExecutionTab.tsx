@@ -35,9 +35,18 @@ export function ExecutionTab({
       ),
     [engagement.standaloneObjectives],
   );
+  const execProcedures = useMemo(
+    () =>
+      (engagement.ungroupedProcedures ?? []).filter(
+        (p) => p.addedFrom === "execution",
+      ),
+    [engagement.ungroupedProcedures],
+  );
 
   const hasExecutionItems =
-    execSections.length > 0 || execObjectives.length > 0;
+    execSections.length > 0 ||
+    execObjectives.length > 0 ||
+    execProcedures.length > 0;
 
   return (
     <div className="space-y-3">
@@ -94,6 +103,7 @@ export function ExecutionTab({
           engagementId={engagement.id}
           sections={execSections}
           standaloneObjectives={execObjectives}
+          standaloneProcedures={execProcedures}
           findingCount={engagement.findings?.length ?? 0}
           mode="execution"
           members={engagement.members}

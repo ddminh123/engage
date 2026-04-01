@@ -2509,6 +2509,40 @@ export async function syncPlanningToExecution(
     }
   }
 
+  // 3. Clone standalone procedures (no section, no objective)
+  const planningStandaloneProcedures = await prisma.engagementProcedure.findMany({
+    where: { engagement_id: engagementId, section_id: null, objective_id: null, added_from: 'planning' },
+    orderBy: { sort_order: 'asc' },
+  });
+
+  for (const proc of planningStandaloneProcedures) {
+    const existing = await prisma.engagementProcedure.findFirst({
+      where: { engagement_id: engagementId, planning_ref_id: proc.id, phase: 'execution' },
+    });
+    if (existing) continue;
+
+    await prisma.engagementProcedure.create({
+      data: {
+        engagement_id: engagementId,
+        section_id: null,
+        objective_id: null,
+        title: proc.title,
+        description: proc.description,
+        procedures: proc.procedures,
+        procedure_type: proc.procedure_type,
+        procedure_category: proc.procedure_category,
+        status: 'not_started',
+        added_from: 'planning',
+        phase: 'execution',
+        planning_ref_id: proc.id,
+        source: 'planned',
+        sort_order: proc.sort_order,
+        priority: proc.priority,
+      },
+    });
+    createdProcedures++;
+  }
+
   await logAudit({
     userId,
     userName,
@@ -3071,20 +3105,6 @@ export async function updateProcedureContent(
   userId: string,
   userName: string,
 ) {
-  await prisma.engagementProcedure.update({
-    where: { id: procedureId },
-    data: { content: content as any },
-  });
-
-  // Invalidate review/approve sign-offs when content changes
-  await invalidateSignoffs('procedure', procedureId, userId);
-
-  await logAudit({
-    userId,
-    userName,
-    action: 'update',
-    entityType: 'engagement_procedure',
-    entityId: procedureId,
-    changes: { content: { old: '(document)', new: '(document updated)' } },
-  });
+  const { saveWorkpaperContent } = await import('./workpaperContent');
+  await saveWorkpaperContent('procedure', procedureId, content, userId, userName);
 }

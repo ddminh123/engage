@@ -9,6 +9,7 @@ import type { EngagementDetail } from "../../types";
 interface EngagementDetailLayoutProps {
   engagement: EngagementDetail;
   onOpenWorkpaper?: (procedureId: string) => void;
+  onOpenPlanningWp?: (stepConfigId: string) => void;
 }
 
 const MIN_WIDTH = 56;
@@ -18,6 +19,7 @@ const DEFAULT_WIDTH = 224;
 export function EngagementDetailLayout({
   engagement,
   onOpenWorkpaper,
+  onOpenPlanningWp,
 }: EngagementDetailLayoutProps) {
   const [sidebarWidth, setSidebarWidth] = React.useState(DEFAULT_WIDTH);
   const isCollapsed = sidebarWidth <= MIN_WIDTH;
@@ -87,6 +89,7 @@ export function EngagementDetailLayout({
           <EngagementTabRouter
             engagement={engagement}
             onOpenWorkpaper={onOpenWorkpaper}
+            onOpenPlanningWp={onOpenPlanningWp}
           />
         </main>
       </div>

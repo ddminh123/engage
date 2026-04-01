@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Plus, Check, X, User } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Check, User, UserCircle } from "lucide-react";
+import { useSession } from "next-auth/react";
 import {
   Popover,
   PopoverContent,
@@ -14,86 +15,11 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
-import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { cn } from "@/lib/utils";
-import { getRoleLabel } from "@/constants/labels/teams";
 import type { WpAssignment, EngagementMember } from "../../types";
-
-// ── Avatar with user-card popover ──
-
-function AssigneeAvatar({
-  assignment,
-  engagementRole,
-  onRemove,
-  index,
-}: {
-  assignment: WpAssignment;
-  engagementRole?: string;
-  onRemove: (userId: string) => void;
-  index: number;
-}) {
-  const [cardOpen, setCardOpen] = useState(false);
-  const u = assignment.user;
-
-  return (
-    <Popover open={cardOpen} onOpenChange={setCardOpen}>
-      <PopoverTrigger
-        render={
-          <button
-            type="button"
-            title={u.name}
-            className={cn(
-              "relative rounded-full ring-2 ring-background cursor-pointer hover:ring-primary transition-colors",
-              index > 0 && "-ml-1.5",
-            )}
-          />
-        }
-      >
-        <UserAvatar
-          user={{ id: u.id, name: u.name, avatarUrl: u.avatarUrl }}
-          size="sm"
-        />
-      </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-3" align="start">
-        <div className="flex items-start gap-2.5">
-          <UserAvatar
-            user={{ id: u.id, name: u.name, avatarUrl: u.avatarUrl }}
-            size="default"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">{u.name}</p>
-            {u.title && (
-              <p className="text-xs text-muted-foreground truncate">
-                {u.title}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-            {engagementRole && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {engagementRole}
-              </p>
-            )}
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full mt-2 h-7 text-xs text-destructive hover:text-destructive"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove(assignment.userId);
-            setCardOpen(false);
-          }}
-        >
-          <X className="h-3 w-3 mr-1" />
-          Bỏ phân công
-        </Button>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 // ── Main Component ──
 
@@ -118,6 +44,7 @@ export function WpAssigneePicker({
   label = "Người thực hiện",
   className,
 }: WpAssigneePickerProps) {
+  const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -129,10 +56,9 @@ export function WpAssigneePicker({
     [assignments, entityType, entityId],
   );
 
-  const assignedUserIds = useMemo(
-    () => new Set(entityAssignments.map((a) => a.userId)),
-    [entityAssignments],
-  );
+  // Single-mode: take first assignment only
+  const currentAssignment = entityAssignments[0] ?? null;
+  const currentUserId = currentAssignment?.userId ?? null;
 
   const filteredMembers = useMemo(
     () =>
@@ -143,64 +69,79 @@ export function WpAssigneePicker({
     [members, search],
   );
 
-  // Build a map of userId → engagement role label for the user card
-  const memberRoleMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const m of members) {
-      const ENGAGEMENT_ROLES: Record<string, string> = {
-        lead: "Trưởng nhóm",
-        member: "Thành viên",
-        reviewer: "Soát xét",
-        observer: "Quan sát",
-      };
-      map.set(m.userId, ENGAGEMENT_ROLES[m.role] ?? m.role);
+  // Single-mode: selecting replaces the current assignee
+  const handleSelect = useCallback(
+    (userId: string) => {
+      if (userId === currentUserId) {
+        // Clicking the already-assigned user → unassign
+        onRemove(userId);
+      } else {
+        // Remove old assignee first (if any), then add new
+        if (currentUserId) {
+          onRemove(currentUserId);
+        }
+        onAdd(userId);
+      }
+      setOpen(false);
+    },
+    [currentUserId, onAdd, onRemove],
+  );
+
+  const handleUnassign = useCallback(() => {
+    if (currentUserId) {
+      onRemove(currentUserId);
     }
-    return map;
-  }, [members]);
+    setOpen(false);
+  }, [currentUserId, onRemove]);
+
+  const handleAssignToMe = useCallback(() => {
+    const myId = session?.user?.id;
+    if (!myId) return;
+    if (myId === currentUserId) return; // already me
+    if (currentUserId) onRemove(currentUserId);
+    onAdd(myId);
+    setOpen(false);
+  }, [session?.user?.id, currentUserId, onAdd, onRemove]);
+
+  const showAssignToMe =
+    !!session?.user?.id && session.user.id !== currentUserId;
+  const u = currentAssignment?.user;
 
   return (
     <div
-      className={cn("flex items-center gap-1.5", className)}
+      className={cn("flex items-center gap-1", className)}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Assigned avatars — click opens user card */}
-      {entityAssignments.map((a, i) => (
-        <AssigneeAvatar
-          key={a.userId}
-          assignment={a}
-          engagementRole={memberRoleMap.get(a.userId)}
-          onRemove={onRemove}
-          index={i}
-        />
-      ))}
-
-      {/* Label (when no assignees) or Plus button → toggle member search */}
+      {/* Assignee trigger — click opens dropdown */}
       <Popover open={open} onOpenChange={setOpen}>
-        {entityAssignments.length === 0 && label ? (
-          <PopoverTrigger
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            title="Phân công"
-          >
-            <User className="h-3 w-3" />
-            {label}
-          </PopoverTrigger>
-        ) : (
-          <PopoverTrigger
-            render={
-              <button
-                type="button"
-                title="Phân công"
-                className={cn(
-                  "flex items-center justify-center rounded-full border border-dashed border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary transition-colors h-5 w-5",
-                  entityAssignments.length > 0 && "-ml-1",
-                )}
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              title={u ? `${label}: ${u.name}` : label}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors hover:bg-muted cursor-pointer"
+            />
+          }
+        >
+          {u ? (
+            <>
+              <UserAvatar
+                user={{ id: u.id, name: u.name, avatarUrl: u.avatarUrl }}
+                size="sm"
               />
-            }
-          >
-            <Plus className="h-3 w-3" />
-          </PopoverTrigger>
-        )}
-        <PopoverContent className="w-[220px] p-0" align="start">
+              <span className="font-medium text-foreground max-w-[100px] truncate">
+                {u.name}
+              </span>
+            </>
+          ) : (
+            <>
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Chưa phân công</span>
+            </>
+          )}
+        </PopoverTrigger>
+
+        <PopoverContent className="w-[240px] p-0" align="start">
           <Command shouldFilter={false}>
             <CommandInput
               placeholder="Tìm thành viên..."
@@ -209,20 +150,42 @@ export function WpAssigneePicker({
             />
             <CommandList>
               <CommandEmpty>Không tìm thấy.</CommandEmpty>
+              {/* Quick actions: assign to me / unassign */}
+              {(showAssignToMe || currentUserId) && (
+                <>
+                  <CommandGroup>
+                    {showAssignToMe && (
+                      <CommandItem onSelect={handleAssignToMe}>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <UserCircle className="h-4 w-4 text-primary shrink-0" />
+                          <span className="text-sm text-primary font-medium">
+                            Phân công cho tôi
+                          </span>
+                        </div>
+                      </CommandItem>
+                    )}
+                    {currentUserId && (
+                      <CommandItem onSelect={handleUnassign}>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm text-muted-foreground">
+                            Bỏ phân công
+                          </span>
+                        </div>
+                      </CommandItem>
+                    )}
+                  </CommandGroup>
+                  <CommandSeparator />
+                </>
+              )}
               <CommandGroup>
                 {filteredMembers.map((m) => {
-                  const isAssigned = assignedUserIds.has(m.userId);
+                  const isSelected = m.userId === currentUserId;
                   return (
                     <CommandItem
                       key={m.userId}
                       value={m.userId}
-                      onSelect={() => {
-                        if (isAssigned) {
-                          onRemove(m.userId);
-                        } else {
-                          onAdd(m.userId);
-                        }
-                      }}
+                      onSelect={() => handleSelect(m.userId)}
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <UserAvatar
@@ -238,7 +201,7 @@ export function WpAssigneePicker({
                       <Check
                         className={cn(
                           "ml-auto h-4 w-4 shrink-0",
-                          isAssigned ? "opacity-100" : "opacity-0",
+                          isSelected ? "opacity-100" : "opacity-0",
                         )}
                       />
                     </CommandItem>
