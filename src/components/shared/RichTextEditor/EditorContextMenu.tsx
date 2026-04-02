@@ -11,6 +11,7 @@ import {
   Trash2,
   MessageSquarePlus,
   NotepadText,
+  SearchCheck,
   Columns2,
   Rows2,
   Merge,
@@ -33,6 +34,7 @@ interface MenuState {
 interface EditorContextMenuProps {
   editor: Editor;
   onAddComment?: (threadType: "comment" | "review_note") => void;
+  onAddFinding?: () => void;
 }
 
 /** Clamp a position so the element stays within the viewport */
@@ -47,6 +49,7 @@ function clamp(click: number, size: number, viewport: number, pad = 8) {
 export function EditorContextMenu({
   editor,
   onAddComment,
+  onAddFinding,
 }: EditorContextMenuProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -264,21 +267,32 @@ export function EditorContextMenu({
           />
         )}
 
-        {/* Ý kiến + Review note — flat items */}
-        {onAddComment && hasText && (
+        {/* Ý kiến + Review note + Thêm phát hiện — flat items */}
+        {(onAddComment || onAddFinding) && hasText && (
           <>
             <MenuDivider />
-            <MenuItem
-              icon={MessageSquarePlus}
-              label="Ý kiến"
-              onClick={() => exec(() => onAddComment("comment"))}
-            />
-            <MenuItem
-              icon={NotepadText}
-              label="Review note"
-              onClick={() => exec(() => onAddComment("review_note"))}
-              destructive
-            />
+            {onAddComment && (
+              <>
+                <MenuItem
+                  icon={MessageSquarePlus}
+                  label="Ý kiến"
+                  onClick={() => exec(() => onAddComment("comment"))}
+                />
+                <MenuItem
+                  icon={NotepadText}
+                  label="Review note"
+                  onClick={() => exec(() => onAddComment("review_note"))}
+                  destructive
+                />
+              </>
+            )}
+            {onAddFinding && (
+              <MenuItem
+                icon={SearchCheck}
+                label="Thêm phát hiện"
+                onClick={() => exec(() => onAddFinding())}
+              />
+            )}
           </>
         )}
 

@@ -67,6 +67,20 @@ export interface WorkpaperDocumentConfig {
   onDeleteThread?: (threadId: string) => void;
   isCreatingThread?: boolean;
   isReplying?: boolean;
+  // ── Finding flow (optional, procedure-specific) ──
+  /** Callback when user clicks "Thêm phát hiện" in context menu */
+  onAddFinding?: (quote: string, from: number, to: number) => void;
+  /** Callback when a finding mark is clicked in the editor */
+  onFindingClicked?: (findingId: string) => void;
+  /** Tab key to switch to when finding flow is initiated */
+  findingTabKey?: string;
+  /** Ref bridge for parent to control finding marks on the editor */
+  findingMarkRef?: React.MutableRefObject<{
+    applyFindingMark: (findingId: string, from: number, to: number) => void;
+    clearPendingFindingRange: () => void;
+    highlightFinding: (findingId: string | null) => void;
+    unsetFindingMark: (findingId: string) => void;
+  } | null>;
 }
 
 export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
@@ -95,6 +109,10 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     signoffBar,
     isCreatingThread = false,
     isReplying = false,
+    onAddFinding,
+    onFindingClicked,
+    findingTabKey,
+    findingMarkRef,
   } = config;
 
   const editorRef = React.useRef<WorkpaperEditorHandle>(null);
@@ -234,6 +252,52 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     editorRef.current?.clearPendingCommentRange();
   };
 
+  // ── Finding handlers (only active when onAddFinding is provided) ──
+
+  const handleFindingActivated = React.useCallback(
+    (_findingId: string | null) => {
+      // Could track active finding for sidebar highlight in future
+    },
+    [],
+  );
+
+  const handleFindingClicked = React.useCallback(
+    (findingId: string) => {
+      if (findingTabKey) setRightTab(findingTabKey);
+      onFindingClicked?.(findingId);
+      editorRef.current?.highlightFinding(findingId);
+    },
+    [findingTabKey, onFindingClicked],
+  );
+
+  const handleAddFinding = React.useCallback(
+    (quote: string, from: number, to: number) => {
+      if (findingTabKey) setRightTab(findingTabKey);
+      onAddFinding?.(quote, from, to);
+    },
+    [findingTabKey, onAddFinding],
+  );
+
+  // Populate findingMarkRef so parent can control finding marks on the editor
+  React.useEffect(() => {
+    if (findingMarkRef) {
+      findingMarkRef.current = {
+        applyFindingMark: (findingId, from, to) => {
+          editorRef.current?.applyFindingMark(findingId, from, to);
+        },
+        clearPendingFindingRange: () => {
+          editorRef.current?.clearPendingFindingRange();
+        },
+        highlightFinding: (findingId) => {
+          editorRef.current?.highlightFinding(findingId);
+        },
+        unsetFindingMark: (findingId) => {
+          editorRef.current?.unsetFindingMark(findingId);
+        },
+      };
+    }
+  }, [findingMarkRef]);
+
   const handleTitleSave = () => {
     setEditingTitle(false);
     if (titleDraft.trim() && titleDraft !== title && onTitleChange) {
@@ -336,6 +400,9 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
             onCommentClicked={handleCommentClicked}
             onAddComment={handleAddComment}
             readOnly={readOnly}
+            onFindingActivated={onAddFinding ? handleFindingActivated : undefined}
+            onFindingClicked={onAddFinding ? handleFindingClicked : undefined}
+            onAddFinding={onAddFinding ? handleAddFinding : undefined}
           />
         </div>
 

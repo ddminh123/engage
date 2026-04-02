@@ -41,6 +41,8 @@ export interface EngageEditorProps {
   extraExtensions?: AnyExtension[];
   /** If provided, context menu shows Ý kiến + Review note items */
   onAddComment?: (threadType: "comment" | "review_note") => void;
+  /** If provided, context menu shows Thêm phát hiện item */
+  onAddFinding?: () => void;
 }
 
 // ── Base extensions shared by every editor instance ──
@@ -80,6 +82,7 @@ export const EngageEditor = forwardRef<EngageEditorHandle, EngageEditorProps>(
       placeholder = "Bắt đầu nhập nội dung...",
       extraExtensions,
       onAddComment,
+      onAddFinding,
     },
     ref,
   ) {
@@ -153,7 +156,7 @@ export const EngageEditor = forwardRef<EngageEditorHandle, EngageEditorProps>(
         <EditorContent editor={editor} className="flex-1" />
 
         {!readOnly && (
-          <EditorContextMenu editor={editor} onAddComment={onAddComment} />
+          <EditorContextMenu editor={editor} onAddComment={onAddComment} onAddFinding={onAddFinding} />
         )}
       </div>
     );

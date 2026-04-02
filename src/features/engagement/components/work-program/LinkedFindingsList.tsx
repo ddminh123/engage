@@ -24,10 +24,25 @@ interface LinkedFinding {
   evidence?: string | null;
 }
 
+export interface PendingFindingData {
+  quote: string;
+  selection: { from: number; to: number };
+}
+
 interface LinkedFindingsListProps {
   findings: LinkedFinding[];
   engagementId: string;
   procedureId: string;
+  /** Pre-populated from editor context menu selection */
+  pendingFinding?: PendingFindingData | null;
+  /** Called after a finding is successfully created from the editor context menu */
+  onFindingCreated?: (findingId: string, from: number, to: number) => void;
+  /** Called when pending finding form is cancelled */
+  onCancelPendingFinding?: () => void;
+  /** Called when a finding row is clicked (for scroll-to-mark behavior) */
+  onFindingClick?: (findingId: string) => void;
+  /** Called when a finding is deleted (to remove editor mark) */
+  onFindingDeleted?: (findingId: string) => void;
 }
 
 const RISK_RATING_OPTIONS = [
@@ -49,6 +64,11 @@ export function LinkedFindingsList({
   findings,
   engagementId,
   procedureId,
+  pendingFinding,
+  onFindingCreated,
+  onCancelPendingFinding,
+  onFindingClick,
+  onFindingDeleted,
 }: LinkedFindingsListProps) {
   const [showForm, setShowForm] = React.useState(false);
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -67,6 +87,20 @@ export function LinkedFindingsList({
   const isEditing = editingId !== null;
   const isSaving = createFinding.isPending || updateFinding.isPending;
 
+  // Auto-open form when pendingFinding arrives from context menu
+  const prevPendingRef = React.useRef<PendingFindingData | null | undefined>(undefined);
+  React.useEffect(() => {
+    if (pendingFinding && pendingFinding !== prevPendingRef.current) {
+      setEditingId(null);
+      setTitle(pendingFinding.quote.slice(0, 100));
+      setRating("");
+      setDescription("");
+      setEvidence(pendingFinding.quote);
+      setShowForm(true);
+    }
+    prevPendingRef.current = pendingFinding;
+  }, [pendingFinding]);
+
   const resetForm = () => {
     setTitle("");
     setRating("");
@@ -74,6 +108,14 @@ export function LinkedFindingsList({
     setEvidence("");
     setEditingId(null);
     setShowForm(false);
+  };
+
+  const handleCancel = () => {
+    const wasPending = !!pendingFinding;
+    resetForm();
+    if (wasPending) {
+      onCancelPendingFinding?.();
+    }
   };
 
   const handleEdit = (f: LinkedFinding) => {
@@ -121,16 +163,34 @@ export function LinkedFindingsList({
             procedureIds: [procedureId],
           },
         },
-        { onSuccess: resetForm },
+        {
+          onSuccess: (createdFinding) => {
+            // If this was from context menu selection, apply the finding mark
+            if (pendingFinding && onFindingCreated) {
+              onFindingCreated(
+                createdFinding.id,
+                pendingFinding.selection.from,
+                pendingFinding.selection.to,
+              );
+            }
+            resetForm();
+          },
+        },
       );
     }
   };
 
   const handleDelete = () => {
     if (!deleteTarget) return;
+    const targetId = deleteTarget.id;
     deleteFinding.mutate(
-      { engagementId, findingId: deleteTarget.id },
-      { onSuccess: () => setDeleteTarget(null) },
+      { engagementId, findingId: targetId },
+      {
+        onSuccess: () => {
+          setDeleteTarget(null);
+          onFindingDeleted?.(targetId);
+        },
+      },
     );
   };
 
@@ -150,7 +210,10 @@ export function LinkedFindingsList({
               <button
                 type="button"
                 className="flex flex-1 items-center gap-2 text-left"
-                onClick={() => handleEdit(f)}
+                onClick={() => {
+                  onFindingClick?.(f.id);
+                  handleEdit(f);
+                }}
               >
                 <span className="flex-1 text-foreground">{f.title}</span>
                 {f.riskRating && (
@@ -209,6 +272,11 @@ export function LinkedFindingsList({
         </Button>
       ) : (
         <div className="mt-2 space-y-2 rounded-md border p-2">
+          {pendingFinding && !isEditing && (
+            <div className="rounded bg-violet-50 px-2 py-1 text-xs text-violet-700 border border-violet-200">
+              Tạo phát hiện từ văn bản đã chọn
+            </div>
+          )}
           <div className="space-y-1">
             <Label className="text-xs">Tiêu đề</Label>
             <Input
@@ -266,7 +334,7 @@ export function LinkedFindingsList({
               size="sm"
               variant="ghost"
               className="h-7 text-xs"
-              onClick={resetForm}
+              onClick={handleCancel}
             >
               Hủy
             </Button>

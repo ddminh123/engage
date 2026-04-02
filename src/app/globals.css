@@ -292,3 +292,29 @@
 .wp-comment-mark[data-resolved="true"]:hover {
   opacity: 0.75;
 }
+
+/* ── Workpaper finding highlights ── */
+.wp-finding-mark {
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+  background-color: #ede9fe;
+  border-bottom-color: #8b5cf6;
+}
+.wp-finding-mark:hover {
+  background-color: #ddd6fe;
+}
+
+/* Pending finding (not yet committed) — violet dashed */
+.wp-finding-pending {
+  background-color: #ede9fe;
+  border-bottom: 2px dashed #8b5cf6;
+  border-radius: 2px;
+}
+
+/* Active (clicked) state */
+.wp-finding-mark.wp-finding-active {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 1px;
+  border-radius: 2px;
+}
