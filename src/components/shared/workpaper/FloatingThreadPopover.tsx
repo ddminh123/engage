@@ -21,6 +21,7 @@ import {
   Trash2,
   MessageSquarePlus,
   PanelRightOpen,
+  Target,
 } from "lucide-react";
 import type { WpCommentThread } from "@/features/engagement/types";
 
@@ -385,11 +386,13 @@ export function FloatingNewComment({
 interface SelectionCommentToolbarProps {
   anchorRect: DOMRect;
   onAddComment: (threadType: "comment" | "review_note") => void;
+  onAddObjective?: () => void;
 }
 
 export function SelectionCommentToolbar({
   anchorRect,
   onAddComment,
+  onAddObjective,
 }: SelectionCommentToolbarProps) {
   const virtualAnchor = React.useMemo(
     () => createVirtualAnchor(anchorRect),
@@ -421,6 +424,17 @@ export function SelectionCommentToolbar({
         <NotepadText className="mr-1 h-3.5 w-3.5" />
         Review
       </Button>
+      {onAddObjective && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs text-teal-600 hover:text-teal-700"
+          onClick={onAddObjective}
+        >
+          <Target className="mr-1 h-3.5 w-3.5" />
+          Mục tiêu
+        </Button>
+      )}
     </AnchoredPopoverContent>
   );
 }

@@ -229,6 +229,7 @@ function EngagementDetailContent() {
               stepConfigKey={pwp.stepConfig?.key}
               onClose={handleClosePlanningWp}
               members={engagement.members ?? []}
+              auditObjectives={engagement.auditObjectives ?? []}
               wpSignoffs={wpSignoffs}
               auditObjectives={engagement.auditObjectives}
             />

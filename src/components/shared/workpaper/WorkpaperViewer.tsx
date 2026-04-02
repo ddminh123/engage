@@ -41,8 +41,18 @@ export interface WorkpaperViewerProps {
   editorClassName?: string;
   /** Optional signoff bar rendered above the editor content */
   signoffBar?: React.ReactNode;
-  /** Default right sidebar content shown when comments sidebar is closed */
-  defaultSidebar?: React.ReactNode;
+  // ── Objective support (optional) ──
+  onAddObjective?: (quote: string, from: number, to: number) => void;
+  onObjectiveClicked?: (objectiveId: string) => void;
+  /** Sidebar content for objectives (rendered alongside comments sidebar) */
+  objectivesSidebar?: React.ReactNode;
+  /** Ref bridge for parent to control objective marks on the editor */
+  objectiveMarkRef?: React.MutableRefObject<{
+    applyObjectiveMark: (objectiveId: string, from: number, to: number) => void;
+    clearPendingObjectiveRange: () => void;
+    highlightObjective: (objectiveId: string | null) => void;
+    unsetObjectiveMark: (objectiveId: string) => void;
+  } | null>;
 }
 
 // ── Component ──
@@ -61,7 +71,10 @@ export function WorkpaperViewer({
   className,
   editorClassName = "min-h-[400px]",
   signoffBar,
-  defaultSidebar,
+  onAddObjective,
+  onObjectiveClicked,
+  objectivesSidebar,
+  objectiveMarkRef,
 }: WorkpaperViewerProps) {
   const editorRef = React.useRef<WorkpaperEditorHandle>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -95,7 +108,8 @@ export function WorkpaperViewer({
 
   // ── Comments sidebar toggle ──
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const showDefaultSidebar = !!defaultSidebar && !sidebarOpen;
+  // ── Objectives sidebar toggle ──
+  const [objectivesSidebarOpen, setObjectivesSidebarOpen] = React.useState(false);
 
   // ── Track editor readiness for mouseup listener ──
   const [editorReady, setEditorReady] = React.useState(false);
@@ -267,6 +281,111 @@ export function WorkpaperViewer({
     [selectionRange],
   );
 
+  // ── Selection → add objective ──
+
+  const handleAddObjectiveFromSelection = React.useCallback(() => {
+    const editor = editorRef.current?.getEditor();
+    if (!editor || !selectionRange || !onAddObjective) return;
+
+    const { from, to } = selectionRange;
+    const quote = editor.state.doc.textBetween(from, to, " ");
+
+    // Temporarily enable editing to apply pending highlight decoration
+    editor.setEditable(true);
+    editor.commands.setPendingObjectiveRange(from, to);
+    editor.setEditable(false);
+
+    onAddObjective(quote || "[empty]", from, to);
+    setSelectionRect(null);
+    setObjectivesSidebarOpen(true);
+  }, [selectionRange, onAddObjective]);
+
+  // ── Objective mark click handler ──
+
+  const handleObjectiveClickedFn = React.useCallback(
+    (objectiveId: string) => {
+      onObjectiveClicked?.(objectiveId);
+      editorRef.current?.highlightObjective(objectiveId);
+      setObjectivesSidebarOpen(true);
+    },
+    [onObjectiveClicked],
+  );
+
+  const handleObjectiveActivated = React.useCallback(
+    (_objectiveId: string | null) => {
+      // No-op in viewer
+    },
+    [],
+  );
+
+  // Populate objectiveMarkRef
+  React.useEffect(() => {
+    if (objectiveMarkRef) {
+      objectiveMarkRef.current = {
+        applyObjectiveMark: (objectiveId, from, to) => {
+          const editor = editorRef.current?.getEditor();
+          if (editor) {
+            editor.setEditable(true);
+            editor
+              .chain()
+              .clearPendingObjectiveRange()
+              .setTextSelection({ from, to })
+              .setObjectiveMark(objectiveId)
+              .run();
+            editor.setEditable(false);
+            if (onContentChange) {
+              onContentChange(editor.getJSON());
+            }
+          }
+        },
+        clearPendingObjectiveRange: () => {
+          const editor = editorRef.current?.getEditor();
+          if (editor) {
+            editor.setEditable(true);
+            editor.commands.clearPendingObjectiveRange();
+            editor.setEditable(false);
+          }
+        },
+        highlightObjective: (objectiveId) => {
+          editorRef.current?.highlightObjective(objectiveId);
+        },
+        unsetObjectiveMark: (objectiveId) => {
+          const editor = editorRef.current?.getEditor();
+          if (editor) {
+            editor.setEditable(true);
+            editor.commands.unsetObjectiveMark(objectiveId);
+            editor.setEditable(false);
+            if (onContentChange) {
+              onContentChange(editor.getJSON());
+            }
+          }
+        },
+      };
+    }
+  }, [objectiveMarkRef, onContentChange]);
+
+  // DOM click fallback for objective marks in read-only mode
+  React.useEffect(() => {
+    if (!editorReady || !onAddObjective) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleDomClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest?.(
+        "span[data-objective-id]",
+      );
+      if (target) {
+        const objectiveId = target.getAttribute("data-objective-id");
+        if (objectiveId) {
+          handleObjectiveClickedFn(objectiveId);
+        }
+      }
+    };
+
+    container.addEventListener("click", handleDomClick);
+    return () => container.removeEventListener("click", handleDomClick);
+  }, [editorReady, onAddObjective, handleObjectiveClickedFn]);
+
   // ── Create thread from floating new-comment input ──
 
   const handleCreateThread = React.useCallback(
@@ -363,15 +482,10 @@ export function WorkpaperViewer({
             onAddComment={() => {}}
             readOnly
             editorClassName={editorClassName}
+            onObjectiveActivated={onAddObjective ? handleObjectiveActivated : undefined}
+            onObjectiveClicked={onAddObjective ? handleObjectiveClickedFn : undefined}
           />
         </div>
-
-        {/* Default sidebar (e.g. objectives list) — shown when comments sidebar is closed */}
-        {showDefaultSidebar && (
-          <div className="w-[320px] shrink-0 border-l overflow-y-auto bg-muted/10">
-            <div className="p-3">{defaultSidebar}</div>
-          </div>
-        )}
 
         {/* Togglable comments sidebar */}
         {sidebarOpen && (
@@ -405,11 +519,33 @@ export function WorkpaperViewer({
           </div>
         )}
 
+        {/* Togglable objectives sidebar */}
+        {objectivesSidebarOpen && objectivesSidebar && (
+          <div className="w-[320px] shrink-0 border-l overflow-y-auto bg-muted/10">
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Mục tiêu
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setObjectivesSidebarOpen(false)}
+                title="Ẩn bảng mục tiêu"
+              >
+                <PanelRightClose className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="p-3">{objectivesSidebar}</div>
+          </div>
+        )}
+
         {/* Floating selection toolbar */}
         {selectionRect && !newCommentState && (
           <SelectionCommentToolbar
             anchorRect={selectionRect}
             onAddComment={handleAddCommentFromSelection}
+            onAddObjective={onAddObjective ? handleAddObjectiveFromSelection : undefined}
           />
         )}
 
