@@ -284,11 +284,6 @@ export function ObjectivesTabContent({
 
       {showAddForm && (
         <div className="px-2 py-1.5">
-          {pendingObjective && (
-            <div className="rounded bg-teal-50 px-2 py-1 text-xs text-teal-700 border border-teal-200 mb-1.5">
-              Tạo mục tiêu từ văn bản đã chọn
-            </div>
-          )}
           <InlineInput
             value={addingTitle}
             onChange={setAddingTitle}

@@ -265,7 +265,7 @@ export function WorkpaperViewer({
 
         // Temporarily enable editing to apply pending highlight decoration
         editor.setEditable(true);
-        editor.commands.setPendingCommentRange(from, to);
+        editor.chain().focus().setPendingCommentRange(from, to).run();
         editor.setEditable(false);
 
         setNewCommentState({
@@ -292,7 +292,7 @@ export function WorkpaperViewer({
 
     // Temporarily enable editing to apply pending highlight decoration
     editor.setEditable(true);
-    editor.commands.setPendingObjectiveRange(from, to);
+    editor.chain().focus().setPendingObjectiveRange(from, to).run();
     editor.setEditable(false);
 
     onAddObjective(quote || "[empty]", from, to);
@@ -328,6 +328,7 @@ export function WorkpaperViewer({
             editor.setEditable(true);
             editor
               .chain()
+              .focus()
               .clearPendingObjectiveRange()
               .setTextSelection({ from, to })
               .setObjectiveMark(objectiveId)
@@ -342,7 +343,7 @@ export function WorkpaperViewer({
           const editor = editorRef.current?.getEditor();
           if (editor) {
             editor.setEditable(true);
-            editor.commands.clearPendingObjectiveRange();
+            editor.chain().focus().clearPendingObjectiveRange().run();
             editor.setEditable(false);
           }
         },
@@ -353,7 +354,7 @@ export function WorkpaperViewer({
           const editor = editorRef.current?.getEditor();
           if (editor) {
             editor.setEditable(true);
-            editor.commands.unsetObjectiveMark(objectiveId);
+            editor.chain().focus().unsetObjectiveMark(objectiveId).run();
             editor.setEditable(false);
             if (onContentChange) {
               onContentChange(editor.getJSON());
@@ -404,6 +405,7 @@ export function WorkpaperViewer({
           editor.setEditable(true);
           editor
             .chain()
+            .focus()
             .clearPendingCommentRange()
             .setTextSelection({
               from: newCommentState.from,
@@ -428,7 +430,7 @@ export function WorkpaperViewer({
     const editor = editorRef.current?.getEditor();
     if (editor) {
       editor.setEditable(true);
-      editor.commands.clearPendingCommentRange();
+      editor.chain().focus().clearPendingCommentRange().run();
       editor.setEditable(false);
     }
     setNewCommentState(null);

@@ -272,11 +272,6 @@ export function LinkedFindingsList({
         </Button>
       ) : (
         <div className="mt-2 space-y-2 rounded-md border p-2">
-          {pendingFinding && !isEditing && (
-            <div className="rounded bg-violet-50 px-2 py-1 text-xs text-violet-700 border border-violet-200">
-              Tạo phát hiện từ văn bản đã chọn
-            </div>
-          )}
           <div className="space-y-1">
             <Label className="text-xs">Tiêu đề</Label>
             <Input
