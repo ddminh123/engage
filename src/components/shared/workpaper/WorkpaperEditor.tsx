@@ -85,35 +85,37 @@ export const WorkpaperEditor = forwardRef<
 ) {
   const baseRef = useRef<EngageEditorHandle>(null);
 
-  // Memoize extra extensions so the array reference is stable
-  const extraExtensions = useMemo(() => {
-    const exts: AnyExtension[] = [
-      CommentMark.configure({
-        HTMLAttributes: {},
-        onCommentActivated,
-        onCommentClicked,
-      }),
-    ];
-    if (onFindingActivated && onFindingClicked) {
-      exts.push(
-        FindingMark.configure({
-          HTMLAttributes: {},
-          onFindingActivated,
-          onFindingClicked,
-        }),
-      );
-    }
-    if (onObjectiveActivated && onObjectiveClicked) {
-      exts.push(
-        ObjectiveMark.configure({
-          HTMLAttributes: {},
-          onObjectiveActivated,
-          onObjectiveClicked,
-        }),
-      );
-    }
-    return exts;
-  }, [onCommentActivated, onCommentClicked, onFindingActivated, onFindingClicked, onObjectiveActivated, onObjectiveClicked]);
+  // Keep stable refs for callbacks so the extensions array doesn't change
+  // (TipTap may recreate the editor when extensions reference changes)
+  const findingActivatedRef = useRef(onFindingActivated);
+  const findingClickedRef = useRef(onFindingClicked);
+  const objectiveActivatedRef = useRef(onObjectiveActivated);
+  const objectiveClickedRef = useRef(onObjectiveClicked);
+  findingActivatedRef.current = onFindingActivated;
+  findingClickedRef.current = onFindingClicked;
+  objectiveActivatedRef.current = onObjectiveActivated;
+  objectiveClickedRef.current = onObjectiveClicked;
+
+  // Build extensions once — always include FindingMark and ObjectiveMark
+  // so the mark schema exists from creation (commands need the mark type)
+  const extraExtensions = useMemo(() => [
+    CommentMark.configure({
+      HTMLAttributes: {},
+      onCommentActivated,
+      onCommentClicked,
+    }),
+    FindingMark.configure({
+      HTMLAttributes: {},
+      onFindingActivated: (id: string | null) => findingActivatedRef.current?.(id),
+      onFindingClicked: (id: string) => findingClickedRef.current?.(id),
+    }),
+    ObjectiveMark.configure({
+      HTMLAttributes: {},
+      onObjectiveActivated: (id: string | null) => objectiveActivatedRef.current?.(id),
+      onObjectiveClicked: (id: string) => objectiveClickedRef.current?.(id),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [onCommentActivated, onCommentClicked]);
 
   // Expose comment + finding imperative methods
   useImperativeHandle(
@@ -136,6 +138,7 @@ export const WorkpaperEditor = forwardRef<
         if (editor) {
           editor
             .chain()
+            .focus()
             .clearPendingCommentRange()
             .setTextSelection({ from, to })
             .setComment(threadId, threadType)
@@ -160,6 +163,7 @@ export const WorkpaperEditor = forwardRef<
         if (editor) {
           editor
             .chain()
+            .focus()
             .clearPendingFindingRange()
             .setTextSelection({ from, to })
             .setFindingMark(findingId)
@@ -190,6 +194,7 @@ export const WorkpaperEditor = forwardRef<
         if (editor) {
           editor
             .chain()
+            .focus()
             .clearPendingObjectiveRange()
             .setTextSelection({ from, to })
             .setObjectiveMark(objectiveId)
