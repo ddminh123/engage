@@ -41,6 +41,8 @@ export interface WorkpaperViewerProps {
   editorClassName?: string;
   /** Optional signoff bar rendered above the editor content */
   signoffBar?: React.ReactNode;
+  /** Default right sidebar content shown when comments sidebar is closed */
+  defaultSidebar?: React.ReactNode;
   // ── Objective support (optional) ──
   onAddObjective?: (quote: string, from: number, to: number) => void;
   onObjectiveClicked?: (objectiveId: string) => void;
@@ -75,9 +77,11 @@ export function WorkpaperViewer({
   onObjectiveClicked,
   objectivesSidebar,
   objectiveMarkRef,
+  defaultSidebar,
 }: WorkpaperViewerProps) {
   const editorRef = React.useRef<WorkpaperEditorHandle>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+
   const handleCommentClickedRef =
     React.useRef<(threadId: string) => void>(undefined);
 
@@ -109,12 +113,14 @@ export function WorkpaperViewer({
   // ── Comments sidebar toggle ──
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   // ── Objectives sidebar toggle ──
-  const [objectivesSidebarOpen, setObjectivesSidebarOpen] = React.useState(false);
+  const [objectivesSidebarOpen, setObjectivesSidebarOpen] =
+    React.useState(false);
 
   // ── Track editor readiness for mouseup listener ──
   const [editorReady, setEditorReady] = React.useState(false);
 
   // ── Derived ──
+  const showDefaultSidebar = !!defaultSidebar && !sidebarOpen;
   const activeThread = threads.find((t) => t.id === activeThreadId) ?? null;
   const openThreads = React.useMemo(
     () => threads.filter((t) => t.status === "open"),
@@ -484,10 +490,20 @@ export function WorkpaperViewer({
             onAddComment={() => {}}
             readOnly
             editorClassName={editorClassName}
-            onObjectiveActivated={onAddObjective ? handleObjectiveActivated : undefined}
-            onObjectiveClicked={onAddObjective ? handleObjectiveClickedFn : undefined}
+            onObjectiveActivated={
+              onAddObjective ? handleObjectiveActivated : undefined
+            }
+            onObjectiveClicked={
+              onAddObjective ? handleObjectiveClickedFn : undefined
+            }
           />
         </div>
+        {/* Default sidebar (e.g. objectives list) — shown when comments sidebar is closed */}
+        {showDefaultSidebar && (
+          <div className="w-[320px] shrink-0 border-l overflow-y-auto bg-muted/10">
+            <div className="p-3">{defaultSidebar}</div>
+          </div>
+        )}
 
         {/* Togglable comments sidebar */}
         {sidebarOpen && (
@@ -547,7 +563,9 @@ export function WorkpaperViewer({
           <SelectionCommentToolbar
             anchorRect={selectionRect}
             onAddComment={handleAddCommentFromSelection}
-            onAddObjective={onAddObjective ? handleAddObjectiveFromSelection : undefined}
+            onAddObjective={
+              onAddObjective ? handleAddObjectiveFromSelection : undefined
+            }
           />
         )}
 

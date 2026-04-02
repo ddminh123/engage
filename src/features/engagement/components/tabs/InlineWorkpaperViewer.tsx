@@ -273,8 +273,8 @@ export function InlineWorkpaperViewer({
       signoffBar={signoffBar}
       onAddObjective={showObjectives ? handleAddObjective : undefined}
       onObjectiveClicked={showObjectives ? handleObjectiveClick : undefined}
-      objectivesSidebar={objectivesSidebar}
       objectiveMarkRef={showObjectives ? objectiveMarkRef : undefined}
+      defaultSidebar={objectivesSidebar}
     />
   );
 }
