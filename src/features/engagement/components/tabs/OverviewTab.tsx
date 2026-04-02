@@ -1,12 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { Building2, User, Calendar, Flag, AlertTriangle, Link2 } from "lucide-react";
+import {
+  Building2,
+  User,
+  Calendar,
+  Flag,
+  AlertTriangle,
+  Link2,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrgUnitCardPopover } from "@/features/settings/components/OrgUnitCard";
 import { ContactCardPopoverById } from "@/features/settings/components/ContactCard";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
+import { EngagementTeamCard } from "./EngagementTeamCard";
 import type { EngagementDetail } from "../../types";
 
 const L = ENGAGEMENT_LABELS.engagement;
@@ -19,96 +27,132 @@ interface OverviewTabProps {
 export function OverviewTab({ engagement }: OverviewTabProps) {
   return (
     <div className="space-y-6">
-      {/* Main info card */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Thông tin chung</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
-            {/* Entity */}
-            <InfoField label={L.field.entity} icon={<Building2 className="h-4 w-4" />}>
-              <span className="font-medium">
-                {engagement.entity?.name ?? "—"}
-                {engagement.entity?.entityType && (
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    ({engagement.entity.entityType.name})
+      {/* Top row: Thông tin chung + Đoàn kiểm toán side by side */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Main info card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">
+              Thông tin chung
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+              {/* Entity */}
+              <InfoField
+                label={L.field.entity}
+                icon={<Building2 className="h-4 w-4" />}
+              >
+                <span className="font-medium">
+                  {engagement.entity?.name ?? "—"}
+                  {engagement.entity?.entityType && (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      ({engagement.entity.entityType.name})
+                    </span>
+                  )}
+                </span>
+              </InfoField>
+
+              {/* Schedule */}
+              <InfoField
+                label={L.field.schedule}
+                icon={<Calendar className="h-4 w-4" />}
+              >
+                <span className="font-medium">
+                  {new Date(engagement.startDate).toLocaleDateString("vi-VN")} —{" "}
+                  {new Date(engagement.endDate).toLocaleDateString("vi-VN")}
+                </span>
+              </InfoField>
+
+              {/* Priority */}
+              {engagement.priority && (
+                <InfoField
+                  label={L.field.priority}
+                  icon={<Flag className="h-4 w-4" />}
+                >
+                  <span className="font-medium">
+                    {L.priority[engagement.priority] ?? engagement.priority}
                   </span>
-                )}
-              </span>
-            </InfoField>
+                </InfoField>
+              )}
 
-            {/* Schedule */}
-            <InfoField label={L.field.schedule} icon={<Calendar className="h-4 w-4" />}>
-              <span className="font-medium">
-                {new Date(engagement.startDate).toLocaleDateString("vi-VN")} —{" "}
-                {new Date(engagement.endDate).toLocaleDateString("vi-VN")}
-              </span>
-            </InfoField>
+              {/* Inherent Risk */}
+              {engagement.entity?.inherentRiskLevel && (
+                <InfoField
+                  label="Rủi ro vốn có"
+                  icon={<AlertTriangle className="h-4 w-4" />}
+                >
+                  <span className="font-medium">
+                    {engagement.entity.inherentRiskLevel}
+                  </span>
+                </InfoField>
+              )}
 
-            {/* Priority */}
-            {engagement.priority && (
-              <InfoField label={L.field.priority} icon={<Flag className="h-4 w-4" />}>
-                <span className="font-medium">
-                  {L.priority[engagement.priority] ?? engagement.priority}
-                </span>
+              {/* Risk Level */}
+              {engagement.entity?.riskLevel && (
+                <InfoField
+                  label="Mức rủi ro tổng hợp"
+                  icon={<AlertTriangle className="h-4 w-4" />}
+                >
+                  <span className="font-medium">
+                    {engagement.entity.riskLevel}
+                  </span>
+                </InfoField>
+              )}
+
+              {/* Linked plan */}
+              {engagement.plannedAudit?.plan && (
+                <InfoField
+                  label={L.field.linkedPlan}
+                  icon={<Link2 className="h-4 w-4" />}
+                >
+                  <span className="font-medium">
+                    {engagement.plannedAudit.plan.title}
+                  </span>
+                </InfoField>
+              )}
+
+              {/* Areas */}
+              <InfoField label={LP.areas}>
+                <div className="flex flex-wrap gap-1.5">
+                  {engagement.entity?.areas &&
+                  engagement.entity.areas.length > 0 ? (
+                    engagement.entity.areas.map((a) => (
+                      <Badge key={a.id} variant="secondary">
+                        {a.name}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground">{LP.noAreas}</span>
+                  )}
+                </div>
               </InfoField>
-            )}
 
-            {/* Inherent Risk */}
-            {engagement.entity?.inherentRiskLevel && (
-              <InfoField label="Rủi ro vốn có" icon={<AlertTriangle className="h-4 w-4" />}>
-                <span className="font-medium">
-                  {engagement.entity.inherentRiskLevel}
-                </span>
-              </InfoField>
-            )}
+              {/* Estimated days */}
+              {engagement.estimatedDays != null && (
+                <InfoField label={L.field.estimatedDays}>
+                  <span className="font-medium">
+                    {engagement.estimatedDays} ngày
+                  </span>
+                </InfoField>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-            {/* Risk Level */}
-            {engagement.entity?.riskLevel && (
-              <InfoField label="Mức rủi ro tổng hợp" icon={<AlertTriangle className="h-4 w-4" />}>
-                <span className="font-medium">{engagement.entity.riskLevel}</span>
-              </InfoField>
-            )}
-
-            {/* Linked plan */}
-            {engagement.plannedAudit?.plan && (
-              <InfoField label={L.field.linkedPlan} icon={<Link2 className="h-4 w-4" />}>
-                <span className="font-medium">
-                  {engagement.plannedAudit.plan.title}
-                </span>
-              </InfoField>
-            )}
-
-            {/* Areas */}
-            <InfoField label={LP.areas}>
-              <div className="flex flex-wrap gap-1.5">
-                {engagement.entity?.areas && engagement.entity.areas.length > 0 ? (
-                  engagement.entity.areas.map((a) => (
-                    <Badge key={a.id} variant="secondary">
-                      {a.name}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-muted-foreground">{LP.noAreas}</span>
-                )}
-              </div>
-            </InfoField>
-
-            {/* Estimated days */}
-            {engagement.estimatedDays != null && (
-              <InfoField label={L.field.estimatedDays}>
-                <span className="font-medium">{engagement.estimatedDays} ngày</span>
-              </InfoField>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        {/* Engagement team card */}
+        <EngagementTeamCard
+          engagementId={engagement.id}
+          members={engagement.members ?? []}
+        />
+      </div>
 
       {/* Organization info card */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Đơn vị & Liên hệ</CardTitle>
+          <CardTitle className="text-base font-semibold">
+            Đơn vị & Liên hệ
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">

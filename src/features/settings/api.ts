@@ -461,15 +461,18 @@ export async function upsertTemplateBindingApi(data: TemplateEntityBindingInput)
   return handleResponse<TemplateEntityBinding>(response);
 }
 
-export async function deleteTemplateBindingApi(entityType: string): Promise<{ success: boolean }> {
-  const response = await fetch(API_ROUTES.SETTINGS_TEMPLATE_BINDINGS_BY_ENTITY(entityType), {
-    method: 'DELETE',
-  });
+export async function deleteTemplateBindingApi(entityType: string, subType: string = ''): Promise<{ success: boolean }> {
+  const url = subType
+    ? `${API_ROUTES.SETTINGS_TEMPLATE_BINDINGS_BY_ENTITY(entityType)}?subType=${encodeURIComponent(subType)}`
+    : API_ROUTES.SETTINGS_TEMPLATE_BINDINGS_BY_ENTITY(entityType);
+  const response = await fetch(url, { method: 'DELETE' });
   return handleResponse<{ success: boolean }>(response);
 }
 
-export async function fetchTemplateForEntityApi(entityType: string): Promise<TemplateForEntity | null> {
-  const response = await fetch(`${API_ROUTES.TEMPLATE_FOR_ENTITY}?entityType=${encodeURIComponent(entityType)}`);
+export async function fetchTemplateForEntityApi(entityType: string, subType: string = ''): Promise<TemplateForEntity | null> {
+  const params = new URLSearchParams({ entityType });
+  if (subType) params.set('subType', subType);
+  const response = await fetch(`${API_ROUTES.TEMPLATE_FOR_ENTITY}?${params.toString()}`);
   return handleResponse<TemplateForEntity | null>(response);
 }
 

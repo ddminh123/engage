@@ -15,7 +15,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { EngagementMember, WpSignoff } from "../../types";
+import { LinkedObjectivesList } from "./LinkedObjectivesList";
+import type { EngagementMember, WpSignoff, AuditObjective } from "../../types";
+import type { WorkpaperTab } from "@/components/shared/workpaper/WorkpaperDocument";
 import type { JSONContent } from "@tiptap/react";
 
 interface PlanningWorkpaperOverlayProps {
@@ -28,18 +30,22 @@ interface PlanningWorkpaperOverlayProps {
   };
   engagementId: string;
   stepTitle: string;
+  stepConfigKey?: string;
   onClose: () => void;
   members?: EngagementMember[];
   wpSignoffs?: WpSignoff[];
+  auditObjectives?: AuditObjective[];
 }
 
 export function PlanningWorkpaperOverlay({
   workpaper,
   engagementId,
   stepTitle,
+  stepConfigKey,
   onClose,
   members = [],
   wpSignoffs = [],
+  auditObjectives,
 }: PlanningWorkpaperOverlayProps) {
   const shell = useWorkpaperShell({
     entityType: "planning_workpaper",
@@ -50,7 +56,25 @@ export function PlanningWorkpaperOverlay({
     content: (workpaper.content as JSONContent) ?? null,
     updatedAt: workpaper.updatedAt,
     templateEntityType: workpaper.content ? null : "planning_workpaper",
+    templateSubType: stepConfigKey,
   });
+
+  // Build objectives tab for scope workpaper
+  const objectivesTab: WorkpaperTab | null =
+    stepConfigKey === "scope" && auditObjectives
+      ? {
+          key: "objectives",
+          label: "Mục tiêu",
+          content: (
+            <LinkedObjectivesList
+              objectives={auditObjectives}
+              engagementId={engagementId}
+            />
+          ),
+        }
+      : null;
+
+  const extraTabs: WorkpaperTab[] = objectivesTab ? [objectivesTab] : [];
 
   return (
     <>
@@ -104,7 +128,8 @@ export function PlanningWorkpaperOverlay({
             />
           </>
         )}
-        tabs={[]}
+        tabs={extraTabs}
+        defaultTab={objectivesTab ? "objectives" : undefined}
         commentsTabLabel="Soát xét"
         threads={shell.threads}
         onCreateThread={shell.handleCreateThread}

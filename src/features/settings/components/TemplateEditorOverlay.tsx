@@ -19,14 +19,14 @@ import {
   type EngageEditorHandle,
 } from "@/components/shared/RichTextEditor/EngageEditor";
 import {
-  TEMPLATE_ENTITY_TYPES,
-  templateEntityTypeLabel,
-} from "@/constants/entityTypes";
-import {
   useUpdateTemplate,
   useTemplateCategories,
   useCreateTemplateCategory,
 } from "../hooks/useTemplates";
+import {
+  useEntityTypeOptions,
+  decodeEntityOption,
+} from "../hooks/useEntityTypeOptions";
 import type { Template } from "../types";
 import type { JSONContent } from "@tiptap/react";
 
@@ -120,6 +120,7 @@ export function TemplateEditorOverlay({
   const { data: categories = [] } = useTemplateCategories();
   const createCategoryMutation = useCreateTemplateCategory();
   const autoSave = useTemplateAutoSave(template.id, updateMutation);
+  const { options: entityOptions, optionLabel } = useEntityTypeOptions();
 
   // Local state for metadata
   const [name, setName] = React.useState(template.name);
@@ -161,7 +162,7 @@ export function TemplateEditorOverlay({
       autoSave.save({
         name,
         description: description || null,
-        entity_type: entityType,
+        entity_type: decodeEntityOption(entityType).entityType,
         category_id: categoryId || null,
         is_active: isActive,
         ...overrides,
@@ -248,7 +249,7 @@ export function TemplateEditorOverlay({
           )}
 
           <Badge variant="secondary" className="text-xs font-normal shrink-0">
-            {templateEntityTypeLabel(entityType)}
+            {optionLabel(entityType)}
           </Badge>
 
           {/* Auto-save indicator */}
@@ -298,19 +299,21 @@ export function TemplateEditorOverlay({
               onValueChange={(v) => {
                 if (v) {
                   setEntityType(v);
-                  saveMetadata({ entity_type: v });
+                  saveMetadata({
+                    entity_type: decodeEntityOption(v).entityType,
+                  });
                 }
               }}
             >
               <SelectTrigger className="h-8 text-xs">
                 <span className="flex flex-1 text-left truncate">
-                  {templateEntityTypeLabel(entityType)}
+                  {optionLabel(entityType)}
                 </span>
               </SelectTrigger>
               <SelectContent>
-                {TEMPLATE_ENTITY_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value} label={t.label}>
-                    {t.label}
+                {entityOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value} label={o.label}>
+                    {o.label}
                   </SelectItem>
                 ))}
               </SelectContent>

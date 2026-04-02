@@ -228,11 +228,12 @@ export async function listTemplateBindings() {
     include: {
       template: { select: { id: true, name: true, entity_type: true, is_active: true } },
     },
-    orderBy: { entity_type: 'asc' },
+    orderBy: [{ entity_type: 'asc' }, { sub_type: 'asc' }],
   });
   return items.map((b) => ({
     id: b.id,
     entityType: b.entity_type,
+    subType: b.sub_type,
     templateId: b.template_id,
     templateName: b.template.name,
     templateEntityType: b.template.entity_type,
@@ -240,14 +241,15 @@ export async function listTemplateBindings() {
   }));
 }
 
-export async function upsertTemplateBinding(entityType: string, templateId: string) {
+export async function upsertTemplateBinding(entityType: string, templateId: string, subType: string = '') {
+  const compositeKey = { entity_type_sub_type: { entity_type: entityType, sub_type: subType } };
   const existing = await prisma.templateEntityBinding.findUnique({
-    where: { entity_type: entityType },
+    where: compositeKey,
   });
 
   if (existing) {
     const item = await prisma.templateEntityBinding.update({
-      where: { entity_type: entityType },
+      where: compositeKey,
       data: { template_id: templateId },
       include: {
         template: { select: { id: true, name: true, entity_type: true, is_active: true } },
@@ -256,13 +258,14 @@ export async function upsertTemplateBinding(entityType: string, templateId: stri
     return {
       id: item.id,
       entityType: item.entity_type,
+      subType: item.sub_type,
       templateId: item.template_id,
       templateName: item.template.name,
     };
   }
 
   const item = await prisma.templateEntityBinding.create({
-    data: { entity_type: entityType, template_id: templateId },
+    data: { entity_type: entityType, sub_type: subType, template_id: templateId },
     include: {
       template: { select: { id: true, name: true, entity_type: true, is_active: true } },
     },
@@ -270,18 +273,21 @@ export async function upsertTemplateBinding(entityType: string, templateId: stri
   return {
     id: item.id,
     entityType: item.entity_type,
+    subType: item.sub_type,
     templateId: item.template_id,
     templateName: item.template.name,
   };
 }
 
-export async function deleteTemplateBinding(entityType: string) {
-  await prisma.templateEntityBinding.delete({ where: { entity_type: entityType } });
+export async function deleteTemplateBinding(entityType: string, subType: string = '') {
+  await prisma.templateEntityBinding.delete({
+    where: { entity_type_sub_type: { entity_type: entityType, sub_type: subType } },
+  });
 }
 
-export async function getTemplateForEntity(entityType: string) {
+export async function getTemplateForEntity(entityType: string, subType: string = '') {
   const binding = await prisma.templateEntityBinding.findUnique({
-    where: { entity_type: entityType },
+    where: { entity_type_sub_type: { entity_type: entityType, sub_type: subType } },
     include: {
       template: {
         select: { id: true, name: true, content: true, is_active: true },

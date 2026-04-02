@@ -1304,11 +1304,13 @@ model Template {
 
 model TemplateEntityBinding {
   id          String @id @default(cuid())
-  entity_type String @unique   // "procedure" | "planning_workpaper" | "entity_risk_assessment"
+  entity_type String   // "procedure" | "planning_workpaper" | "entity_risk_assessment"
+  sub_type    String @default("")  // "" for base types, step config key for planning_workpaper, etc.
   template_id String
 
   template Template @relation(fields: [template_id], references: [id], onDelete: Cascade)
 
+  @@unique([entity_type, sub_type])
   @@index([template_id])
   @@map("template_entity_binding")
 }

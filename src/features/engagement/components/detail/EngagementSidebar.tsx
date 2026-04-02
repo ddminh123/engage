@@ -54,7 +54,7 @@ export function EngagementSidebar({
   onCollapsedChange,
 }: EngagementSidebarProps) {
   const searchParams = useSearchParams();
-  const currentTab = searchParams.get("tab") ?? "planning";
+  const currentTab = searchParams.get("tab");
   const currentSection = searchParams.get("section");
 
   // Fetch planning steps for dynamic sub-navigation

@@ -121,7 +121,8 @@ export function useUpsertTemplateBinding() {
 export function useDeleteTemplateBinding() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (entityType: string) => deleteTemplateBindingApi(entityType),
+    mutationFn: ({ entityType, subType }: { entityType: string; subType?: string }) =>
+      deleteTemplateBindingApi(entityType, subType ?? ''),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: TEMPLATE_BINDINGS_KEY });
     },
@@ -130,10 +131,10 @@ export function useDeleteTemplateBinding() {
 
 // ── Template for Entity (used by WP editors) ──
 
-export function useTemplateForEntity(entityType: string | null) {
+export function useTemplateForEntity(entityType: string | null, subType?: string) {
   return useQuery<TemplateForEntity | null>({
-    queryKey: ["template-for-entity", entityType],
-    queryFn: () => fetchTemplateForEntityApi(entityType!),
+    queryKey: ["template-for-entity", entityType, subType ?? ''],
+    queryFn: () => fetchTemplateForEntityApi(entityType!, subType ?? ''),
     enabled: !!entityType,
   });
 }

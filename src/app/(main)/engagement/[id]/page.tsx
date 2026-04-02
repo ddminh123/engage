@@ -226,9 +226,11 @@ function EngagementDetailContent() {
               workpaper={pwp}
               engagementId={engagementId}
               stepTitle={pwp.stepConfig?.title ?? "Workpaper"}
+              stepConfigKey={pwp.stepConfig?.key}
               onClose={handleClosePlanningWp}
               members={engagement.members ?? []}
               wpSignoffs={wpSignoffs}
+              auditObjectives={engagement.auditObjectives}
             />
           );
         })()}

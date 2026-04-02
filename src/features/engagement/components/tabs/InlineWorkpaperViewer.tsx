@@ -36,6 +36,8 @@ interface InlineWorkpaperViewerProps {
   wpSignoffs?: WpSignoff[];
   /** Optional edit button rendered inside the signoff bar */
   editButton?: React.ReactNode;
+  /** Default right sidebar content shown when comments sidebar is closed */
+  defaultSidebar?: React.ReactNode;
 }
 
 export function InlineWorkpaperViewer({
@@ -49,6 +51,7 @@ export function InlineWorkpaperViewer({
   members = [],
   wpSignoffs,
   editButton,
+  defaultSidebar,
 }: InlineWorkpaperViewerProps) {
   const queryClient = useQueryClient();
   const { data: threads = [] } = useCommentThreads(
@@ -210,6 +213,7 @@ export function InlineWorkpaperViewer({
       onContentChange={handleContentChange}
       className={className}
       signoffBar={signoffBar}
+      defaultSidebar={defaultSidebar}
     />
   );
 }

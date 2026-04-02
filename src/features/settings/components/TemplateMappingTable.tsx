@@ -22,15 +22,16 @@ import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/shared/DataTable";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
-  TEMPLATE_ENTITY_TYPES,
-  templateEntityTypeLabel,
-} from "@/constants/entityTypes";
-import {
   useTemplateBindings,
   useUpsertTemplateBinding,
   useDeleteTemplateBinding,
   useTemplates,
 } from "../hooks/useTemplates";
+import {
+  useEntityTypeOptions,
+  encodeEntityOption,
+  decodeEntityOption,
+} from "../hooks/useEntityTypeOptions";
 import type { TemplateEntityBinding } from "../types";
 
 // ── Main Component ──
@@ -41,45 +42,56 @@ export function TemplateMappingTable() {
   const upsertBinding = useUpsertTemplateBinding();
   const deleteBinding = useDeleteTemplateBinding();
 
-  const [showAddDialog, setShowAddDialog] = React.useState(false);
-  const [newEntityType, setNewEntityType] = React.useState("");
-  const [newTemplateId, setNewTemplateId] = React.useState("");
-  const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
+  const { options: allEntityOptions, optionLabel } = useEntityTypeOptions();
 
-  const boundTypes = new Set(bindings.map((b) => b.entityType));
-  const availableTypes = TEMPLATE_ENTITY_TYPES.filter(
-    (t) => !boundTypes.has(t.value),
+  const [showAddDialog, setShowAddDialog] = React.useState(false);
+  const [newOptionValue, setNewOptionValue] = React.useState("");
+  const [newTemplateId, setNewTemplateId] = React.useState("");
+  const [deleteTarget, setDeleteTarget] = React.useState<{
+    entityType: string;
+    subType: string;
+  } | null>(null);
+
+  // Encoded keys of already-bound entity+sub combos
+  const boundKeys = new Set(
+    bindings.map((b) => encodeEntityOption(b.entityType, b.subType)),
+  );
+  const availableOptions = allEntityOptions.filter(
+    (o) => !boundKeys.has(o.value),
   );
 
   // Active templates only for selection
   const activeTemplates = templates.filter((t) => t.isActive);
 
-  // Filter templates by selected entity type
-  const filteredTemplates = newEntityType
-    ? activeTemplates.filter((t) => t.entityType === newEntityType)
+  // Decode selected option for template filtering
+  const decoded = newOptionValue ? decodeEntityOption(newOptionValue) : null;
+  const filteredTemplates = decoded
+    ? activeTemplates.filter((t) => t.entityType === decoded.entityType)
     : activeTemplates;
 
   // Handle workflow change inline
   const handleTemplateChange = async (
     entityType: string,
+    subType: string,
     templateId: string,
   ) => {
     try {
-      await upsertBinding.mutateAsync({ entityType, templateId });
+      await upsertBinding.mutateAsync({ entityType, templateId, subType });
     } catch {
       // Error handled by mutation state
     }
   };
 
   const handleAdd = async () => {
-    if (!newEntityType || !newTemplateId) return;
+    if (!newOptionValue || !newTemplateId || !decoded) return;
     try {
       await upsertBinding.mutateAsync({
-        entityType: newEntityType,
+        entityType: decoded.entityType,
         templateId: newTemplateId,
+        subType: decoded.subType,
       });
       setShowAddDialog(false);
-      setNewEntityType("");
+      setNewOptionValue("");
       setNewTemplateId("");
     } catch {
       // Error handled by mutation state
@@ -103,7 +115,9 @@ export function TemplateMappingTable() {
       header: "Loại đối tượng",
       cell: ({ row }) => (
         <Badge variant="secondary" className="text-xs font-normal">
-          {templateEntityTypeLabel(row.original.entityType)}
+          {optionLabel(
+            encodeEntityOption(row.original.entityType, row.original.subType),
+          )}
         </Badge>
       ),
     },
@@ -121,7 +135,7 @@ export function TemplateMappingTable() {
           <Select
             value={currentTemplateId}
             onValueChange={(v) => {
-              if (v) handleTemplateChange(entityType, v);
+              if (v) handleTemplateChange(entityType, row.original.subType, v);
             }}
           >
             <SelectTrigger className="h-8 w-[280px] text-xs">
@@ -172,7 +186,12 @@ export function TemplateMappingTable() {
           size="icon-sm"
           title="Gỡ gán"
           className="text-destructive hover:text-destructive"
-          onClick={() => setDeleteTarget(row.original.entityType)}
+          onClick={() =>
+            setDeleteTarget({
+              entityType: row.original.entityType,
+              subType: row.original.subType,
+            })
+          }
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -194,7 +213,7 @@ export function TemplateMappingTable() {
             size="sm"
             className="h-8"
             onClick={() => setShowAddDialog(true)}
-            disabled={availableTypes.length === 0}
+            disabled={availableOptions.length === 0}
           >
             <Plus className="mr-2 h-4 w-4" />
             Thêm gán mẫu
@@ -212,9 +231,9 @@ export function TemplateMappingTable() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Loại đối tượng</label>
               <Select
-                value={newEntityType}
+                value={newOptionValue}
                 onValueChange={(v) => {
-                  setNewEntityType(v ?? "");
+                  setNewOptionValue(v ?? "");
                   setNewTemplateId("");
                 }}
               >
@@ -222,20 +241,25 @@ export function TemplateMappingTable() {
                   <span
                     className={cn(
                       "flex flex-1 text-left truncate",
-                      !newEntityType && "text-muted-foreground",
+                      !newOptionValue && "text-muted-foreground",
                     )}
                   >
-                    {newEntityType
-                      ? templateEntityTypeLabel(newEntityType)
+                    {newOptionValue
+                      ? optionLabel(newOptionValue)
                       : "Chọn loại đối tượng"}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
-                  {availableTypes.map((t) => (
-                    <SelectItem key={t.value} value={t.value} label={t.label}>
-                      {t.label}
+                  {availableOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value} label={o.label}>
+                      {o.label}
                     </SelectItem>
                   ))}
+                  {availableOptions.length === 0 && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      Tất cả loại đã được gán mẫu
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -267,7 +291,7 @@ export function TemplateMappingTable() {
                   ))}
                   {filteredTemplates.length === 0 && (
                     <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                      {newEntityType
+                      {newOptionValue
                         ? "Chưa có mẫu nào cho loại này"
                         : "Chọn loại đối tượng trước"}
                     </div>
@@ -283,7 +307,7 @@ export function TemplateMappingTable() {
             <Button
               onClick={handleAdd}
               disabled={
-                !newEntityType || !newTemplateId || upsertBinding.isPending
+                !newOptionValue || !newTemplateId || upsertBinding.isPending
               }
             >
               {upsertBinding.isPending ? (
@@ -300,7 +324,7 @@ export function TemplateMappingTable() {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title="Gỡ gán mẫu"
-        description={`Bạn có chắc muốn gỡ mẫu mặc định cho "${deleteTarget ? templateEntityTypeLabel(deleteTarget) : ""}"?`}
+        description={`Bạn có chắc muốn gỡ mẫu mặc định cho "${deleteTarget ? optionLabel(encodeEntityOption(deleteTarget.entityType, deleteTarget.subType)) : ""}"?`}
         confirmLabel="Gỡ"
         onConfirm={handleDelete}
         isLoading={deleteBinding.isPending}

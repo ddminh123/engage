@@ -23,14 +23,14 @@ import {
 import { FormDialog } from "@/components/shared/FormDialog";
 import { COMMON_LABELS } from "@/constants/labels";
 import {
-  TEMPLATE_ENTITY_TYPES,
-  templateEntityTypeLabel,
-} from "@/constants/entityTypes";
-import {
   useCreateTemplate,
   useTemplateCategories,
   useCreateTemplateCategory,
 } from "../hooks/useTemplates";
+import {
+  useEntityTypeOptions,
+  decodeEntityOption,
+} from "../hooks/useEntityTypeOptions";
 import type { Template } from "../types";
 
 const C = COMMON_LABELS;
@@ -58,6 +58,7 @@ export function TemplateForm({
   const createMutation = useCreateTemplate();
   const { data: categories = [] } = useTemplateCategories();
   const createCategoryMutation = useCreateTemplateCategory();
+  const { options: entityOptions, optionLabel } = useEntityTypeOptions();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -108,10 +109,13 @@ export function TemplateForm({
         categoryId = newCat.id;
       }
 
+      const { entityType: resolvedEntityType } = decodeEntityOption(
+        values.entity_type,
+      );
       const created = await createMutation.mutateAsync({
         name: values.name,
         content: { type: "doc", content: [] },
-        entity_type: values.entity_type,
+        entity_type: resolvedEntityType,
         category_id: categoryId,
       });
 
@@ -177,14 +181,14 @@ export function TemplateForm({
                   <FormControl>
                     <SelectTrigger>
                       <span className="flex flex-1 text-left truncate">
-                        {templateEntityTypeLabel(field.value)}
+                        {optionLabel(field.value)}
                       </span>
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {TEMPLATE_ENTITY_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value} label={t.label}>
-                        {t.label}
+                    {entityOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value} label={o.label}>
+                        {o.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

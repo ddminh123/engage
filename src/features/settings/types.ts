@@ -176,6 +176,7 @@ export interface TemplateInput {
 export interface TemplateEntityBinding {
   id: string;
   entityType: string;
+  subType: string;
   templateId: string;
   templateName: string;
   templateEntityType: string;
@@ -185,6 +186,7 @@ export interface TemplateEntityBinding {
 export interface TemplateEntityBindingInput {
   entityType: string;
   templateId: string;
+  subType?: string;
 }
 
 export interface TemplateForEntity {

@@ -41,6 +41,8 @@ export interface WorkpaperViewerProps {
   editorClassName?: string;
   /** Optional signoff bar rendered above the editor content */
   signoffBar?: React.ReactNode;
+  /** Default right sidebar content shown when comments sidebar is closed */
+  defaultSidebar?: React.ReactNode;
 }
 
 // ── Component ──
@@ -59,6 +61,7 @@ export function WorkpaperViewer({
   className,
   editorClassName = "min-h-[400px]",
   signoffBar,
+  defaultSidebar,
 }: WorkpaperViewerProps) {
   const editorRef = React.useRef<WorkpaperEditorHandle>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -92,6 +95,7 @@ export function WorkpaperViewer({
 
   // ── Comments sidebar toggle ──
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const showDefaultSidebar = !!defaultSidebar && !sidebarOpen;
 
   // ── Track editor readiness for mouseup listener ──
   const [editorReady, setEditorReady] = React.useState(false);
@@ -361,6 +365,13 @@ export function WorkpaperViewer({
             editorClassName={editorClassName}
           />
         </div>
+
+        {/* Default sidebar (e.g. objectives list) — shown when comments sidebar is closed */}
+        {showDefaultSidebar && (
+          <div className="w-[320px] shrink-0 border-l overflow-y-auto bg-muted/10">
+            <div className="p-3">{defaultSidebar}</div>
+          </div>
+        )}
 
         {/* Togglable comments sidebar */}
         {sidebarOpen && (

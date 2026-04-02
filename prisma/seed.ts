@@ -162,8 +162,8 @@ async function main() {
   // 6. Default Planning Step Configs
   // =========================================================================
   const planningSteps = [
-    { key: 'scope',         title: 'Phạm vi kiểm toán',          icon: 'FileText',     step_type: 'fixed',    sort_order: 0, is_active: true },
-    { key: 'objectives',    title: 'Mục tiêu kiểm toán',        icon: 'Target',       step_type: 'fixed',    sort_order: 1, is_active: true },
+    { key: 'scope',         title: 'Phạm vi và Mục tiêu',        icon: 'FileText',     step_type: 'fixed',    sort_order: 0, is_active: true },
+    { key: 'objectives',    title: 'Mục tiêu kiểm toán',        icon: 'Target',       step_type: 'fixed',    sort_order: 1, is_active: false },
     { key: 'understanding', title: 'Tìm hiểu đối tượng',        icon: 'BookOpen',     step_type: 'fixed',    sort_order: 2, is_active: true },
     { key: 'rcm',           title: 'Rủi ro & Kiểm soát (RACM)', icon: 'ShieldCheck',  step_type: 'fixed',    sort_order: 3, is_active: true },
     { key: 'work_program',  title: 'Chương trình kiểm toán',     icon: 'ClipboardList', step_type: 'fixed',   sort_order: 4, is_active: true },

@@ -28,7 +28,7 @@ const ROLE_OPTIONS = [
 ];
 
 const ROLE_LABEL: Record<string, string> = {
-  lead: "Trưởng nhóm",
+  lead: "Trưởng đoàn",
   member: "Thành viên",
   reviewer: "Soát xét",
   observer: "Quan sát",

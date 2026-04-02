@@ -16,25 +16,13 @@ import {
   X,
   Shield,
   Layers,
-  ArrowUpToLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-} from "@/components/ui/context-menu";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { LabeledSelect } from "@/components/shared/LabeledSelect";
-import {
-  SortableList,
-  DragHandle,
-  type DragHandleRenderProps,
-} from "@/components/shared/SortableList";
 import { RichTextDisplay } from "@/components/shared/RichTextEditor";
 import { InlineWorkpaperViewer } from "./InlineWorkpaperViewer";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
@@ -109,8 +97,6 @@ export function PlanningTab({
   const {
     state,
     dispatch,
-    handleAddObjective,
-    handleUpdateObjective,
     handleAddRisk,
     handleUpdateRisk,
     handleAddControl,
@@ -122,8 +108,6 @@ export function PlanningTab({
     handleAddProcedure,
     handleUpdateProcedure,
     handleConfirmDelete,
-    handleReorderAuditObjectives,
-    handleMoveToTopAuditObjective,
   } = usePlanningEditor(engagement);
 
   const syncRcmToWp = useSyncRcmToWorkProgram();
@@ -209,43 +193,11 @@ export function PlanningTab({
         switch (step.key) {
           case "scope": {
             const scopeWp = wpByStep.get(step.id);
+            const scopeStatus = scopeWp?.approvalStatus ?? "not_started";
             const scopeHeaderRight = cardHeaderRight(
               "planning_workpaper",
               scopeWp?.id,
-              scopeWp?.approvalStatus ?? "not_started",
-            );
-
-            // Section page view: show header + content directly
-            if (section) {
-              return (
-                <div key={step.key}>
-                  <SectionPageHeader
-                    title={step.title}
-                    icon={<StepIcon name={step.icon} />}
-                    headerRight={scopeHeaderRight}
-                  />
-                  <ScopeSection engagement={engagement} />
-                </div>
-              );
-            }
-
-            // Main view: show navigable card
-            return (
-              <NavigableCard
-                key={step.key}
-                title={step.title}
-                icon={<StepIcon name={step.icon} />}
-                href={`/engagement/${engagement.id}?tab=planning&section=${step.key}`}
-                headerRight={scopeHeaderRight}
-              />
-            );
-          }
-
-          case "objectives": {
-            const objHeaderRight = cardHeaderRight(
-              "work_program",
-              undefined,
-              "not_started",
+              scopeStatus,
             );
 
             // Main view: show navigable card
@@ -256,147 +208,82 @@ export function PlanningTab({
                   title={step.title}
                   icon={<StepIcon name={step.icon} />}
                   href={`/engagement/${engagement.id}?tab=planning&section=${step.key}`}
-                  headerRight={objHeaderRight}
+                  headerRight={scopeHeaderRight}
                 />
               );
             }
 
-            // Section page view: show header + content directly
+            // Section page: version info right-aligned
+            const scopeSectionHeaderRight = scopeWp ? (
+              <ViewerVersionInfo
+                entityType="planning_workpaper"
+                entityId={scopeWp.id}
+                engagementId={engagement.id}
+                currentVersion={scopeWp.currentVersion}
+                updatedAt={scopeWp.updatedAt}
+              />
+            ) : null;
+
+            const scopeEditButton = !isReviewMode ? (
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => onOpenPlanningWp?.(step.id)}
+              >
+                <Pencil className="mr-1 h-3 w-3" />
+                Chỉnh sửa
+              </Button>
+            ) : null;
+
+            // Section page view: show header + inline viewer + objectives list
             return (
               <div key={step.key}>
                 <SectionPageHeader
                   title={step.title}
                   icon={<StepIcon name={step.icon} />}
-                  headerRight={objHeaderRight}
+                  titleExtra={<StatusBadge status={scopeStatus} />}
+                  headerRight={scopeSectionHeaderRight}
                 />
-                {!isReviewMode && (
-                  <div className="flex justify-end mb-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => dispatch({ type: "START_ADD_OBJECTIVE" })}
-                    >
-                      <Plus className="mr-1 h-3 w-3" />
-                      {LAO.createTitle}
-                    </Button>
-                  </div>
-                )}
-                {engagement.auditObjectives.length === 0 &&
-                  !state.addingObjective && (
-                    <p className="py-2 text-sm text-muted-foreground">
-                      {LAO.noData}
+                {scopeWp?.content ? (
+                  <InlineWorkpaperViewer
+                    engagementId={engagement.id}
+                    entityId={scopeWp.id}
+                    content={scopeWp.content}
+                    approvalStatus={scopeWp.approvalStatus}
+                    currentVersion={scopeWp.currentVersion}
+                    members={engagement.members}
+                    editButton={scopeEditButton}
+                    defaultSidebar={
+                      <ObjectivesReadOnlyList
+                        objectives={engagement.auditObjectives}
+                      />
+                    }
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-6">
+                    <FileText className="h-8 w-8 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground">
+                      Chưa có nội dung phạm vi kiểm toán.
                     </p>
-                  )}
-
-                <SortableList
-                  items={engagement.auditObjectives}
-                  onReorder={handleReorderAuditObjectives}
-                  renderItem={(obj, dragHandle) => {
-                    const idx = engagement.auditObjectives.findIndex(
-                      (o) => o.id === obj.id,
-                    );
-                    return (
-                      <ContextMenu>
-                        <ContextMenuTrigger asChild>
-                          <div className="group/row flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
-                            <DragHandle {...dragHandle} />
-                            <span className="w-6 text-center text-xs text-muted-foreground">
-                              {idx + 1}
-                            </span>
-
-                            {state.editingObjectiveId === obj.id ? (
-                              <InlineInput
-                                value={state.editingObjectiveTitle}
-                                onChange={(t) =>
-                                  dispatch({
-                                    type: "SET_EDITING_OBJECTIVE_TITLE",
-                                    title: t,
-                                  })
-                                }
-                                onSubmit={() => handleUpdateObjective(obj.id)}
-                                onCancel={() =>
-                                  dispatch({ type: "CANCEL_EDIT_OBJECTIVE" })
-                                }
-                                autoFocus
-                              />
-                            ) : (
-                              <>
-                                <span className="flex-1 text-sm">
-                                  {obj.title}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  onClick={() =>
-                                    dispatch({
-                                      type: "START_EDIT_OBJECTIVE",
-                                      id: obj.id,
-                                      title: obj.title,
-                                    })
-                                  }
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() =>
-                                    dispatch({
-                                      type: "SET_DELETE_TARGET",
-                                      target: {
-                                        type: "objective",
-                                        id: obj.id,
-                                        title: obj.title,
-                                      },
-                                    })
-                                  }
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </ContextMenuTrigger>
-                        <ContextMenuContent>
-                          <ContextMenuItem
-                            onClick={() =>
-                              handleMoveToTopAuditObjective(obj.id)
-                            }
-                            disabled={idx === 0}
-                          >
-                            <ArrowUpToLine className="mr-2 h-3.5 w-3.5" />
-                            Đưa lên đầu
-                          </ContextMenuItem>
-                        </ContextMenuContent>
-                      </ContextMenu>
-                    );
-                  }}
-                />
-
-                {state.addingObjective && (
-                  <div className="px-2 py-1.5">
-                    <InlineInput
-                      value={state.addingObjectiveTitle}
-                      onChange={(t) =>
-                        dispatch({ type: "SET_OBJECTIVE_TITLE", title: t })
-                      }
-                      onSubmit={handleAddObjective}
-                      onCancel={() =>
-                        dispatch({ type: "CANCEL_ADD_OBJECTIVE" })
-                      }
-                      placeholder="Tên mục tiêu kiểm toán..."
-                      icon={
-                        <Target className="h-3.5 w-3.5 text-muted-foreground" />
-                      }
-                      autoFocus
-                    />
+                    {!isReviewMode && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onOpenPlanningWp?.(step.id)}
+                      >
+                        <Plus className="mr-1 h-3.5 w-3.5" />
+                        Thêm nội dung
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
             );
           }
+
+          case "objectives":
+            // Objectives step is merged into scope — skip rendering
+            return null;
 
           case "understanding": {
             const undWp = wpByStep.get(step.id);
@@ -832,37 +719,49 @@ function ViewerVersionInfo({
   );
 }
 
-// ── Scope Section (simplified - general info moved to OverviewTab) ──
+// ── Objectives Read-Only List (shown below scope workpaper in view mode) ──
 
-function ScopeSection({ engagement }: { engagement: EngagementDetail }) {
-  const hasContent = engagement.objective || engagement.scope;
-
-  if (!hasContent) {
+function ObjectivesReadOnlyList({
+  objectives,
+}: {
+  objectives: AuditObjective[];
+}) {
+  if (objectives.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-2">
-        Chưa có thông tin phạm vi kiểm toán.
-      </p>
+      <div className="text-sm text-muted-foreground py-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide mb-2">
+          Mục tiêu kiểm toán
+        </h3>
+        <p>Chưa có mục tiêu kiểm toán.</p>
+      </div>
     );
   }
 
   return (
-    <div className="text-sm space-y-4">
-      {engagement.objective && (
-        <div>
-          <div className="text-muted-foreground text-xs mb-1">
-            {L.field.objective}
-          </div>
-          <div className="whitespace-pre-wrap">{engagement.objective}</div>
-        </div>
-      )}
-      {engagement.scope && (
-        <div>
-          <div className="text-muted-foreground text-xs mb-1">
-            {L.field.scope}
-          </div>
-          <div className="whitespace-pre-wrap">{engagement.scope}</div>
-        </div>
-      )}
+    <div>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+        Mục tiêu kiểm toán
+      </h3>
+      <ol className="space-y-1.5 list-none">
+        {objectives.map((obj, idx) => (
+          <li
+            key={obj.id}
+            className="flex items-start gap-2 rounded-md border border-muted px-2.5 py-2 text-sm"
+          >
+            <span className="mt-0.5 w-5 shrink-0 text-center text-xs font-medium text-muted-foreground">
+              {idx + 1}
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-foreground">{obj.title}</span>
+              {obj.description && (
+                <span className="text-xs text-muted-foreground line-clamp-2">
+                  {obj.description}
+                </span>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

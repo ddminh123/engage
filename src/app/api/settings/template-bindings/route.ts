@@ -15,14 +15,14 @@ export const POST = withAccess(
   async (req: NextRequest) => {
     try {
       const body = await req.json();
-      const { entityType, templateId } = body;
+      const { entityType, templateId, subType } = body;
       if (!entityType || !templateId) {
         return Response.json(
           { error: { code: 'VALIDATION_ERROR', message: 'entityType and templateId are required' } },
           { status: 400 },
         );
       }
-      const data = await upsertTemplateBinding(entityType, templateId);
+      const data = await upsertTemplateBinding(entityType, templateId, subType ?? '');
       return Response.json({ data });
     } catch (error) {
       const message = (error as Error).message;
