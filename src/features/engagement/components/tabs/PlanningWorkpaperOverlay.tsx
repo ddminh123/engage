@@ -15,8 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { EngagementMember, WpSignoff } from "../../types";
+import type { EngagementMember, WpSignoff, AuditObjective } from "../../types";
 import type { JSONContent } from "@tiptap/react";
+import type { WorkpaperTab } from "@/components/shared/workpaper/WorkpaperDocument";
+import {
+  ObjectivesTabContent,
+  type PendingObjectiveData,
+} from "./ObjectivesTabContent";
 
 interface PlanningWorkpaperOverlayProps {
   workpaper: {
@@ -31,6 +36,7 @@ interface PlanningWorkpaperOverlayProps {
   onClose: () => void;
   members?: EngagementMember[];
   wpSignoffs?: WpSignoff[];
+  auditObjectives?: AuditObjective[];
 }
 
 export function PlanningWorkpaperOverlay({
@@ -40,7 +46,44 @@ export function PlanningWorkpaperOverlay({
   onClose,
   members = [],
   wpSignoffs = [],
+  auditObjectives = [],
 }: PlanningWorkpaperOverlayProps) {
+  const [pendingObjective, setPendingObjective] =
+    React.useState<PendingObjectiveData | null>(null);
+  const objectiveMarkRef = React.useRef<{
+    applyObjectiveMark: (objectiveId: string, from: number, to: number) => void;
+    clearPendingObjectiveRange: () => void;
+    highlightObjective: (objectiveId: string | null) => void;
+    unsetObjectiveMark: (objectiveId: string) => void;
+  } | null>(null);
+
+  const handleAddObjective = React.useCallback(
+    (quote: string, from: number, to: number) => {
+      setPendingObjective({ quote, selection: { from, to } });
+    },
+    [],
+  );
+
+  const handleObjectiveCreated = React.useCallback(
+    (objectiveId: string, from: number, to: number) => {
+      objectiveMarkRef.current?.applyObjectiveMark(objectiveId, from, to);
+      setPendingObjective(null);
+    },
+    [],
+  );
+
+  const handleCancelPendingObjective = React.useCallback(() => {
+    objectiveMarkRef.current?.clearPendingObjectiveRange();
+    setPendingObjective(null);
+  }, []);
+
+  const handleObjectiveClick = React.useCallback((objectiveId: string) => {
+    objectiveMarkRef.current?.highlightObjective(objectiveId);
+  }, []);
+
+  const handleObjectiveDeleted = React.useCallback((objectiveId: string) => {
+    objectiveMarkRef.current?.unsetObjectiveMark(objectiveId);
+  }, []);
   const shell = useWorkpaperShell({
     entityType: "planning_workpaper",
     entityId: workpaper.id,
@@ -51,6 +94,34 @@ export function PlanningWorkpaperOverlay({
     updatedAt: workpaper.updatedAt,
     templateEntityType: workpaper.content ? null : "planning_workpaper",
   });
+
+  const objectivesTab: WorkpaperTab = React.useMemo(
+    () => ({
+      key: "objectives",
+      label: "Mục tiêu",
+      content: (
+        <ObjectivesTabContent
+          engagementId={engagementId}
+          objectives={auditObjectives}
+          pendingObjective={pendingObjective}
+          onObjectiveCreated={handleObjectiveCreated}
+          onCancelPendingObjective={handleCancelPendingObjective}
+          onObjectiveClick={handleObjectiveClick}
+          onObjectiveDeleted={handleObjectiveDeleted}
+        />
+      ),
+      badge: auditObjectives.length || undefined,
+    }),
+    [
+      engagementId,
+      auditObjectives,
+      pendingObjective,
+      handleObjectiveCreated,
+      handleCancelPendingObjective,
+      handleObjectiveClick,
+      handleObjectiveDeleted,
+    ],
+  );
 
   return (
     <>
@@ -104,8 +175,13 @@ export function PlanningWorkpaperOverlay({
             />
           </>
         )}
-        tabs={[]}
+        tabs={[objectivesTab]}
+        defaultTab="objectives"
         commentsTabLabel="Soát xét"
+        onAddObjective={handleAddObjective}
+        onObjectiveClicked={handleObjectiveClick}
+        objectiveTabKey="objectives"
+        objectiveMarkRef={objectiveMarkRef}
         threads={shell.threads}
         onCreateThread={shell.handleCreateThread}
         onReplyToThread={shell.handleReplyToThread}

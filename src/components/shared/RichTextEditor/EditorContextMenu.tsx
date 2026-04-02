@@ -12,6 +12,7 @@ import {
   MessageSquarePlus,
   NotepadText,
   SearchCheck,
+  Target,
   Columns2,
   Rows2,
   Merge,
@@ -35,6 +36,7 @@ interface EditorContextMenuProps {
   editor: Editor;
   onAddComment?: (threadType: "comment" | "review_note") => void;
   onAddFinding?: () => void;
+  onAddObjective?: () => void;
 }
 
 /** Clamp a position so the element stays within the viewport */
@@ -50,6 +52,7 @@ export function EditorContextMenu({
   editor,
   onAddComment,
   onAddFinding,
+  onAddObjective,
 }: EditorContextMenuProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -267,8 +270,8 @@ export function EditorContextMenu({
           />
         )}
 
-        {/* Ý kiến + Review note + Thêm phát hiện — flat items */}
-        {(onAddComment || onAddFinding) && hasText && (
+        {/* Ý kiến + Review note + Thêm phát hiện + Thêm mục tiêu — flat items */}
+        {(onAddComment || onAddFinding || onAddObjective) && hasText && (
           <>
             <MenuDivider />
             {onAddComment && (
@@ -291,6 +294,13 @@ export function EditorContextMenu({
                 icon={SearchCheck}
                 label="Thêm phát hiện"
                 onClick={() => exec(() => onAddFinding())}
+              />
+            )}
+            {onAddObjective && (
+              <MenuItem
+                icon={Target}
+                label="Thêm mục tiêu"
+                onClick={() => exec(() => onAddObjective())}
               />
             )}
           </>

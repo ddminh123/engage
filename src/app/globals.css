@@ -318,3 +318,25 @@
   outline-offset: 1px;
   border-radius: 2px;
 }
+
+/* ── Workpaper objective highlights (teal) ── */
+.wp-objective-mark {
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+  background-color: #ccfbf1;       /* teal-100 */
+  border-bottom-color: #14b8a6;    /* teal-500 */
+}
+.wp-objective-mark:hover {
+  background-color: #99f6e4;       /* teal-200 */
+}
+.wp-objective-pending {
+  background-color: #ccfbf1;
+  border-bottom: 2px dashed #14b8a6;
+  border-radius: 2px;
+}
+.wp-objective-mark.wp-objective-active {
+  outline: 2px solid #14b8a6;
+  outline-offset: 1px;
+  border-radius: 2px;
+}

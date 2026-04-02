@@ -81,6 +81,20 @@ export interface WorkpaperDocumentConfig {
     highlightFinding: (findingId: string | null) => void;
     unsetFindingMark: (findingId: string) => void;
   } | null>;
+  // ── Objective flow (optional, planning workpaper-specific) ──
+  /** Callback when user clicks "Thêm mục tiêu" in context menu */
+  onAddObjective?: (quote: string, from: number, to: number) => void;
+  /** Callback when an objective mark is clicked in the editor */
+  onObjectiveClicked?: (objectiveId: string) => void;
+  /** Tab key to switch to when objective flow is initiated */
+  objectiveTabKey?: string;
+  /** Ref bridge for parent to control objective marks on the editor */
+  objectiveMarkRef?: React.MutableRefObject<{
+    applyObjectiveMark: (objectiveId: string, from: number, to: number) => void;
+    clearPendingObjectiveRange: () => void;
+    highlightObjective: (objectiveId: string | null) => void;
+    unsetObjectiveMark: (objectiveId: string) => void;
+  } | null>;
 }
 
 export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
@@ -113,6 +127,10 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     onFindingClicked,
     findingTabKey,
     findingMarkRef,
+    onAddObjective,
+    onObjectiveClicked,
+    objectiveTabKey,
+    objectiveMarkRef,
   } = config;
 
   const editorRef = React.useRef<WorkpaperEditorHandle>(null);
@@ -278,6 +296,32 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     [findingTabKey, onAddFinding],
   );
 
+  // ── Objective handlers (only active when onAddObjective is provided) ──
+
+  const handleObjectiveActivated = React.useCallback(
+    (_objectiveId: string | null) => {
+      // Could track active objective for sidebar highlight in future
+    },
+    [],
+  );
+
+  const handleObjectiveClicked = React.useCallback(
+    (objectiveId: string) => {
+      if (objectiveTabKey) setRightTab(objectiveTabKey);
+      onObjectiveClicked?.(objectiveId);
+      editorRef.current?.highlightObjective(objectiveId);
+    },
+    [objectiveTabKey, onObjectiveClicked],
+  );
+
+  const handleAddObjective = React.useCallback(
+    (quote: string, from: number, to: number) => {
+      if (objectiveTabKey) setRightTab(objectiveTabKey);
+      onAddObjective?.(quote, from, to);
+    },
+    [objectiveTabKey, onAddObjective],
+  );
+
   // Populate findingMarkRef so parent can control finding marks on the editor
   React.useEffect(() => {
     if (findingMarkRef) {
@@ -297,6 +341,26 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
       };
     }
   }, [findingMarkRef]);
+
+  // Populate objectiveMarkRef so parent can control objective marks on the editor
+  React.useEffect(() => {
+    if (objectiveMarkRef) {
+      objectiveMarkRef.current = {
+        applyObjectiveMark: (objectiveId, from, to) => {
+          editorRef.current?.applyObjectiveMark(objectiveId, from, to);
+        },
+        clearPendingObjectiveRange: () => {
+          editorRef.current?.clearPendingObjectiveRange();
+        },
+        highlightObjective: (objectiveId) => {
+          editorRef.current?.highlightObjective(objectiveId);
+        },
+        unsetObjectiveMark: (objectiveId) => {
+          editorRef.current?.unsetObjectiveMark(objectiveId);
+        },
+      };
+    }
+  }, [objectiveMarkRef]);
 
   const handleTitleSave = () => {
     setEditingTitle(false);
@@ -403,6 +467,9 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
             onFindingActivated={onAddFinding ? handleFindingActivated : undefined}
             onFindingClicked={onAddFinding ? handleFindingClicked : undefined}
             onAddFinding={onAddFinding ? handleAddFinding : undefined}
+            onObjectiveActivated={onAddObjective ? handleObjectiveActivated : undefined}
+            onObjectiveClicked={onAddObjective ? handleObjectiveClicked : undefined}
+            onAddObjective={onAddObjective ? handleAddObjective : undefined}
           />
         </div>
 

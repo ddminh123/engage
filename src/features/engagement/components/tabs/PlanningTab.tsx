@@ -209,22 +209,59 @@ export function PlanningTab({
         switch (step.key) {
           case "scope": {
             const scopeWp = wpByStep.get(step.id);
+            const scopeStatus = scopeWp?.approvalStatus ?? "not_started";
             const scopeHeaderRight = cardHeaderRight(
               "planning_workpaper",
               scopeWp?.id,
-              scopeWp?.approvalStatus ?? "not_started",
+              scopeStatus,
             );
 
             // Section page view: show header + content directly
             if (section) {
+              const scopeSectionHeaderRight = scopeWp ? (
+                <ViewerVersionInfo
+                  entityType="planning_workpaper"
+                  entityId={scopeWp.id}
+                  engagementId={engagement.id}
+                  currentVersion={scopeWp.currentVersion}
+                  updatedAt={scopeWp.updatedAt}
+                />
+              ) : null;
+
+              const scopeEditButton = !isReviewMode ? (
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => onOpenPlanningWp?.(step.id)}
+                >
+                  <Pencil className="mr-1 h-3 w-3" />
+                  Chỉnh sửa
+                </Button>
+              ) : null;
+
               return (
                 <div key={step.key}>
                   <SectionPageHeader
                     title={step.title}
                     icon={<StepIcon name={step.icon} />}
-                    headerRight={scopeHeaderRight}
+                    titleExtra={<StatusBadge status={scopeStatus} />}
+                    headerRight={scopeSectionHeaderRight}
                   />
-                  <ScopeSection engagement={engagement} />
+                  {scopeWp?.content ? (
+                    <InlineWorkpaperViewer
+                      engagementId={engagement.id}
+                      entityId={scopeWp.id}
+                      content={scopeWp.content}
+                      approvalStatus={scopeWp.approvalStatus}
+                      currentVersion={scopeWp.currentVersion}
+                      members={engagement.members}
+                      editButton={scopeEditButton}
+                      auditObjectives={engagement.auditObjectives}
+                      showObjectives
+                    />
+                  ) : (
+                    <ScopeSection engagement={engagement} />
+                  )}
                 </div>
               );
             }

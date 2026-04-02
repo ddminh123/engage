@@ -228,6 +228,7 @@ function EngagementDetailContent() {
               stepTitle={pwp.stepConfig?.title ?? "Workpaper"}
               onClose={handleClosePlanningWp}
               members={engagement.members ?? []}
+              auditObjectives={engagement.auditObjectives ?? []}
               wpSignoffs={wpSignoffs}
             />
           );

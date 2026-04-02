@@ -21,7 +21,12 @@ import type {
   WpThreadType,
   EngagementMember,
   WpSignoff,
+  AuditObjective,
 } from "@/features/engagement/types";
+import {
+  ObjectivesTabContent,
+  type PendingObjectiveData,
+} from "./ObjectivesTabContent";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface InlineWorkpaperViewerProps {
@@ -36,6 +41,10 @@ interface InlineWorkpaperViewerProps {
   wpSignoffs?: WpSignoff[];
   /** Optional edit button rendered inside the signoff bar */
   editButton?: React.ReactNode;
+  /** Audit objectives for objective mark + sidebar support */
+  auditObjectives?: AuditObjective[];
+  /** Enable objectives feature (sidebar + bubble menu) */
+  showObjectives?: boolean;
 }
 
 export function InlineWorkpaperViewer({
@@ -49,6 +58,8 @@ export function InlineWorkpaperViewer({
   members = [],
   wpSignoffs,
   editButton,
+  auditObjectives = [],
+  showObjectives = false,
 }: InlineWorkpaperViewerProps) {
   const queryClient = useQueryClient();
   const { data: threads = [] } = useCommentThreads(
@@ -175,6 +186,56 @@ export function InlineWorkpaperViewer({
     [contentMutation, engagementId, entityType, entityId],
   );
 
+  // ── Objectives state (optional) ──
+  const [pendingObjective, setPendingObjective] =
+    React.useState<PendingObjectiveData | null>(null);
+  const objectiveMarkRef = React.useRef<{
+    applyObjectiveMark: (objectiveId: string, from: number, to: number) => void;
+    clearPendingObjectiveRange: () => void;
+    highlightObjective: (objectiveId: string | null) => void;
+    unsetObjectiveMark: (objectiveId: string) => void;
+  } | null>(null);
+
+  const handleAddObjective = React.useCallback(
+    (quote: string, from: number, to: number) => {
+      setPendingObjective({ quote, selection: { from, to } });
+    },
+    [],
+  );
+
+  const handleObjectiveCreated = React.useCallback(
+    (objectiveId: string, from: number, to: number) => {
+      objectiveMarkRef.current?.applyObjectiveMark(objectiveId, from, to);
+      setPendingObjective(null);
+    },
+    [],
+  );
+
+  const handleCancelPendingObjective = React.useCallback(() => {
+    objectiveMarkRef.current?.clearPendingObjectiveRange();
+    setPendingObjective(null);
+  }, []);
+
+  const handleObjectiveClick = React.useCallback((objectiveId: string) => {
+    objectiveMarkRef.current?.highlightObjective(objectiveId);
+  }, []);
+
+  const handleObjectiveDeleted = React.useCallback((objectiveId: string) => {
+    objectiveMarkRef.current?.unsetObjectiveMark(objectiveId);
+  }, []);
+
+  const objectivesSidebar = showObjectives ? (
+    <ObjectivesTabContent
+      engagementId={engagementId}
+      objectives={auditObjectives}
+      pendingObjective={pendingObjective}
+      onObjectiveCreated={handleObjectiveCreated}
+      onCancelPendingObjective={handleCancelPendingObjective}
+      onObjectiveClick={handleObjectiveClick}
+      onObjectiveDeleted={handleObjectiveDeleted}
+    />
+  ) : undefined;
+
   const signoffBar = approvalStatus ? (
     <WpSignoffBar
       entityType={entityType}
@@ -210,6 +271,10 @@ export function InlineWorkpaperViewer({
       onContentChange={handleContentChange}
       className={className}
       signoffBar={signoffBar}
+      onAddObjective={showObjectives ? handleAddObjective : undefined}
+      onObjectiveClicked={showObjectives ? handleObjectiveClick : undefined}
+      objectivesSidebar={objectivesSidebar}
+      objectiveMarkRef={showObjectives ? objectiveMarkRef : undefined}
     />
   );
 }

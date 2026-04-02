@@ -9,6 +9,7 @@ import {
 } from "@/components/shared/RichTextEditor/EngageEditor";
 import { CommentMark } from "./extensions/CommentMark";
 import { FindingMark } from "./extensions/FindingMark";
+import { ObjectiveMark } from "./extensions/ObjectiveMark";
 import type { WpThreadType } from "@/features/engagement/types";
 
 // ── Public handle (superset of EngageEditorHandle) ──
@@ -28,6 +29,11 @@ export interface WorkpaperEditorHandle {
   applyFindingMark: (findingId: string, from: number, to: number) => void;
   clearPendingFindingRange: () => void;
   unsetFindingMark: (findingId: string) => void;
+  // Objective methods
+  highlightObjective: (objectiveId: string | null) => void;
+  applyObjectiveMark: (objectiveId: string, from: number, to: number) => void;
+  clearPendingObjectiveRange: () => void;
+  unsetObjectiveMark: (objectiveId: string) => void;
 }
 
 interface WorkpaperEditorProps {
@@ -49,6 +55,10 @@ interface WorkpaperEditorProps {
   onFindingActivated?: (findingId: string | null) => void;
   onFindingClicked?: (findingId: string) => void;
   onAddFinding?: (quote: string, from: number, to: number) => void;
+  // Objective callbacks (optional — only wired when objective feature is enabled)
+  onObjectiveActivated?: (objectiveId: string | null) => void;
+  onObjectiveClicked?: (objectiveId: string) => void;
+  onAddObjective?: (quote: string, from: number, to: number) => void;
 }
 
 export const WorkpaperEditor = forwardRef<
@@ -67,6 +77,9 @@ export const WorkpaperEditor = forwardRef<
     onFindingActivated,
     onFindingClicked,
     onAddFinding,
+    onObjectiveActivated,
+    onObjectiveClicked,
+    onAddObjective,
   },
   ref,
 ) {
@@ -90,8 +103,17 @@ export const WorkpaperEditor = forwardRef<
         }),
       );
     }
+    if (onObjectiveActivated && onObjectiveClicked) {
+      exts.push(
+        ObjectiveMark.configure({
+          HTMLAttributes: {},
+          onObjectiveActivated,
+          onObjectiveClicked,
+        }),
+      );
+    }
     return exts;
-  }, [onCommentActivated, onCommentClicked, onFindingActivated, onFindingClicked]);
+  }, [onCommentActivated, onCommentClicked, onFindingActivated, onFindingClicked, onObjectiveActivated, onObjectiveClicked]);
 
   // Expose comment + finding imperative methods
   useImperativeHandle(
@@ -156,6 +178,36 @@ export const WorkpaperEditor = forwardRef<
           editor.commands.unsetFindingMark(findingId);
         }
       },
+      // Objective methods
+      highlightObjective: (objectiveId: string | null) => {
+        const editor = baseRef.current?.getEditor();
+        if (editor) {
+          editor.commands.highlightObjective(objectiveId);
+        }
+      },
+      applyObjectiveMark: (objectiveId: string, from: number, to: number) => {
+        const editor = baseRef.current?.getEditor();
+        if (editor) {
+          editor
+            .chain()
+            .clearPendingObjectiveRange()
+            .setTextSelection({ from, to })
+            .setObjectiveMark(objectiveId)
+            .run();
+        }
+      },
+      clearPendingObjectiveRange: () => {
+        const editor = baseRef.current?.getEditor();
+        if (editor) {
+          editor.commands.clearPendingObjectiveRange();
+        }
+      },
+      unsetObjectiveMark: (objectiveId: string) => {
+        const editor = baseRef.current?.getEditor();
+        if (editor) {
+          editor.commands.unsetObjectiveMark(objectiveId);
+        }
+      },
     }),
     [],
   );
@@ -215,6 +267,33 @@ export const WorkpaperEditor = forwardRef<
     onAddFinding(quote || "[empty cell]", from, to);
   };
 
+  const handleAddObjective = () => {
+    const editor = baseRef.current?.getEditor();
+    if (!editor || !onAddObjective) return;
+    let { from, to } = editor.state.selection;
+
+    // If collapsed selection inside a table cell, expand to the cell content range
+    if (from === to && editor.isActive("table")) {
+      const $pos = editor.state.doc.resolve(from);
+      for (let d = $pos.depth; d > 0; d--) {
+        const node = $pos.node(d);
+        if (
+          node.type.name === "tableCell" ||
+          node.type.name === "tableHeader"
+        ) {
+          from = $pos.start(d);
+          to = $pos.end(d);
+          break;
+        }
+      }
+    }
+
+    if (from === to) return;
+    const quote = editor.state.doc.textBetween(from, to, " ");
+    editor.commands.setPendingObjectiveRange(from, to);
+    onAddObjective(quote || "[empty cell]", from, to);
+  };
+
   return (
     <EngageEditor
       ref={baseRef}
@@ -226,6 +305,7 @@ export const WorkpaperEditor = forwardRef<
       extraExtensions={extraExtensions}
       onAddComment={handleAddComment}
       onAddFinding={onAddFinding ? handleAddFinding : undefined}
+      onAddObjective={onAddObjective ? handleAddObjective : undefined}
     />
   );
 });
