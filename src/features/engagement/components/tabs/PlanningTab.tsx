@@ -55,6 +55,7 @@ import type {
 } from "../../hooks/usePlanningEditor";
 import { InlineInput } from "./InlineInput";
 import { RcmDataTable } from "./RcmDataTable";
+import { RcmTable } from "./RcmTable";
 import { PlanningWorkpaperCard } from "./PlanningWorkpaperCard";
 import { WorkProgramV2 } from "../work-program";
 import { PlanningCardStatus } from "./PlanningCardStatus";
@@ -548,9 +549,10 @@ export function PlanningTab({
                   icon={<StepIcon name={step.icon} />}
                   headerRight={rcmHeaderRight}
                 />
-                <RcmDataTable
+                <RcmTable
                   engagementId={engagement.id}
                   rcmObjectives={engagement.rcmObjectives}
+                  controls={engagement.controls}
                 />
               </div>
             );

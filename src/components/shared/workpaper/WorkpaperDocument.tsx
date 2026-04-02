@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -44,6 +44,8 @@ export interface WorkpaperDocumentConfig {
     lastSavedAt: Date | null;
   }) => React.ReactNode;
   readOnly?: boolean;
+  /** Show loading spinner while content/template is loading */
+  isLoadingContent?: boolean;
   /** Initial "last saved" timestamp (e.g. entity's updatedAt) so indicator shows correct time on load */
   initialLastSavedAt?: Date | null;
   /** Mini signoff info bar rendered below the header */
@@ -110,6 +112,7 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     isSaving = false,
     headerExtra,
     readOnly = false,
+    isLoadingContent = false,
     tabs = [],
     commentsTabLabel = "Soát xét",
     defaultTab,
@@ -456,21 +459,36 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Document Editor */}
         <div className="flex-1 overflow-y-auto border-r">
-          <WorkpaperEditor
-            ref={editorRef}
-            content={localContent}
-            onChange={handleContentChange}
-            onCommentActivated={handleCommentActivated}
-            onCommentClicked={handleCommentClicked}
-            onAddComment={handleAddComment}
-            readOnly={readOnly}
-            onFindingActivated={onAddFinding ? handleFindingActivated : undefined}
-            onFindingClicked={onAddFinding ? handleFindingClicked : undefined}
-            onAddFinding={onAddFinding ? handleAddFinding : undefined}
-            onObjectiveActivated={onAddObjective ? handleObjectiveActivated : undefined}
-            onObjectiveClicked={onAddObjective ? handleObjectiveClicked : undefined}
-            onAddObjective={onAddObjective ? handleAddObjective : undefined}
-          />
+          {isLoadingContent ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="text-sm">Đang tải mẫu...</span>
+              </div>
+            </div>
+          ) : (
+            <WorkpaperEditor
+              ref={editorRef}
+              content={localContent}
+              onChange={handleContentChange}
+              onCommentActivated={handleCommentActivated}
+              onCommentClicked={handleCommentClicked}
+              onAddComment={handleAddComment}
+              readOnly={readOnly}
+              onFindingActivated={
+                onAddFinding ? handleFindingActivated : undefined
+              }
+              onFindingClicked={onAddFinding ? handleFindingClicked : undefined}
+              onAddFinding={onAddFinding ? handleAddFinding : undefined}
+              onObjectiveActivated={
+                onAddObjective ? handleObjectiveActivated : undefined
+              }
+              onObjectiveClicked={
+                onAddObjective ? handleObjectiveClicked : undefined
+              }
+              onAddObjective={onAddObjective ? handleAddObjective : undefined}
+            />
+          )}
         </div>
 
         {/* Right: Configurable Task Pane */}

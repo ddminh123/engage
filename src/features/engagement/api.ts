@@ -390,14 +390,13 @@ export async function deleteEngagementRiskApi(
   return handleResponse<{ id: string }>(response);
 }
 
-// ── Engagement Control CRUD (under a risk) ──
+// ── Engagement Control CRUD (engagement-level, M:N with risks) ──
 
 export async function createEngagementControlApi(
   engagementId: string,
-  riskId: string,
-  data: EngagementControlInput,
+  data: EngagementControlInput & { linkToRiskId?: string },
 ): Promise<EngagementControl> {
-  const response = await fetch(API_ROUTES.ENGAGEMENT_CONTROLS(engagementId, riskId), {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_CONTROLS(engagementId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -407,11 +406,10 @@ export async function createEngagementControlApi(
 
 export async function updateEngagementControlApi(
   engagementId: string,
-  riskId: string,
   controlId: string,
   data: EngagementControlUpdateInput,
 ): Promise<EngagementControl> {
-  const response = await fetch(API_ROUTES.ENGAGEMENT_CONTROL_BY_ID(engagementId, riskId, controlId), {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_CONTROL_BY_ID(engagementId, controlId), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -421,13 +419,40 @@ export async function updateEngagementControlApi(
 
 export async function deleteEngagementControlApi(
   engagementId: string,
-  riskId: string,
   controlId: string,
 ): Promise<{ id: string }> {
-  const response = await fetch(API_ROUTES.ENGAGEMENT_CONTROL_BY_ID(engagementId, riskId, controlId), {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_CONTROL_BY_ID(engagementId, controlId), {
     method: 'DELETE',
   });
   return handleResponse<{ id: string }>(response);
+}
+
+// ── Risk ↔ Control Link/Unlink ──
+
+export async function linkControlToRiskApi(
+  engagementId: string,
+  riskId: string,
+  controlId: string,
+): Promise<{ riskId: string; controlId: string }> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_RISK_CONTROL_LINK(engagementId, riskId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ controlId }),
+  });
+  return handleResponse<{ riskId: string; controlId: string }>(response);
+}
+
+export async function unlinkControlFromRiskApi(
+  engagementId: string,
+  riskId: string,
+  controlId: string,
+): Promise<{ riskId: string; controlId: string }> {
+  const response = await fetch(API_ROUTES.ENGAGEMENT_RISK_CONTROL_LINK(engagementId, riskId), {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ controlId }),
+  });
+  return handleResponse<{ riskId: string; controlId: string }>(response);
 }
 
 // ── Reorder ──

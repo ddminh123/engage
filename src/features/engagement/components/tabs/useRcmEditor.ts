@@ -112,11 +112,11 @@ export function useRcmEditor(
       createControl.mutate(
         {
           engagementId,
-          riskId: state.addingForId,
           data: {
             description: desc,
             effectiveness: state.addingEffectiveness || null,
           },
+          linkToRiskId: state.addingForId,
         },
         { onSuccess: () => dispatch({ type: "CANCEL_ADD" }) },
       );
@@ -152,7 +152,6 @@ export function useRcmEditor(
       updateControl.mutate(
         {
           engagementId,
-          riskId: lookup.riskId,
           controlId: state.editingId,
           data: {
             description: desc,
@@ -186,7 +185,7 @@ export function useRcmEditor(
       );
     } else if (target.type === "control" && target.riskId) {
       deleteControl.mutate(
-        { engagementId, riskId: target.riskId, controlId: target.id },
+        { engagementId, controlId: target.id },
         { onSuccess: () => dispatch({ type: "CLEAR_DELETE" }) },
       );
     }
@@ -205,11 +204,8 @@ export function useRcmEditor(
 
   const handleEffectivenessChange = useCallback(
     (controlId: string, value: string) => {
-      const lookup = controlMap.get(controlId);
-      if (!lookup) return;
       updateControl.mutate({
         engagementId,
-        riskId: lookup.riskId,
         controlId,
         data: { effectiveness: value || null },
       });

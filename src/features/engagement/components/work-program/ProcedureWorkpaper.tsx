@@ -32,7 +32,10 @@ import { ENGAGEMENT_LABELS } from "@/constants/labels";
 import { cn } from "@/lib/utils";
 import { useProcedureForm } from "./useProcedureForm";
 import { WpAssigneePicker } from "./WpAssigneePicker";
-import { LinkedFindingsList, type PendingFindingData } from "./LinkedFindingsList";
+import {
+  LinkedFindingsList,
+  type PendingFindingData,
+} from "./LinkedFindingsList";
 import type {
   EngagementProcedure,
   EngagementMember,
@@ -196,7 +199,17 @@ export function ProcedureWorkpaper({
         />
       ),
     }),
-    [state, setField, procedure, engagementId, pendingFinding, handleFindingCreated, handleCancelPendingFinding, handleFindingClick, handleFindingDeleted],
+    [
+      state,
+      setField,
+      procedure,
+      engagementId,
+      pendingFinding,
+      handleFindingCreated,
+      handleCancelPendingFinding,
+      handleFindingClick,
+      handleFindingDeleted,
+    ],
   );
 
   const infoTab = React.useMemo(
@@ -249,6 +262,7 @@ export function ProcedureWorkpaper({
         onTitleChange={handleTitleChange}
         onBack={onBack}
         isSaving={form.isSaving || shell.isSavingContent}
+        isLoadingContent={shell.isLoadingTemplate}
         initialLastSavedAt={shell.initialLastSavedAt}
         signoffBar={
           <WpSignoffBar

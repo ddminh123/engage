@@ -27,6 +27,8 @@ import {
   createEngagementControlApi,
   updateEngagementControlApi,
   deleteEngagementControlApi,
+  linkControlToRiskApi,
+  unlinkControlFromRiskApi,
   createRcmObjectiveApi,
   updateRcmObjectiveApi,
   deleteRcmObjectiveApi,
@@ -506,13 +508,13 @@ export function useCreateEngagementControl() {
   return useMutation({
     mutationFn: ({
       engagementId,
-      riskId,
       data,
+      linkToRiskId,
     }: {
       engagementId: string;
-      riskId: string;
       data: EngagementControlInput;
-    }) => createEngagementControlApi(engagementId, riskId, data),
+      linkToRiskId?: string;
+    }) => createEngagementControlApi(engagementId, { ...data, linkToRiskId }),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: engagementKey(variables.engagementId) });
     },
@@ -524,15 +526,13 @@ export function useUpdateEngagementControl() {
   return useMutation({
     mutationFn: ({
       engagementId,
-      riskId,
       controlId,
       data,
     }: {
       engagementId: string;
-      riskId: string;
       controlId: string;
       data: EngagementControlUpdateInput;
-    }) => updateEngagementControlApi(engagementId, riskId, controlId, data),
+    }) => updateEngagementControlApi(engagementId, controlId, data),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: engagementKey(variables.engagementId) });
     },
@@ -544,13 +544,47 @@ export function useDeleteEngagementControl() {
   return useMutation({
     mutationFn: ({
       engagementId,
+      controlId,
+    }: {
+      engagementId: string;
+      controlId: string;
+    }) => deleteEngagementControlApi(engagementId, controlId),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: engagementKey(variables.engagementId) });
+    },
+  });
+}
+
+export function useLinkControlToRisk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
       riskId,
       controlId,
     }: {
       engagementId: string;
       riskId: string;
       controlId: string;
-    }) => deleteEngagementControlApi(engagementId, riskId, controlId),
+    }) => linkControlToRiskApi(engagementId, riskId, controlId),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: engagementKey(variables.engagementId) });
+    },
+  });
+}
+
+export function useUnlinkControlFromRisk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagementId,
+      riskId,
+      controlId,
+    }: {
+      engagementId: string;
+      riskId: string;
+      controlId: string;
+    }) => unlinkControlFromRiskApi(engagementId, riskId, controlId),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: engagementKey(variables.engagementId) });
     },

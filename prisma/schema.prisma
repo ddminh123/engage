@@ -663,6 +663,7 @@ model Engagement {
   audit_objectives   AuditObjective[]
   rcm_objectives     EngagementRcmObjective[]
   risks              EngagementRisk[]
+  controls           EngagementControl[]
   members             EngagementMember[]
   wp_assignments      WpAssignment[]
   wp_signoffs         WpSignoff[]
@@ -820,20 +821,24 @@ model EngagementRcmObjective {
   @@map("engagement_rcm_objective")
 }
 
-// RACM light — risk rows mapped to RCM objectives
+// RACM — risk rows mapped to RCM objectives
 model EngagementRisk {
   id                 String    @id @default(cuid())
   engagement_id      String
   rcm_objective_id   String?
   risk_description   String    @db.Text
   risk_rating        String?   // low | medium | high | critical
+  risk_category      String?   // operational | financial | compliance | strategic | it
+  likelihood         String?   // rare | unlikely | possible | likely | almost_certain
+  impact             String?   // insignificant | minor | moderate | major | catastrophic
+  workpaper_content  Json?     // TipTap JSON for rich text workpaper
   sort_order         Int       @default(0)
   created_at         DateTime  @default(now())
   updated_at         DateTime  @updatedAt
 
   engagement      Engagement              @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
   rcm_objective   EngagementRcmObjective?  @relation(fields: [rcm_objective_id], references: [id], onDelete: SetNull)
-  controls        EngagementControl[]
+  control_refs    RiskControlRef[]
   procedure_refs  ProcedureRiskRef[]
 
   @@index([engagement_id])
@@ -842,22 +847,39 @@ model EngagementRisk {
   @@map("engagement_risk")
 }
 
-// Control rows linked to a risk (1 risk → N controls)
+// Control — engagement-level entity, linked to risks via M:N junction table
 model EngagementControl {
-  id            String    @id @default(cuid())
-  risk_id       String
-  description   String    @db.Text
-  effectiveness String?   // strong | adequate | weak | none
-  sort_order    Int       @default(0)
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  engagement_id     String
+  description       String    @db.Text
+  effectiveness     String?   // strong | adequate | weak | none
+  control_type      String?   // preventive | detective | corrective
+  control_nature    String?   // manual | automated | it_dependent
+  frequency         String?   // continuous | daily | weekly | monthly | quarterly | annually | event_driven
+  workpaper_content Json?     // TipTap JSON for rich text workpaper
+  sort_order        Int       @default(0)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
 
-  risk EngagementRisk @relation(fields: [risk_id], references: [id], onDelete: Cascade)
+  engagement     Engagement       @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  risk_refs      RiskControlRef[]
   procedure_refs ProcedureControlRef[]
 
-  @@index([risk_id])
+  @@index([engagement_id])
   @@index([sort_order])
   @@map("engagement_control")
+}
+
+// M:N junction: EngagementRisk ↔ EngagementControl
+model RiskControlRef {
+  risk_id    String
+  control_id String
+
+  risk    EngagementRisk    @relation(fields: [risk_id], references: [id], onDelete: Cascade)
+  control EngagementControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@id([risk_id, control_id])
+  @@map("risk_control_ref")
 }
 
 model EngagementSection {
@@ -1304,13 +1326,11 @@ model Template {
 
 model TemplateEntityBinding {
   id          String @id @default(cuid())
-  entity_type String   // "procedure" | "planning_workpaper" | "entity_risk_assessment"
-  sub_type    String @default("")  // "" for base types, step config key for planning_workpaper, etc.
+  entity_type String @unique   // "procedure" | "planning_workpaper" | "entity_risk_assessment"
   template_id String
 
   template Template @relation(fields: [template_id], references: [id], onDelete: Cascade)
 
-  @@unique([entity_type, sub_type])
   @@index([template_id])
   @@map("template_entity_binding")
 }

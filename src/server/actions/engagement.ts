@@ -17,6 +17,12 @@ const PROCEDURE_TYPES = [
 const FINDING_STATUSES = ['draft', 'to_review', 'reviewed', 'accepted', 'rejected'] as const;
 const PROCEDURE_CATEGORIES = ['toc', 'substantive'] as const;
 const RISK_RATINGS = ['low', 'medium', 'high', 'critical'] as const;
+const RISK_CATEGORIES = ['operational', 'financial', 'compliance', 'strategic', 'it'] as const;
+const LIKELIHOOD_LEVELS = ['rare', 'unlikely', 'possible', 'likely', 'almost_certain'] as const;
+const IMPACT_LEVELS = ['insignificant', 'minor', 'moderate', 'major', 'catastrophic'] as const;
+const CONTROL_TYPES = ['preventive', 'detective', 'corrective'] as const;
+const CONTROL_NATURES = ['manual', 'automated', 'it_dependent'] as const;
+const CONTROL_FREQUENCIES = ['continuous', 'daily', 'weekly', 'monthly', 'quarterly', 'annually', 'event_driven'] as const;
 
 // =============================================================================
 // ZOD SCHEMAS
@@ -159,6 +165,10 @@ export const createEngagementRiskSchema = z.object({
   rcmObjectiveId: z.string().nullable().optional(),
   riskDescription: z.string().min(1, 'Risk description is required'),
   riskRating: z.enum(RISK_RATINGS).nullable().optional(),
+  riskCategory: z.enum(RISK_CATEGORIES).nullable().optional(),
+  likelihood: z.enum(LIKELIHOOD_LEVELS).nullable().optional(),
+  impact: z.enum(IMPACT_LEVELS).nullable().optional(),
+  workpaperContent: z.any().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -167,6 +177,10 @@ export const updateEngagementRiskSchema = createEngagementRiskSchema.partial();
 export const createEngagementControlSchema = z.object({
   description: z.string().min(1, 'Control description is required'),
   effectiveness: z.enum(CONTROL_EFFECTIVENESS).nullable().optional(),
+  controlType: z.enum(CONTROL_TYPES).nullable().optional(),
+  controlNature: z.enum(CONTROL_NATURES).nullable().optional(),
+  frequency: z.enum(CONTROL_FREQUENCIES).nullable().optional(),
+  workpaperContent: z.any().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -243,7 +257,10 @@ const engagementDetailInclude = {
     include: {
       risks: {
         include: {
-          controls: { orderBy: { sort_order: 'asc' as const } },
+          control_refs: {
+            include: { control: true },
+            orderBy: { control: { sort_order: 'asc' as const } },
+          },
         },
         orderBy: { sort_order: 'asc' as const },
       },
@@ -253,8 +270,14 @@ const engagementDetailInclude = {
   risks: {
     include: {
       rcm_objective: { select: { id: true, title: true } },
-      controls: { orderBy: { sort_order: 'asc' as const } },
+      control_refs: {
+        include: { control: true },
+        orderBy: { control: { sort_order: 'asc' as const } },
+      },
     },
+    orderBy: { sort_order: 'asc' as const },
+  },
+  controls: {
     orderBy: { sort_order: 'asc' as const },
   },
   members: {
@@ -581,6 +604,7 @@ function mapEngagementDetail(e: any) {
     auditObjectives: (e.audit_objectives ?? []).map(mapAuditObjective),
     rcmObjectives: (e.rcm_objectives ?? []).map(mapRcmObjective),
     risks: (e.risks ?? []).map(mapEngagementRisk),
+    controls: (e.controls ?? []).map(mapEngagementControl),
   };
 }
 
@@ -607,26 +631,38 @@ function mapRcmObjective(o: any) {
 }
 
 function mapEngagementRisk(r: any) {
+  // controls may come from M:N control_refs or legacy direct controls
+  const controls = r.control_refs
+    ? r.control_refs.map((ref: any) => mapEngagementControl(ref.control))
+    : (r.controls ?? []).map(mapEngagementControl);
   return {
     id: r.id as string,
     engagementId: r.engagement_id as string,
     rcmObjectiveId: r.rcm_objective_id as string | null,
     riskDescription: r.risk_description as string,
     riskRating: r.risk_rating as string | null,
+    riskCategory: r.risk_category as string | null,
+    likelihood: r.likelihood as string | null,
+    impact: r.impact as string | null,
+    workpaperContent: r.workpaper_content ?? null,
     sortOrder: r.sort_order as number,
     rcmObjective: r.rcm_objective
       ? { id: r.rcm_objective.id, title: r.rcm_objective.title }
       : null,
-    controls: (r.controls ?? []).map(mapEngagementControl),
+    controls,
   };
 }
 
 function mapEngagementControl(c: any) {
   return {
     id: c.id as string,
-    riskId: c.risk_id as string,
+    engagementId: c.engagement_id as string,
     description: c.description as string,
     effectiveness: c.effectiveness as string | null,
+    controlType: c.control_type as string | null,
+    controlNature: c.control_nature as string | null,
+    frequency: c.frequency as string | null,
+    workpaperContent: c.workpaper_content ?? null,
     sortOrder: c.sort_order as number,
   };
 }
@@ -1618,11 +1654,18 @@ export async function createEngagementRisk(
       rcm_objective_id: parsed.rcmObjectiveId ?? null,
       risk_description: parsed.riskDescription,
       risk_rating: parsed.riskRating ?? null,
+      risk_category: parsed.riskCategory ?? null,
+      likelihood: parsed.likelihood ?? null,
+      impact: parsed.impact ?? null,
+      workpaper_content: parsed.workpaperContent ?? undefined,
       sort_order: parsed.sortOrder ?? (maxOrder._max.sort_order ?? 0) + 1,
     },
     include: {
       rcm_objective: { select: { id: true, title: true } },
-      controls: { orderBy: { sort_order: 'asc' } },
+      control_refs: {
+        include: { control: true },
+        orderBy: { control: { sort_order: 'asc' } },
+      },
     },
   });
 
@@ -1649,6 +1692,10 @@ export async function updateEngagementRisk(
   if (parsed.rcmObjectiveId !== undefined) data.rcm_objective_id = parsed.rcmObjectiveId ?? null;
   if (parsed.riskDescription !== undefined) data.risk_description = parsed.riskDescription;
   if (parsed.riskRating !== undefined) data.risk_rating = parsed.riskRating ?? null;
+  if (parsed.riskCategory !== undefined) data.risk_category = parsed.riskCategory ?? null;
+  if (parsed.likelihood !== undefined) data.likelihood = parsed.likelihood ?? null;
+  if (parsed.impact !== undefined) data.impact = parsed.impact ?? null;
+  if (parsed.workpaperContent !== undefined) data.workpaper_content = parsed.workpaperContent ?? null;
   if (parsed.sortOrder !== undefined) data.sort_order = parsed.sortOrder;
 
   const risk = await prisma.engagementRisk.update({
@@ -1656,7 +1703,10 @@ export async function updateEngagementRisk(
     data,
     include: {
       rcm_objective: { select: { id: true, title: true } },
-      controls: { orderBy: { sort_order: 'asc' } },
+      control_refs: {
+        include: { control: true },
+        orderBy: { control: { sort_order: 'asc' } },
+      },
     },
   });
 
@@ -1687,33 +1737,44 @@ export async function deleteEngagementRisk(
 }
 
 // =============================================================================
-// ENGAGEMENT CONTROL CRUD (under a risk)
+// ENGAGEMENT CONTROL CRUD (engagement-level, M:N with risks)
 // =============================================================================
 
 export async function createEngagementControl(
-  riskId: string,
+  engagementId: string,
   input: unknown,
   userId: string,
   userName: string,
+  /** Optional: link to a risk immediately after creation */
+  linkToRiskId?: string,
 ) {
-  const risk = await prisma.engagementRisk.findUnique({ where: { id: riskId } });
-  if (!risk) throw new Error('Engagement risk not found');
-
+  await verifyEngagement(engagementId);
   const parsed = createEngagementControlSchema.parse(input);
 
   const maxOrder = await prisma.engagementControl.aggregate({
-    where: { risk_id: riskId },
+    where: { engagement_id: engagementId },
     _max: { sort_order: true },
   });
 
   const control = await prisma.engagementControl.create({
     data: {
-      risk_id: riskId,
+      engagement_id: engagementId,
       description: parsed.description,
       effectiveness: parsed.effectiveness ?? null,
+      control_type: parsed.controlType ?? null,
+      control_nature: parsed.controlNature ?? null,
+      frequency: parsed.frequency ?? null,
+      workpaper_content: parsed.workpaperContent ?? undefined,
       sort_order: parsed.sortOrder ?? (maxOrder._max.sort_order ?? 0) + 1,
     },
   });
+
+  // Link to risk if specified
+  if (linkToRiskId) {
+    await prisma.riskControlRef.create({
+      data: { risk_id: linkToRiskId, control_id: control.id },
+    });
+  }
 
   await logAudit({
     userId, userName, action: 'create',
@@ -1737,6 +1798,10 @@ export async function updateEngagementControl(
 
   if (parsed.description !== undefined) data.description = parsed.description;
   if (parsed.effectiveness !== undefined) data.effectiveness = parsed.effectiveness ?? null;
+  if (parsed.controlType !== undefined) data.control_type = parsed.controlType ?? null;
+  if (parsed.controlNature !== undefined) data.control_nature = parsed.controlNature ?? null;
+  if (parsed.frequency !== undefined) data.frequency = parsed.frequency ?? null;
+  if (parsed.workpaperContent !== undefined) data.workpaper_content = parsed.workpaperContent ?? null;
   if (parsed.sortOrder !== undefined) data.sort_order = parsed.sortOrder;
 
   const control = await prisma.engagementControl.update({
@@ -1771,13 +1836,65 @@ export async function deleteEngagementControl(
 }
 
 // =============================================================================
+// RISK ↔ CONTROL LINK/UNLINK (M:N)
+// =============================================================================
+
+export async function linkControlToRisk(
+  riskId: string,
+  controlId: string,
+  userId: string,
+  userName: string,
+) {
+  // Verify both exist
+  const risk = await prisma.engagementRisk.findUnique({ where: { id: riskId } });
+  if (!risk) throw new Error('Engagement risk not found');
+  const control = await prisma.engagementControl.findUnique({ where: { id: controlId } });
+  if (!control) throw new Error('Engagement control not found');
+
+  // Upsert to avoid duplicate key errors
+  await prisma.riskControlRef.upsert({
+    where: { risk_id_control_id: { risk_id: riskId, control_id: controlId } },
+    create: { risk_id: riskId, control_id: controlId },
+    update: {},
+  });
+
+  await logAudit({
+    userId, userName, action: 'create',
+    entityType: 'risk_control_ref', entityId: `${riskId}:${controlId}`,
+  });
+
+  return { riskId, controlId };
+}
+
+export async function unlinkControlFromRisk(
+  riskId: string,
+  controlId: string,
+  userId: string,
+  userName: string,
+) {
+  await prisma.riskControlRef.deleteMany({
+    where: { risk_id: riskId, control_id: controlId },
+  });
+
+  await logAudit({
+    userId, userName, action: 'delete',
+    entityType: 'risk_control_ref', entityId: `${riskId}:${controlId}`,
+  });
+
+  return { riskId, controlId };
+}
+
+// =============================================================================
 // RCM OBJECTIVE CRUD (detached copy for RCM)
 // =============================================================================
 
 const rcmObjectiveInclude = {
   risks: {
     include: {
-      controls: { orderBy: { sort_order: 'asc' as const } },
+      control_refs: {
+        include: { control: true },
+        orderBy: { control: { sort_order: 'asc' as const } },
+      },
     },
     orderBy: { sort_order: 'asc' as const },
   },
@@ -2227,13 +2344,13 @@ export async function syncRcmToWorkProgram(
 ) {
   await verifyEngagement(engagementId);
 
-  // Fetch RCM objectives with risks and controls
+  // Fetch RCM objectives with risks and linked controls (M:N)
   const rcmObjectives = await prisma.engagementRcmObjective.findMany({
     where: { engagement_id: engagementId },
     include: {
       risks: {
         include: {
-          controls: true,
+          control_refs: { include: { control: true } },
         },
         orderBy: { sort_order: 'asc' },
       },
@@ -2276,10 +2393,11 @@ export async function syncRcmToWorkProgram(
     });
     let nextProcOrder = (maxProcOrder._max.sort_order ?? 0) + 1;
 
-    // Process each control under this objective's risks
+    // Process each control under this objective's risks (1 procedure per control)
     for (const risk of rcmObj.risks) {
-      for (const control of risk.controls) {
-        // Create WP Procedure from RCM Control with prefix
+      const controls = risk.control_refs.map((ref: { control: any }) => ref.control);
+      for (const control of controls) {
+        // Create WP Procedure from RCM Control
         const procedure = await prisma.engagementProcedure.create({
           data: {
             engagement_id: engagementId,
@@ -2295,10 +2413,12 @@ export async function syncRcmToWorkProgram(
 
         // Link procedure to control
         await prisma.procedureControlRef.create({
-          data: {
-            procedure_id: procedure.id,
-            control_id: control.id,
-          },
+          data: { procedure_id: procedure.id, control_id: control.id },
+        });
+
+        // Link procedure to parent risk for traceability
+        await prisma.procedureRiskRef.create({
+          data: { procedure_id: procedure.id, risk_id: risk.id },
         });
       }
     }

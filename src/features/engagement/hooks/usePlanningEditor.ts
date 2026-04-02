@@ -403,11 +403,11 @@ export function usePlanningEditor(engagement: EngagementDetail) {
       createControl.mutate(
         {
           engagementId: engagement.id,
-          riskId,
           data: {
             description,
             effectiveness: state.addingControlEffectiveness || null,
           },
+          linkToRiskId: riskId,
         },
         { onSuccess: () => dispatch({ type: "CANCEL_ADD_CONTROL" }) },
       );
@@ -422,7 +422,6 @@ export function usePlanningEditor(engagement: EngagementDetail) {
       updateControl.mutate(
         {
           engagementId: engagement.id,
-          riskId,
           controlId,
           data: {
             description,
@@ -438,7 +437,7 @@ export function usePlanningEditor(engagement: EngagementDetail) {
   const handleDeleteControl = useCallback(
     (controlId: string, riskId: string) => {
       deleteControl.mutate(
-        { engagementId: engagement.id, riskId, controlId },
+        { engagementId: engagement.id, controlId },
         { onSuccess: () => dispatch({ type: "CLEAR_DELETE_TARGET" }) },
       );
     },

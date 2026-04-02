@@ -1,0 +1,692 @@
+"use client";
+
+import * as React from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Target,
+  RefreshCw,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@/components/ui/context-menu";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { InlineInput } from "./InlineInput";
+import { RiskWorkpaper } from "./RiskWorkpaper";
+import { ControlWorkpaper } from "./ControlWorkpaper";
+import { useRcmTable } from "./useRcmTable";
+import { ENGAGEMENT_LABELS } from "@/constants/labels";
+import type {
+  RcmObjective,
+  EngagementRisk,
+  EngagementControl,
+} from "../../types";
+
+const L = ENGAGEMENT_LABELS;
+const LR = L.risk;
+
+// ─── Rating badge color helper ──────────────────────────────────────────────
+function ratingColor(rating: string | null): string {
+  switch (rating) {
+    case "critical":
+      return "bg-red-100 text-red-800 border-red-300";
+    case "high":
+      return "bg-orange-100 text-orange-800 border-orange-300";
+    case "medium":
+      return "bg-yellow-100 text-yellow-800 border-yellow-300";
+    case "low":
+      return "bg-green-100 text-green-800 border-green-300";
+    default:
+      return "";
+  }
+}
+
+// ─── Control badge border tint by effectiveness ─────────────────────────────
+function effectivenessBorder(eff: string | null): string {
+  switch (eff) {
+    case "strong":
+      return "border-green-400";
+    case "adequate":
+      return "border-yellow-400";
+    case "weak":
+      return "border-red-400";
+    case "none":
+      return "border-gray-400";
+    default:
+      return "";
+  }
+}
+
+function controlTooltip(c: EngagementControl): string {
+  const parts: string[] = [];
+  if (c.controlType) parts.push(LR.controlType[c.controlType] ?? c.controlType);
+  if (c.frequency) parts.push(LR.controlFrequency[c.frequency] ?? c.frequency);
+  if (c.effectiveness) parts.push(LR.controlEffectiveness[c.effectiveness] ?? c.effectiveness);
+  return parts.join(" · ") || c.description;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface RcmTableProps {
+  engagementId: string;
+  rcmObjectives: RcmObjective[];
+  controls: EngagementControl[];
+}
+
+export function RcmTable({
+  engagementId,
+  rcmObjectives,
+  controls,
+}: RcmTableProps) {
+  const {
+    state,
+    dispatch,
+    openRisk,
+    openControl,
+    riskMap,
+    controlMap,
+    availableControlsForRisk,
+    handleAddRisk,
+    handleAddControl,
+    handleAddObjective,
+    handleUpdateObjective,
+    handleConfirmDelete,
+    handleConfirmUnlink,
+    handleLinkExistingControl,
+    handleSyncObjectives,
+    isDeleting,
+    isUnlinking,
+    isSyncingObjectives,
+    isAddingRisk,
+    isAddingControl,
+    isAddingObjective,
+    isLinking,
+  } = useRcmTable({ engagementId, rcmObjectives, controls });
+
+  // ── Compute linked risks for control workpaper ──
+  const linkedRisksForControl = React.useMemo(() => {
+    if (!state.openControlId) return [];
+    const risks: EngagementRisk[] = [];
+    for (const obj of rcmObjectives) {
+      for (const risk of obj.risks) {
+        if (risk.controls.some((c) => c.id === state.openControlId)) {
+          risks.push(risk);
+        }
+      }
+    }
+    return risks;
+  }, [state.openControlId, rcmObjectives]);
+
+  // ── Risk workpaper overlay ──
+  if (openRisk) {
+    return (
+      <RiskWorkpaper
+        risk={openRisk}
+        engagementId={engagementId}
+        onBack={() => dispatch({ type: "CLOSE_RISK" })}
+      />
+    );
+  }
+
+  // ── Control workpaper overlay ──
+  if (openControl) {
+    return (
+      <ControlWorkpaper
+        control={openControl}
+        engagementId={engagementId}
+        linkedRisks={linkedRisksForControl}
+        onBack={() => dispatch({ type: "CLOSE_CONTROL" })}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncObjectives}
+            disabled={isSyncingObjectives}
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            {L.planning.areas}
+          </Button>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => dispatch({ type: "START_ADD_OBJECTIVE" })}
+        >
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          {L.auditObjective.createTitle}
+        </Button>
+      </div>
+
+      {/* No data */}
+      {rcmObjectives.length === 0 && !state.showAddObjective && (
+        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          {L.planning.noAreas}
+        </div>
+      )}
+
+      {/* Objective sections */}
+      {rcmObjectives.map((obj) => (
+        <ObjectiveSection
+          key={obj.id}
+          objective={obj}
+          engagementId={engagementId}
+          state={state}
+          dispatch={dispatch}
+          availableControlsForRisk={availableControlsForRisk}
+          handleAddRisk={handleAddRisk}
+          handleAddControl={handleAddControl}
+          handleLinkExistingControl={handleLinkExistingControl}
+          handleUpdateObjective={handleUpdateObjective}
+          isAddingRisk={isAddingRisk}
+          isAddingControl={isAddingControl}
+          isLinking={isLinking}
+        />
+      ))}
+
+      {/* Add objective inline */}
+      {state.showAddObjective && (
+        <div className="rounded-lg border border-dashed p-3">
+          <InlineInput
+            value={state.addingObjectiveTitle}
+            onChange={(v) => dispatch({ type: "SET_ADD_OBJECTIVE_TITLE", value: v })}
+            onSubmit={handleAddObjective}
+            onCancel={() => dispatch({ type: "CANCEL_ADD_OBJECTIVE" })}
+            placeholder={L.auditObjective.field.title}
+            icon={<Target className="h-4 w-4 text-muted-foreground" />}
+            autoFocus
+          />
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!state.deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) dispatch({ type: "CLEAR_DELETE" });
+        }}
+        title={
+          state.deleteTarget?.type === "objective"
+            ? L.auditObjective.deleteTitle
+            : state.deleteTarget?.type === "risk"
+              ? LR.deleteTitle
+              : L.control.deleteTitle
+        }
+        description={
+          state.deleteTarget?.type === "objective"
+            ? L.auditObjective.deleteDescription(state.deleteTarget?.title ?? "")
+            : state.deleteTarget?.type === "risk"
+              ? LR.deleteDescription(state.deleteTarget?.title ?? "")
+              : L.control.deleteDescription(state.deleteTarget?.title ?? "")
+        }
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
+      />
+
+      {/* Unlink confirmation */}
+      <ConfirmDialog
+        open={!!state.unlinkTarget}
+        onOpenChange={(open) => {
+          if (!open) dispatch({ type: "CLEAR_UNLINK" });
+        }}
+        title={L.control.unlinkTitle}
+        description={L.control.unlinkDescription(state.unlinkTarget?.controlTitle ?? "")}
+        onConfirm={handleConfirmUnlink}
+        isLoading={isUnlinking}
+        variant="destructive"
+      />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OBJECTIVE SECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface ObjectiveSectionProps {
+  objective: RcmObjective;
+  engagementId: string;
+  state: ReturnType<typeof useRcmTable>["state"];
+  dispatch: ReturnType<typeof useRcmTable>["dispatch"];
+  availableControlsForRisk: (riskId: string) => EngagementControl[];
+  handleAddRisk: () => void;
+  handleAddControl: () => void;
+  handleLinkExistingControl: (riskId: string, controlId: string) => void;
+  handleUpdateObjective: () => void;
+  isAddingRisk: boolean;
+  isAddingControl: boolean;
+  isLinking: boolean;
+}
+
+function ObjectiveSection({
+  objective,
+  state,
+  dispatch,
+  availableControlsForRisk,
+  handleAddRisk,
+  handleAddControl,
+  handleLinkExistingControl,
+  handleUpdateObjective,
+  isAddingRisk,
+  isAddingControl,
+  isLinking,
+}: ObjectiveSectionProps) {
+  const isCollapsed = state.collapsedObjectives.has(objective.id);
+  const isEditing = state.editingObjectiveId === objective.id;
+
+  return (
+    <Collapsible
+      open={!isCollapsed}
+      onOpenChange={() => dispatch({ type: "TOGGLE_COLLAPSE", objectiveId: objective.id })}
+    >
+      {/* Section header */}
+      <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
+        <CollapsibleTrigger
+          render={
+            <Button variant="ghost" size="icon-sm" className="shrink-0">
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
+          }
+        />
+
+        {isEditing ? (
+          <InlineInput
+            value={state.editingObjectiveTitle}
+            onChange={(v) => dispatch({ type: "SET_EDIT_OBJECTIVE_TITLE", value: v })}
+            onSubmit={handleUpdateObjective}
+            onCancel={() => dispatch({ type: "CANCEL_EDIT_OBJECTIVE" })}
+            placeholder={L.auditObjective.field.title}
+            autoFocus
+          />
+        ) : (
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <span className="flex-1 cursor-default text-sm font-medium">
+                {objective.title}
+              </span>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem
+                onClick={() =>
+                  dispatch({
+                    type: "START_EDIT_OBJECTIVE",
+                    id: objective.id,
+                    title: objective.title,
+                  })
+                }
+              >
+                <Pencil className="mr-2 h-3.5 w-3.5" />
+                {L.auditObjective.editTitle}
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={() =>
+                  dispatch({
+                    type: "SET_DELETE",
+                    target: {
+                      type: "objective",
+                      id: objective.id,
+                      title: objective.title,
+                    },
+                  })
+                }
+                className="text-destructive"
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                {L.auditObjective.deleteTitle}
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        )}
+
+        <Badge variant="outline" className="ml-auto text-[10px]">
+          {objective.risks.length} {LR.title.toLowerCase()}
+        </Badge>
+      </div>
+
+      {/* Risks table */}
+      <CollapsibleContent>
+        <div className="ml-2 mt-1 rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[45%]">{LR.field.riskDescription}</TableHead>
+                <TableHead className="w-[15%]">{LR.field.riskRating}</TableHead>
+                <TableHead>{LR.field.linkedControls}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {objective.risks.map((risk) => (
+                <RiskRow
+                  key={risk.id}
+                  risk={risk}
+                  state={state}
+                  dispatch={dispatch}
+                  availableControls={availableControlsForRisk(risk.id)}
+                  handleAddControl={handleAddControl}
+                  handleLinkExistingControl={handleLinkExistingControl}
+                  isAddingControl={isAddingControl}
+                  isLinking={isLinking}
+                />
+              ))}
+
+              {/* Inline add risk */}
+              {state.addingRiskForObjectiveId === objective.id ? (
+                <TableRow>
+                  <TableCell colSpan={3}>
+                    <InlineInput
+                      value={state.addingRiskDesc}
+                      onChange={(v) => dispatch({ type: "SET_ADD_RISK_DESC", value: v })}
+                      onSubmit={handleAddRisk}
+                      onCancel={() => dispatch({ type: "CANCEL_ADD_RISK" })}
+                      placeholder={LR.field.riskDescription}
+                      autoFocus
+                    />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={3} className="py-1.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground"
+                      onClick={() =>
+                        dispatch({ type: "START_ADD_RISK", objectiveId: objective.id })
+                      }
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      {LR.createTitle}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RISK ROW
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface RiskRowProps {
+  risk: EngagementRisk;
+  state: ReturnType<typeof useRcmTable>["state"];
+  dispatch: ReturnType<typeof useRcmTable>["dispatch"];
+  availableControls: EngagementControl[];
+  handleAddControl: () => void;
+  handleLinkExistingControl: (riskId: string, controlId: string) => void;
+  isAddingControl: boolean;
+  isLinking: boolean;
+}
+
+function RiskRow({
+  risk,
+  state,
+  dispatch,
+  availableControls,
+  handleAddControl,
+  handleLinkExistingControl,
+  isAddingControl,
+  isLinking,
+}: RiskRowProps) {
+  const isAddingControlHere = state.addingControlForRiskId === risk.id;
+  const isLinkingHere = state.linkingControlForRiskId === risk.id;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <TableRow className="group">
+          {/* Risk description */}
+          <TableCell>
+            <button
+              className="text-left text-sm hover:underline"
+              onClick={() => dispatch({ type: "OPEN_RISK", riskId: risk.id })}
+            >
+              {risk.riskDescription}
+            </button>
+          </TableCell>
+
+          {/* Risk rating */}
+          <TableCell>
+            {risk.riskRating && (
+              <Badge
+                variant="outline"
+                className={`text-[10px] ${ratingColor(risk.riskRating)}`}
+              >
+                {LR.riskRating[risk.riskRating] ?? risk.riskRating}
+              </Badge>
+            )}
+          </TableCell>
+
+          {/* Controls */}
+          <TableCell>
+            <div className="flex flex-wrap items-center gap-1">
+              {risk.controls.map((ctrl) => (
+                <Badge
+                  key={ctrl.id}
+                  variant="secondary"
+                  className={`group/badge cursor-pointer border text-xs font-normal ${effectivenessBorder(ctrl.effectiveness)}`}
+                  title={controlTooltip(ctrl)}
+                  onClick={() => dispatch({ type: "OPEN_CONTROL", controlId: ctrl.id })}
+                >
+                  <span className="max-w-[180px] truncate">
+                    {ctrl.description}
+                  </span>
+                  <button
+                    className="ml-1 hidden rounded-full p-0.5 hover:bg-muted group-hover/badge:inline-flex"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      dispatch({
+                        type: "SET_UNLINK",
+                        target: {
+                          riskId: risk.id,
+                          controlId: ctrl.id,
+                          controlTitle: ctrl.description,
+                        },
+                      });
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+
+              {/* Add control inline (create new) */}
+              {isAddingControlHere ? (
+                <div className="w-full mt-1">
+                  <InlineInput
+                    value={state.addingControlDesc}
+                    onChange={(v) => dispatch({ type: "SET_ADD_CONTROL_DESC", value: v })}
+                    onSubmit={handleAddControl}
+                    onCancel={() => dispatch({ type: "CANCEL_ADD_CONTROL" })}
+                    placeholder={L.control.addNew}
+                    autoFocus
+                  />
+                </div>
+              ) : isLinkingHere ? (
+                <LinkControlPicker
+                  availableControls={availableControls}
+                  onSelect={(controlId) => handleLinkExistingControl(risk.id, controlId)}
+                  onCancel={() => dispatch({ type: "CANCEL_LINK_CONTROL" })}
+                  onCreateNew={() => dispatch({ type: "START_ADD_CONTROL", riskId: risk.id })}
+                  isLinking={isLinking}
+                />
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1.5 text-[10px] text-muted-foreground"
+                  onClick={() =>
+                    dispatch({ type: "START_LINK_CONTROL", riskId: risk.id })
+                  }
+                >
+                  <Plus className="mr-0.5 h-3 w-3" />
+                  {L.control.title}
+                </Button>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem
+          onClick={() => dispatch({ type: "OPEN_RISK", riskId: risk.id })}
+        >
+          <Pencil className="mr-2 h-3.5 w-3.5" />
+          {LR.editTitle}
+        </ContextMenuItem>
+        <ContextMenuItem
+          onClick={() =>
+            dispatch({
+              type: "SET_DELETE",
+              target: {
+                type: "risk",
+                id: risk.id,
+                title: risk.riskDescription,
+              },
+            })
+          }
+          className="text-destructive"
+        >
+          <Trash2 className="mr-2 h-3.5 w-3.5" />
+          {LR.deleteTitle}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LINK CONTROL PICKER (select existing or create new)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface LinkControlPickerProps {
+  availableControls: EngagementControl[];
+  onSelect: (controlId: string) => void;
+  onCancel: () => void;
+  onCreateNew: () => void;
+  isLinking: boolean;
+}
+
+function LinkControlPicker({
+  availableControls,
+  onSelect,
+  onCancel,
+  onCreateNew,
+  isLinking,
+}: LinkControlPickerProps) {
+  const [search, setSearch] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const filtered = React.useMemo(() => {
+    if (!search.trim()) return availableControls;
+    const q = search.toLowerCase();
+    return availableControls.filter((c) =>
+      c.description.toLowerCase().includes(q),
+    );
+  }, [search, availableControls]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") onCancel();
+  };
+
+  return (
+    <div className="w-full mt-1 rounded-md border bg-popover p-1 shadow-md">
+      <input
+        ref={inputRef}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={L.control.addExisting}
+        className="w-full rounded-sm border-0 bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
+      />
+      <div className="max-h-[160px] overflow-y-auto">
+        {filtered.length > 0 ? (
+          filtered.map((c) => (
+            <button
+              key={c.id}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50"
+              onClick={() => onSelect(c.id)}
+              disabled={isLinking}
+            >
+              <span className="flex-1 truncate">{c.description}</span>
+              {c.effectiveness && (
+                <Badge variant="outline" className="shrink-0 text-[10px]">
+                  {LR.controlEffectiveness[c.effectiveness] ?? c.effectiveness}
+                </Badge>
+              )}
+            </button>
+          ))
+        ) : (
+          <p className="px-2 py-1.5 text-xs text-muted-foreground">
+            {availableControls.length === 0
+              ? L.control.noData
+              : L.control.noData}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center justify-between border-t pt-1 mt-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={onCreateNew}
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          {L.control.addNew}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={onCancel}
+        >
+          <X className="mr-1 h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}

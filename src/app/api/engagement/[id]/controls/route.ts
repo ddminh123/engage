@@ -1,10 +1,10 @@
 import { withAccess } from '@/server/middleware/withAccess';
 import { createEngagementControl } from '@/server/actions/engagement';
 
-// Legacy route: create control and link to the specified risk
 export const POST = withAccess('engagement:create', async (req, context, session) => {
-  const { id, riskId } = await context.params;
+  const { id } = await context.params;
   const body = await req.json();
-  const data = await createEngagementControl(id, body, session.user.id, session.user.name, riskId);
+  const { linkToRiskId, ...controlData } = body;
+  const data = await createEngagementControl(id, controlData, session.user.id, session.user.name, linkToRiskId);
   return Response.json({ data }, { status: 201 });
 });

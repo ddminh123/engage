@@ -33,7 +33,6 @@ interface PlanningWorkpaperOverlayProps {
   };
   engagementId: string;
   stepTitle: string;
-  stepConfigKey?: string;
   onClose: () => void;
   members?: EngagementMember[];
   wpSignoffs?: WpSignoff[];
@@ -44,7 +43,6 @@ export function PlanningWorkpaperOverlay({
   workpaper,
   engagementId,
   stepTitle,
-  stepConfigKey,
   onClose,
   members = [],
   wpSignoffs = [],
@@ -95,7 +93,6 @@ export function PlanningWorkpaperOverlay({
     content: (workpaper.content as JSONContent) ?? null,
     updatedAt: workpaper.updatedAt,
     templateEntityType: workpaper.content ? null : "planning_workpaper",
-    templateSubType: stepConfigKey,
   });
 
   const objectivesTab: WorkpaperTab = React.useMemo(
@@ -141,6 +138,7 @@ export function PlanningWorkpaperOverlay({
         }}
         onBack={onClose}
         isSaving={shell.isSavingContent}
+        isLoadingContent={shell.isLoadingTemplate}
         initialLastSavedAt={shell.initialLastSavedAt}
         signoffBar={
           <WpSignoffBar

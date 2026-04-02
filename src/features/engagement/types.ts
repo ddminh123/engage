@@ -1,3 +1,5 @@
+import type { JSONContent } from "@tiptap/react";
+
 // =============================================================================
 // ENGAGEMENT MEMBER
 // =============================================================================
@@ -158,6 +160,7 @@ export interface EngagementDetail {
   auditObjectives: AuditObjective[];
   rcmObjectives: RcmObjective[];
   risks: EngagementRisk[];
+  controls: EngagementControl[];
 }
 
 export interface EngagementInput {
@@ -401,7 +404,7 @@ export interface AuditObjectiveInput {
 export interface AuditObjectiveUpdateInput extends Partial<AuditObjectiveInput> {}
 
 // =============================================================================
-// ENGAGEMENT RISK (RACM light)
+// ENGAGEMENT RISK (RACM)
 // =============================================================================
 
 export interface EngagementRisk {
@@ -410,6 +413,10 @@ export interface EngagementRisk {
   rcmObjectiveId: string | null;
   riskDescription: string;
   riskRating: string | null;
+  riskCategory: string | null;
+  likelihood: string | null;
+  impact: string | null;
+  workpaperContent: JSONContent | null;
   sortOrder: number;
   rcmObjective: { id: string; title: string } | null;
   controls: EngagementControl[];
@@ -419,6 +426,10 @@ export interface EngagementRiskInput {
   rcmObjectiveId?: string | null;
   riskDescription: string;
   riskRating?: string | null;
+  riskCategory?: string | null;
+  likelihood?: string | null;
+  impact?: string | null;
+  workpaperContent?: JSONContent | null;
   sortOrder?: number;
 }
 
@@ -452,20 +463,30 @@ export interface RcmObjectiveUpdateInput {
 }
 
 // =============================================================================
-// ENGAGEMENT CONTROL (under a risk)
+// ENGAGEMENT CONTROL (engagement-level, linked to risks via M:N)
 // =============================================================================
 
 export interface EngagementControl {
   id: string;
-  riskId: string;
+  engagementId: string;
   description: string;
   effectiveness: string | null;
+  controlType: string | null;
+  controlNature: string | null;
+  frequency: string | null;
+  workpaperContent: JSONContent | null;
   sortOrder: number;
+  /** Linked risks (populated when fetching controls with relations) */
+  risks?: EngagementRisk[];
 }
 
 export interface EngagementControlInput {
   description: string;
   effectiveness?: string | null;
+  controlType?: string | null;
+  controlNature?: string | null;
+  frequency?: string | null;
+  workpaperContent?: JSONContent | null;
   sortOrder?: number;
 }
 
