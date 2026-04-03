@@ -61,13 +61,11 @@ export const updateEngagementSchema = createEngagementSchema
 
 export type UpdateEngagementInput = z.infer<typeof updateEngagementSchema>;
 
-const ADDED_FROM = ['planning', 'execution'] as const;
 const PHASE = ['planning', 'execution'] as const;
 
 export const createSectionSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().nullable().optional(),
-  addedFrom: z.enum(ADDED_FROM).optional(),
   phase: z.enum(PHASE).optional(),
   sortOrder: z.number().int().optional(),
 });
@@ -80,7 +78,6 @@ export const updateSectionSchema = createSectionSchema.partial().extend({
 export const createObjectiveSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().nullable().optional(),
-  addedFrom: z.enum(ADDED_FROM).optional(),
   phase: z.enum(PHASE).optional(),
   sortOrder: z.number().int().optional(),
 });
@@ -100,7 +97,7 @@ export const createProcedureSchema = z.object({
   sectionId: z.string().nullable().optional(),
   objectiveId: z.string().nullable().optional(),
   priority: z.enum(PRIORITIES).nullable().optional(),
-  addedFrom: z.enum(ADDED_FROM).optional(),
+  phase: z.enum(PHASE).optional(),
   sortOrder: z.number().int().optional(),
   controlRefIds: z.array(z.string()).optional(),
   riskRefIds: z.array(z.string()).optional(),
@@ -368,7 +365,6 @@ function mapProcedure(p: any) {
     approvedBy: p.approved_by as string | null,
     approvedAt: p.approved_at ? (p.approved_at as Date).toISOString() : null,
     approvedVersion: p.approved_version as number | null,
-    addedFrom: (p.added_from as string) ?? 'execution',
     phase: (p.phase as string) ?? 'planning',
     planningRefId: p.planning_ref_id as string | null,
     source: (p.source as string) ?? 'planned',
@@ -416,7 +412,6 @@ function mapObjective(o: any) {
     title: o.title as string,
     description: o.description as string | null,
     status: o.status as string,
-    addedFrom: (o.added_from as string) ?? 'execution',
     phase: (o.phase as string) ?? 'planning',
     planningRefId: o.planning_ref_id as string | null,
     source: (o.source as string) ?? 'planned',
@@ -435,7 +430,6 @@ function mapSection(s: any) {
     title: s.title as string,
     description: s.description as string | null,
     status: s.status as string,
-    addedFrom: (s.added_from as string) ?? 'execution',
     phase: (s.phase as string) ?? 'planning',
     planningRefId: s.planning_ref_id as string | null,
     source: (s.source as string) ?? 'planned',
@@ -951,7 +945,6 @@ export async function createSection(
       engagement_id: engagementId,
       title: parsed.title,
       description: parsed.description ?? null,
-      added_from: parsed.addedFrom ?? 'execution',
       phase: parsed.phase ?? 'planning',
       sort_order: parsed.sortOrder ?? (maxOrder._max.sort_order ?? 0) + 1,
     },
@@ -1057,7 +1050,6 @@ export async function createObjective(
       section_id: sectionId,
       title: parsed.title,
       description: parsed.description ?? null,
-      added_from: parsed.addedFrom ?? 'execution',
       phase: parsed.phase ?? section.phase,
       sort_order: parsed.sortOrder ?? (maxOrder._max.sort_order ?? 0) + 1,
     },
@@ -1100,7 +1092,6 @@ export async function createStandaloneObjective(
       section_id: null,
       title: parsed.title,
       description: parsed.description ?? null,
-      added_from: parsed.addedFrom ?? 'execution',
       phase: parsed.phase ?? 'planning',
       sort_order: parsed.sortOrder ?? nextOrder,
     },
@@ -1207,7 +1198,7 @@ export async function createProcedure(
       procedure_type: parsed.procedureType ?? null,
       procedure_category: parsed.procedureCategory ?? null,
       priority: parsed.priority ?? null,
-      added_from: parsed.addedFrom ?? 'execution',
+      phase: parsed.phase ?? 'planning',
       sort_order: parsed.sortOrder ?? (maxOrder._max.sort_order ?? 0) + 1,
       ...(parsed.controlRefIds && parsed.controlRefIds.length > 0 && {
         ref_controls: { create: parsed.controlRefIds.map((cid) => ({ control_id: cid })) },
@@ -2379,7 +2370,7 @@ export async function syncRcmToWorkProgram(
         title: rcmObj.title,
         description: rcmObj.description,
         status: 'not_started',
-        added_from: 'manual',
+        source: 'rcm',
         sort_order: nextObjOrder++,
       },
     });
@@ -2404,7 +2395,7 @@ export async function syncRcmToWorkProgram(
             objective_id: wpObjective.id,
             title: `Kiểm thử ${control.description}`,
             status: 'not_started',
-            added_from: 'manual',
+            source: 'rcm',
             sort_order: nextProcOrder++,
           },
         });
@@ -2502,7 +2493,6 @@ export async function syncPlanningToExecution(
         title: sec.title,
         description: sec.description,
         status: 'not_started',
-        added_from: 'planning',
         phase: 'execution',
         planning_ref_id: sec.id,
         source: 'planned',
@@ -2520,7 +2510,6 @@ export async function syncPlanningToExecution(
           title: obj.title,
           description: obj.description,
           status: 'not_started',
-          added_from: 'planning',
           phase: 'execution',
           planning_ref_id: obj.id,
           source: 'planned',
@@ -2542,7 +2531,6 @@ export async function syncPlanningToExecution(
             procedure_type: proc.procedure_type,
             procedure_category: proc.procedure_category,
             status: 'not_started',
-            added_from: 'planning',
             phase: 'execution',
             planning_ref_id: proc.id,
             source: 'planned',
@@ -2566,7 +2554,6 @@ export async function syncPlanningToExecution(
           procedure_type: proc.procedure_type,
           procedure_category: proc.procedure_category,
           status: 'not_started',
-          added_from: 'planning',
           phase: 'execution',
           planning_ref_id: proc.id,
           source: 'planned',
@@ -2597,7 +2584,6 @@ export async function syncPlanningToExecution(
         title: obj.title,
         description: obj.description,
         status: 'not_started',
-        added_from: 'planning',
         phase: 'execution',
         planning_ref_id: obj.id,
         source: 'planned',
@@ -2617,7 +2603,6 @@ export async function syncPlanningToExecution(
           procedure_type: proc.procedure_type,
           procedure_category: proc.procedure_category,
           status: 'not_started',
-          added_from: 'planning',
           phase: 'execution',
           planning_ref_id: proc.id,
           source: 'planned',
@@ -2631,7 +2616,7 @@ export async function syncPlanningToExecution(
 
   // 3. Clone standalone procedures (no section, no objective)
   const planningStandaloneProcedures = await prisma.engagementProcedure.findMany({
-    where: { engagement_id: engagementId, section_id: null, objective_id: null, added_from: 'planning' },
+    where: { engagement_id: engagementId, section_id: null, objective_id: null, phase: 'planning' },
     orderBy: { sort_order: 'asc' },
   });
 
@@ -2652,7 +2637,6 @@ export async function syncPlanningToExecution(
         procedure_type: proc.procedure_type,
         procedure_category: proc.procedure_category,
         status: 'not_started',
-        added_from: 'planning',
         phase: 'execution',
         planning_ref_id: proc.id,
         source: 'planned',

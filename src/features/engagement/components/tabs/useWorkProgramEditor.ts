@@ -242,7 +242,7 @@ export function useWorkProgramEditor(
             title: t,
             sectionId: null,
             objectiveId: null,
-            addedFrom: mode,
+            phase: mode,
           },
         },
         { onSuccess: () => dispatch({ type: "CANCEL_ADD_TOP" }) },

@@ -159,7 +159,7 @@ function reducer(state: EditorState, action: Action): EditorState {
         showAddSection: false,
         addingSectionTitle: "",
         sectionFormOpen: true,
-        editingSectionData: { id: "", engagementId: "", title: action.title, description: null, status: "draft", addedFrom: "execution", phase: "planning", planningRefId: null, source: "planned", sortOrder: 0, reviewNotes: null, reviewedBy: null, reviewedAt: null, objectives: [], procedures: [] },
+        editingSectionData: { id: "", engagementId: "", title: action.title, description: null, status: "draft", phase: "planning", planningRefId: null, source: "planned", sortOrder: 0, reviewNotes: null, reviewedBy: null, reviewedAt: null, objectives: [], procedures: [] },
       };
 
     // Full form: objective
@@ -174,7 +174,7 @@ function reducer(state: EditorState, action: Action): EditorState {
         addingObjectiveTitle: "",
         objectiveFormOpen: true,
         objectiveParentSectionId: action.sectionId,
-        editingObjectiveData: { id: "", title: action.title, description: null, sectionId: action.sectionId, status: "draft", addedFrom: "execution", phase: "planning", planningRefId: null, source: "planned", sortOrder: 0, reviewNotes: null, reviewedBy: null, reviewedAt: null, procedures: [] },
+        editingObjectiveData: { id: "", title: action.title, description: null, sectionId: action.sectionId, status: "draft", phase: "planning", planningRefId: null, source: "planned", sortOrder: 0, reviewNotes: null, reviewedBy: null, reviewedAt: null, procedures: [] },
       };
 
     // Full form: procedure

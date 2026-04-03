@@ -888,7 +888,6 @@ model EngagementSection {
   title         String
   description   String?   @db.Text
   status        String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
-  added_from    String    @default("execution") // planning | execution
   phase          String    @default("planning")   // planning | execution
   planning_ref_id String?                          // FK → self (execution item → planning item)
   source         String    @default("planned")     // planned | fieldwork
@@ -919,7 +918,6 @@ model EngagementObjective {
   title         String
   description   String?   @db.Text
   status        String    @default("not_started") // not_started | in_progress | waiting_review | reviewed
-  added_from    String    @default("execution") // planning | execution
   phase          String    @default("planning")   // planning | execution
   planning_ref_id String?                          // FK → self (execution item → planning item)
   source         String    @default("planned")     // planned | fieldwork
@@ -960,7 +958,6 @@ model EngagementProcedure {
   approved_by       String?
   approved_at       DateTime?
   approved_version  Int?                               // which version was approved
-  added_from     String    @default("execution") // planning | execution
   phase          String    @default("planning")   // planning | execution
   planning_ref_id String?                          // FK → self (execution item → planning item)
   source         String    @default("planned")     // planned | fieldwork

@@ -38,7 +38,7 @@ export function ExecutionTab({
   const execProcedures = useMemo(
     () =>
       (engagement.ungroupedProcedures ?? []).filter(
-        (p) => p.addedFrom === "execution",
+        (p) => p.phase === "execution",
       ),
     [engagement.ungroupedProcedures],
   );
@@ -91,25 +91,21 @@ export function ExecutionTab({
         </Button>
       </div>
 
-      {!hasExecutionItems && (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          Chưa có dữ liệu thực hiện. Nhấn &quot;Đồng bộ từ Kế hoạch&quot; để sao
-          chép chương trình kiểm toán từ giai đoạn lập kế hoạch.
-        </p>
-      )}
-
-      {hasExecutionItems && (
-        <WorkProgramV2
-          engagementId={engagement.id}
-          sections={execSections}
-          standaloneObjectives={execObjectives}
-          standaloneProcedures={execProcedures}
-          findingCount={engagement.findings?.length ?? 0}
-          mode="execution"
-          members={engagement.members}
-          onOpenWorkpaper={onOpenWorkpaper}
-        />
-      )}
+      <WorkProgramV2
+        engagementId={engagement.id}
+        sections={execSections}
+        standaloneObjectives={execObjectives}
+        standaloneProcedures={execProcedures}
+        findingCount={engagement.findings?.length ?? 0}
+        mode="execution"
+        members={engagement.members}
+        onOpenWorkpaper={onOpenWorkpaper}
+        emptyMessage={
+          !hasExecutionItems
+            ? 'Chưa có dữ liệu thực hiện. Nhấn "Đồng bộ từ Kế hoạch" để sao chép chương trình kiểm toán từ giai đoạn lập kế hoạch.'
+            : undefined
+        }
+      />
 
       <ConfirmDialog
         open={!!syncResult}
