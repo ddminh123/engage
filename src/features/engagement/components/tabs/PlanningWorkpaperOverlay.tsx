@@ -52,39 +52,23 @@ export function PlanningWorkpaperOverlay({
 }: PlanningWorkpaperOverlayProps) {
   const [pendingObjective, setPendingObjective] =
     React.useState<PendingObjectiveData | null>(null);
-  const objectiveMarkRef = React.useRef<{
-    applyObjectiveMark: (objectiveId: string, from: number, to: number) => void;
-    clearPendingObjectiveRange: () => void;
-    highlightObjective: (objectiveId: string | null) => void;
-    unsetObjectiveMark: (objectiveId: string) => void;
-  } | null>(null);
 
   const handleAddObjective = React.useCallback(
-    (quote: string, from: number, to: number) => {
-      setPendingObjective({ quote, selection: { from, to } });
+    (quote: string, _from: number, _to: number) => {
+      setPendingObjective({ quote, selection: { from: _from, to: _to } });
     },
     [],
   );
 
   const handleObjectiveCreated = React.useCallback(
-    (objectiveId: string, from: number, to: number) => {
-      objectiveMarkRef.current?.applyObjectiveMark(objectiveId, from, to);
+    (_objectiveId: string, _from: number, _to: number) => {
       setPendingObjective(null);
     },
     [],
   );
 
   const handleCancelPendingObjective = React.useCallback(() => {
-    objectiveMarkRef.current?.clearPendingObjectiveRange();
     setPendingObjective(null);
-  }, []);
-
-  const handleObjectiveClick = React.useCallback((objectiveId: string) => {
-    objectiveMarkRef.current?.highlightObjective(objectiveId);
-  }, []);
-
-  const handleObjectiveDeleted = React.useCallback((objectiveId: string) => {
-    objectiveMarkRef.current?.unsetObjectiveMark(objectiveId);
   }, []);
   const shell = useWorkpaperShell({
     entityType: "planning_workpaper",
@@ -109,8 +93,6 @@ export function PlanningWorkpaperOverlay({
           pendingObjective={pendingObjective}
           onObjectiveCreated={handleObjectiveCreated}
           onCancelPendingObjective={handleCancelPendingObjective}
-          onObjectiveClick={handleObjectiveClick}
-          onObjectiveDeleted={handleObjectiveDeleted}
         />
       ),
       badge: auditObjectives.length || undefined,
@@ -121,8 +103,6 @@ export function PlanningWorkpaperOverlay({
       pendingObjective,
       handleObjectiveCreated,
       handleCancelPendingObjective,
-      handleObjectiveClick,
-      handleObjectiveDeleted,
     ],
   );
 
@@ -182,9 +162,7 @@ export function PlanningWorkpaperOverlay({
         defaultTab="objectives"
         commentsTabLabel="Soát xét"
         onAddObjective={handleAddObjective}
-        onObjectiveClicked={handleObjectiveClick}
         objectiveTabKey="objectives"
-        objectiveMarkRef={objectiveMarkRef}
         threads={shell.threads}
         onCreateThread={shell.handleCreateThread}
         onReplyToThread={shell.handleReplyToThread}

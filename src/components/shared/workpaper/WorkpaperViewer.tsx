@@ -45,16 +45,8 @@ export interface WorkpaperViewerProps {
   defaultSidebar?: React.ReactNode;
   // ── Objective support (optional) ──
   onAddObjective?: (quote: string, from: number, to: number) => void;
-  onObjectiveClicked?: (objectiveId: string) => void;
   /** Sidebar content for objectives (rendered alongside comments sidebar) */
   objectivesSidebar?: React.ReactNode;
-  /** Ref bridge for parent to control objective marks on the editor */
-  objectiveMarkRef?: React.MutableRefObject<{
-    applyObjectiveMark: (objectiveId: string, from: number, to: number) => void;
-    clearPendingObjectiveRange: () => void;
-    highlightObjective: (objectiveId: string | null) => void;
-    unsetObjectiveMark: (objectiveId: string) => void;
-  } | null>;
 }
 
 // ── Component ──
@@ -74,9 +66,7 @@ export function WorkpaperViewer({
   editorClassName = "min-h-[400px]",
   signoffBar,
   onAddObjective,
-  onObjectiveClicked,
   objectivesSidebar,
-  objectiveMarkRef,
   defaultSidebar,
 }: WorkpaperViewerProps) {
   const editorRef = React.useRef<WorkpaperEditorHandle>(null);
@@ -296,102 +286,11 @@ export function WorkpaperViewer({
     const { from, to } = selectionRange;
     const quote = editor.state.doc.textBetween(from, to, " ");
 
-    // Temporarily enable editing to apply pending highlight decoration
-    editor.setEditable(true);
-    editor.chain().focus().setPendingObjectiveRange(from, to).run();
-    editor.setEditable(false);
-
     onAddObjective(quote || "[empty]", from, to);
     setSelectionRect(null);
     setObjectivesSidebarOpen(true);
   }, [selectionRange, onAddObjective]);
 
-  // ── Objective mark click handler ──
-
-  const handleObjectiveClickedFn = React.useCallback(
-    (objectiveId: string) => {
-      onObjectiveClicked?.(objectiveId);
-      editorRef.current?.highlightObjective(objectiveId);
-      setObjectivesSidebarOpen(true);
-    },
-    [onObjectiveClicked],
-  );
-
-  const handleObjectiveActivated = React.useCallback(
-    (_objectiveId: string | null) => {
-      // No-op in viewer
-    },
-    [],
-  );
-
-  // Populate objectiveMarkRef
-  React.useEffect(() => {
-    if (objectiveMarkRef) {
-      objectiveMarkRef.current = {
-        applyObjectiveMark: (objectiveId, from, to) => {
-          const editor = editorRef.current?.getEditor();
-          if (editor) {
-            editor.setEditable(true);
-            editor
-              .chain()
-              .focus()
-              .clearPendingObjectiveRange()
-              .setTextSelection({ from, to })
-              .setObjectiveMark(objectiveId)
-              .run();
-            editor.setEditable(false);
-            if (onContentChange) {
-              onContentChange(editor.getJSON());
-            }
-          }
-        },
-        clearPendingObjectiveRange: () => {
-          const editor = editorRef.current?.getEditor();
-          if (editor) {
-            editor.setEditable(true);
-            editor.chain().focus().clearPendingObjectiveRange().run();
-            editor.setEditable(false);
-          }
-        },
-        highlightObjective: (objectiveId) => {
-          editorRef.current?.highlightObjective(objectiveId);
-        },
-        unsetObjectiveMark: (objectiveId) => {
-          const editor = editorRef.current?.getEditor();
-          if (editor) {
-            editor.setEditable(true);
-            editor.chain().focus().unsetObjectiveMark(objectiveId).run();
-            editor.setEditable(false);
-            if (onContentChange) {
-              onContentChange(editor.getJSON());
-            }
-          }
-        },
-      };
-    }
-  }, [objectiveMarkRef, onContentChange]);
-
-  // DOM click fallback for objective marks in read-only mode
-  React.useEffect(() => {
-    if (!editorReady || !onAddObjective) return;
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleDomClick = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement).closest?.(
-        "span[data-objective-id]",
-      );
-      if (target) {
-        const objectiveId = target.getAttribute("data-objective-id");
-        if (objectiveId) {
-          handleObjectiveClickedFn(objectiveId);
-        }
-      }
-    };
-
-    container.addEventListener("click", handleDomClick);
-    return () => container.removeEventListener("click", handleDomClick);
-  }, [editorReady, onAddObjective, handleObjectiveClickedFn]);
 
   // ── Create thread from floating new-comment input ──
 
@@ -490,12 +389,6 @@ export function WorkpaperViewer({
             onAddComment={() => {}}
             readOnly
             editorClassName={editorClassName}
-            onObjectiveActivated={
-              onAddObjective ? handleObjectiveActivated : undefined
-            }
-            onObjectiveClicked={
-              onAddObjective ? handleObjectiveClickedFn : undefined
-            }
           />
         </div>
         {/* Default sidebar (e.g. objectives list) — shown when comments sidebar is closed */}

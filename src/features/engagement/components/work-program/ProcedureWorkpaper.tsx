@@ -138,43 +138,26 @@ export function ProcedureWorkpaper({
     (a) => a.entityType === "procedure" && a.entityId === procedure.id,
   );
 
-  // ── Finding flow (context menu → sidebar → mark) ──
+  // ── Finding flow (context menu → sidebar) ──
   const [pendingFinding, setPendingFinding] =
     React.useState<PendingFindingData | null>(null);
 
-  const findingMarkRef = React.useRef<{
-    applyFindingMark: (findingId: string, from: number, to: number) => void;
-    clearPendingFindingRange: () => void;
-    highlightFinding: (findingId: string | null) => void;
-    unsetFindingMark: (findingId: string) => void;
-  } | null>(null);
-
   const handleAddFinding = React.useCallback(
-    (quote: string, from: number, to: number) => {
-      setPendingFinding({ quote, selection: { from, to } });
+    (quote: string, _from: number, _to: number) => {
+      setPendingFinding({ quote, selection: { from: _from, to: _to } });
     },
     [],
   );
 
   const handleFindingCreated = React.useCallback(
-    (findingId: string, from: number, to: number) => {
-      findingMarkRef.current?.applyFindingMark(findingId, from, to);
+    (_findingId: string, _from: number, _to: number) => {
       setPendingFinding(null);
     },
     [],
   );
 
   const handleCancelPendingFinding = React.useCallback(() => {
-    findingMarkRef.current?.clearPendingFindingRange();
     setPendingFinding(null);
-  }, []);
-
-  const handleFindingClick = React.useCallback((findingId: string) => {
-    findingMarkRef.current?.highlightFinding(findingId);
-  }, []);
-
-  const handleFindingDeleted = React.useCallback((findingId: string) => {
-    findingMarkRef.current?.unsetFindingMark(findingId);
   }, []);
 
   // Build configurable tabs
@@ -191,12 +174,10 @@ export function ProcedureWorkpaper({
           pendingFinding={pendingFinding}
           onFindingCreated={handleFindingCreated}
           onCancelPendingFinding={handleCancelPendingFinding}
-          onFindingClick={handleFindingClick}
-          onFindingDeleted={handleFindingDeleted}
         />
       ),
     }),
-    [state, setField, procedure, engagementId, pendingFinding, handleFindingCreated, handleCancelPendingFinding, handleFindingClick, handleFindingDeleted],
+    [state, setField, procedure, engagementId, pendingFinding, handleFindingCreated, handleCancelPendingFinding],
   );
 
   const infoTab = React.useMemo(
@@ -310,9 +291,7 @@ export function ProcedureWorkpaper({
         isCreatingThread={shell.isCreatingThread}
         isReplying={shell.isReplying}
         onAddFinding={handleAddFinding}
-        onFindingClicked={handleFindingClick}
         findingTabKey="conclusion"
-        findingMarkRef={findingMarkRef}
       />
 
       {/* Version detail dialog */}
@@ -376,8 +355,6 @@ function ConclusionTabContent({
   pendingFinding,
   onFindingCreated,
   onCancelPendingFinding,
-  onFindingClick,
-  onFindingDeleted,
 }: {
   state: ReturnType<typeof useProcedureForm>["state"];
   setField: ReturnType<typeof useProcedureForm>["setField"];
@@ -386,8 +363,6 @@ function ConclusionTabContent({
   pendingFinding?: PendingFindingData | null;
   onFindingCreated?: (findingId: string, from: number, to: number) => void;
   onCancelPendingFinding?: () => void;
-  onFindingClick?: (findingId: string) => void;
-  onFindingDeleted?: (findingId: string) => void;
 }) {
   const [evidenceFiles, setEvidenceFiles] = React.useState<File[]>([]);
   const [wpAttachments, setWpAttachments] = React.useState<File[]>([]);
@@ -459,8 +434,6 @@ function ConclusionTabContent({
         pendingFinding={pendingFinding}
         onFindingCreated={onFindingCreated}
         onCancelPendingFinding={onCancelPendingFinding}
-        onFindingClick={onFindingClick}
-        onFindingDeleted={onFindingDeleted}
       />
     </div>
   );

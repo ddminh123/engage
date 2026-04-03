@@ -45,10 +45,6 @@ interface ObjectivesTabContentProps {
   onObjectiveCreated?: (objectiveId: string, from: number, to: number) => void;
   /** Called when pending objective form is cancelled */
   onCancelPendingObjective?: () => void;
-  /** Called when an objective row is clicked — scroll to mark in editor */
-  onObjectiveClick?: (objectiveId: string) => void;
-  /** Called when objective deleted — remove mark from editor */
-  onObjectiveDeleted?: (objectiveId: string) => void;
   readOnly?: boolean;
 }
 
@@ -58,8 +54,6 @@ export function ObjectivesTabContent({
   pendingObjective,
   onObjectiveCreated,
   onCancelPendingObjective,
-  onObjectiveClick,
-  onObjectiveDeleted,
   readOnly = false,
 }: ObjectivesTabContentProps) {
   const [addingTitle, setAddingTitle] = React.useState("");
@@ -154,7 +148,6 @@ export function ObjectivesTabContent({
       {
         onSuccess: () => {
           setDeleteTarget(null);
-          onObjectiveDeleted?.(targetId);
         },
       },
     );
@@ -220,13 +213,9 @@ export function ObjectivesTabContent({
                       />
                     ) : (
                       <>
-                        <button
-                          type="button"
-                          className="flex-1 text-left text-sm hover:text-teal-700 transition-colors"
-                          onClick={() => onObjectiveClick?.(obj.id)}
-                        >
+                        <span className="flex-1 text-left text-sm">
                           {obj.title}
-                        </button>
+                        </span>
                         {!readOnly && (
                           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100">
                             <Button
