@@ -6,6 +6,7 @@ import {
   fetchWorkpaperVersionsApi,
   fetchWorkpaperVersionApi,
   restoreWorkpaperVersionApi,
+  createManualVersionApi,
 } from '@/features/engagement/api';
 
 // =============================================================================
@@ -74,6 +75,33 @@ export function useWorkpaperVersion(
     queryKey: workpaperVersionKey(entityType, entityId, version),
     queryFn: () => fetchWorkpaperVersionApi(entityType, engagementId, entityId, version!),
     enabled: !!entityType && !!engagementId && !!entityId && version !== null,
+  });
+}
+
+// =============================================================================
+// RESTORE VERSION
+// =============================================================================
+
+// =============================================================================
+// CREATE MANUAL VERSION
+// =============================================================================
+
+export function useCreateManualVersion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      entityType,
+      engagementId,
+      entityId,
+    }: {
+      entityType: string;
+      engagementId: string;
+      entityId: string;
+    }) => createManualVersionApi(entityType, engagementId, entityId),
+    onSuccess: (_, { entityType, entityId, engagementId }) => {
+      qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
+      qc.invalidateQueries({ queryKey: workpaperVersionsKey(entityType, entityId) });
+    },
   });
 }
 

@@ -102,6 +102,8 @@ export async function fetchControlCatalogItems(filters?: ControlCatalogItemFilte
   if (filters?.source) params.set('source', filters.source);
   if (filters?.controlType) params.set('controlType', filters.controlType);
   if (filters?.search) params.set('search', filters.search);
+  if (filters?.categoryId) params.set('categoryId', filters.categoryId);
+  if (filters?.domainId) params.set('domainId', filters.domainId);
 
   const response = await fetch(buildUrl(API_ROUTES.SETTINGS_RISK_CATALOG_CONTROLS, params));
   return handleResponse<ControlCatalogItem[]>(response);
@@ -141,6 +143,8 @@ export async function fetchProcedureCatalogItems(filters?: ProcedureCatalogItemF
   if (filters?.source) params.set('source', filters.source);
   if (filters?.procedureType) params.set('procedureType', filters.procedureType);
   if (filters?.search) params.set('search', filters.search);
+  if (filters?.categoryId) params.set('categoryId', filters.categoryId);
+  if (filters?.domainId) params.set('domainId', filters.domainId);
 
   const response = await fetch(buildUrl(API_ROUTES.SETTINGS_RISK_CATALOG_PROCEDURES, params));
   return handleResponse<ProcedureCatalogItem[]>(response);

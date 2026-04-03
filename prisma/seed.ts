@@ -1,7 +1,7 @@
 import { PrismaClient } from '../src/generated/prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import bcrypt from 'bcryptjs';
-import { seedRiskCatalog } from './seeds';
+import { seedRiskCatalog, seedTemplates } from './seeds';
 
 async function createPrismaClient() {
   const url = new URL(process.env.DATABASE_URL!);
@@ -409,6 +409,11 @@ async function main() {
   // Risk Catalog Library (COBIT 2019 + COSO ERM — banking focus)
   // =========================================================================
   await seedRiskCatalog(prisma);
+
+  // =========================================================================
+  // Templates (procedure, scope, understanding workpapers)
+  // =========================================================================
+  await seedTemplates(prisma);
 
   console.log('🌱 Seeding complete!');
   await prisma.$disconnect();

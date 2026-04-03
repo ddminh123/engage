@@ -16,6 +16,7 @@ import {
   useWorkpaperVersions,
   useWorkpaperVersion,
   useRestoreWorkpaperVersion,
+  useCreateManualVersion,
 } from "@/hooks/useWorkpaper";
 import { useTemplateForEntity } from "@/features/settings/hooks/useTemplates";
 import { autoTransitionApi } from "@/features/engagement/api";
@@ -90,6 +91,10 @@ export interface UseWorkpaperShellReturn {
   handleAutoSave: (content: JSONContent) => Promise<void>;
   isSavingContent: boolean;
 
+  // Manual version save
+  saveVersion: () => Promise<void>;
+  isSavingVersion: boolean;
+
   // Initial content & meta
   initialContent: JSONContent | null;
   initialLastSavedAt: Date | null;
@@ -153,6 +158,7 @@ export function useWorkpaperShell(
     viewVersion,
   );
   const restoreMutation = useRestoreWorkpaperVersion();
+  const manualVersionMutation = useCreateManualVersion();
 
   // ── Transitions / Approval ──
   const { data: transitions = [] } = useAvailableTransitions(
@@ -260,6 +266,19 @@ export function useWorkpaperShell(
     [restoreMutation, entityType, engagementId, entityId],
   );
 
+  // ── Save version handler ──
+  const saveVersion = React.useCallback(async () => {
+    try {
+      await manualVersionMutation.mutateAsync({
+        entityType,
+        engagementId,
+        entityId,
+      });
+    } catch {
+      // Error handled by mutation state
+    }
+  }, [manualVersionMutation, entityType, engagementId, entityId]);
+
   // ── Comment handlers ──
   const handleCreateThread = React.useCallback(
     async (data: {
@@ -366,6 +385,10 @@ export function useWorkpaperShell(
     // Auto-save
     handleAutoSave,
     isSavingContent: contentMutation.isPending,
+
+    // Manual version save
+    saveVersion,
+    isSavingVersion: manualVersionMutation.isPending,
 
     // Initial data
     initialContent,

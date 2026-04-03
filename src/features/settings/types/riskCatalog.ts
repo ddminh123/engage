@@ -81,12 +81,16 @@ export interface ControlCatalogItemFilters {
   source?: string;
   controlType?: string;
   search?: string;
+  categoryId?: string;
+  domainId?: string;
 }
 
 export interface ProcedureCatalogItemFilters {
   source?: string;
   procedureType?: string;
   search?: string;
+  categoryId?: string;
+  domainId?: string;
 }
 
 export interface CopyRisksToEngagementInput {

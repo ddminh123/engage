@@ -10,8 +10,10 @@ export const GET = withAccess(
     const procedureType = searchParams.get('procedureType') || undefined;
     const source = searchParams.get('source') || undefined;
     const search = searchParams.get('search') || undefined;
+    const categoryId = searchParams.get('categoryId') || undefined;
+    const domainId = searchParams.get('domainId') || undefined;
 
-    const data = await getProcedureCatalogItems({ procedureType, source, search });
+    const data = await getProcedureCatalogItems({ procedureType, source, search, categoryId, domainId });
     return Response.json({ data });
   },
 );

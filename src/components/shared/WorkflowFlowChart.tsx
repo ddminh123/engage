@@ -192,12 +192,47 @@ interface WorkflowFlowChartProps {
   showLabel?: boolean;
 }
 
+// ── Drag-to-scroll hook ──
+function useDragScroll() {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const dragging = React.useRef(false);
+  const start = React.useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+
+  const onMouseDown = React.useCallback((e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    dragging.current = true;
+    start.current = { x: e.clientX, y: e.clientY, scrollLeft: el.scrollLeft, scrollTop: el.scrollTop };
+    el.style.cursor = "grabbing";
+    el.style.userSelect = "none";
+  }, []);
+
+  const onMouseMove = React.useCallback((e: React.MouseEvent) => {
+    if (!dragging.current || !ref.current) return;
+    const dx = e.clientX - start.current.x;
+    const dy = e.clientY - start.current.y;
+    ref.current.scrollLeft = start.current.scrollLeft - dx;
+    ref.current.scrollTop = start.current.scrollTop - dy;
+  }, []);
+
+  const onMouseUp = React.useCallback(() => {
+    dragging.current = false;
+    if (ref.current) {
+      ref.current.style.cursor = "";
+      ref.current.style.userSelect = "";
+    }
+  }, []);
+
+  return { ref, onMouseDown, onMouseMove, onMouseUp, onMouseLeave: onMouseUp };
+}
+
 export function WorkflowFlowChart({
   transitions,
   highlightStatus,
   showLabel = true,
 }: WorkflowFlowChartProps) {
   const { nodes, edges, width, height } = useGraphLayout(transitions);
+  const dragScroll = useDragScroll();
 
   if (nodes.length === 0) return null;
 
@@ -208,7 +243,14 @@ export function WorkflowFlowChart({
           Sơ đồ trạng thái
         </span>
       )}
-      <div className="overflow-x-auto">
+      <div
+        ref={dragScroll.ref}
+        className="overflow-auto cursor-grab"
+        onMouseDown={dragScroll.onMouseDown}
+        onMouseMove={dragScroll.onMouseMove}
+        onMouseUp={dragScroll.onMouseUp}
+        onMouseLeave={dragScroll.onMouseLeave}
+      >
         <svg
           width={width}
           height={height}

@@ -458,6 +458,22 @@ async function getEntityStatus(
         lastPublishedBy: null,
       };
     }
+    case 'section': {
+      const s = await prisma.engagementSection.findUnique({
+        where: { id: entityId },
+        select: { status: true },
+      });
+      if (!s) return null;
+      return { approvalStatus: s.status, currentVersion: 0, lastPublishedBy: null };
+    }
+    case 'objective': {
+      const o = await prisma.engagementObjective.findUnique({
+        where: { id: entityId },
+        select: { status: true },
+      });
+      if (!o) return null;
+      return { approvalStatus: o.status, currentVersion: 0, lastPublishedBy: null };
+    }
     default:
       throw new Error(`Unsupported entity type: ${entityType}`);
   }
@@ -494,6 +510,22 @@ async function updateEntityStatus(
         data,
       });
       break;
+    case 'section': {
+      const sData: Record<string, unknown> = {};
+      if (data.approval_status) sData.status = data.approval_status;
+      if (data.reviewed_by) sData.reviewed_by = data.reviewed_by;
+      if (data.reviewed_at) sData.reviewed_at = data.reviewed_at;
+      await prisma.engagementSection.update({ where: { id: entityId }, data: sData });
+      break;
+    }
+    case 'objective': {
+      const oData: Record<string, unknown> = {};
+      if (data.approval_status) oData.status = data.approval_status;
+      if (data.reviewed_by) oData.reviewed_by = data.reviewed_by;
+      if (data.reviewed_at) oData.reviewed_at = data.reviewed_at;
+      await prisma.engagementObjective.update({ where: { id: entityId }, data: oData });
+      break;
+    }
     default:
       throw new Error(`Unsupported entity type: ${entityType}`);
   }

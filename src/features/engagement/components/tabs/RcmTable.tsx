@@ -11,6 +11,7 @@ import {
   Target,
   RefreshCw,
   BookOpen,
+  Maximize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,19 +66,19 @@ function ratingColor(rating: string | null): string {
   }
 }
 
-// ─── Control effectiveness border tint ──────────────────────────────────────
-function effectivenessBorder(eff: string | null): string {
+// ─── Control effectiveness left-accent ─────────────────────────────────────
+function effectivenessAccent(eff: string | null): string {
   switch (eff) {
     case "strong":
-      return "border-b-green-400";
+      return "border-l-2 border-l-green-400";
     case "adequate":
-      return "border-b-yellow-400";
+      return "border-l-2 border-l-yellow-400";
     case "weak":
-      return "border-b-red-400";
+      return "border-l-2 border-l-red-400";
     case "none":
-      return "border-b-gray-300";
+      return "border-l-2 border-l-gray-300";
     default:
-      return "border-b-gray-200";
+      return "border-l-2 border-l-transparent";
   }
 }
 
@@ -555,13 +556,22 @@ function RiskRow({
         <TableRow className="group">
           {/* Risk description */}
           <TableCell className="w-80 min-w-80">
-            <button
-              className="text-left text-sm hover:underline break-words line-clamp-3 whitespace-normal"
-              onClick={() => dispatch({ type: "OPEN_RISK", riskId: risk.id })}
-              title={risk.riskDescription}
-            >
-              {risk.riskDescription}
-            </button>
+            <div className="flex items-start gap-1">
+              <button
+                className="flex-1 text-left text-sm hover:underline break-words line-clamp-3 whitespace-normal"
+                onClick={() => dispatch({ type: "OPEN_RISK", riskId: risk.id })}
+                title={risk.riskDescription}
+              >
+                {risk.riskDescription}
+              </button>
+              <button
+                className="shrink-0 mt-0.5 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                onClick={() => dispatch({ type: "OPEN_RISK", riskId: risk.id })}
+                title="Mở giấy tờ rủi ro"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </TableCell>
 
           {/* Risk rating */}
@@ -582,7 +592,7 @@ function RiskRow({
               {risk.controls.map((ctrl) => (
                 <div
                   key={ctrl.id}
-                  className={`group/ctrl flex items-center gap-2 rounded-sm border-b-2 px-2 py-2 text-sm transition-colors hover:bg-accent/30 ${effectivenessBorder(ctrl.effectiveness)}`}
+                  className={`group/ctrl flex items-center gap-2 rounded-sm bg-muted/30 px-2 py-1.5 text-sm transition-colors hover:bg-accent/30 ${effectivenessAccent(ctrl.effectiveness)}`}
                   title={controlTooltip(ctrl)}
                 >
                   <button
@@ -599,6 +609,16 @@ function RiskRow({
                       {LR.controlEffectiveness[ctrl.effectiveness] ?? ctrl.effectiveness}
                     </Badge>
                   )}
+                  <button
+                    className="shrink-0 hidden rounded p-0.5 text-muted-foreground hover:bg-muted group-hover/ctrl:inline-flex"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      dispatch({ type: "OPEN_CONTROL", controlId: ctrl.id });
+                    }}
+                    title="Mở giấy tờ kiểm soát"
+                  >
+                    <Maximize2 className="h-3 w-3" />
+                  </button>
                   <button
                     className="shrink-0 hidden rounded-full p-0.5 hover:bg-muted group-hover/ctrl:inline-flex"
                     onClick={(e) => {

@@ -41,6 +41,10 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import {
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@/components/ui/context-menu";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { FormDialog } from "@/components/shared/FormDialog";
 import { COMMON_LABELS } from "@/constants/labels";
@@ -336,7 +340,7 @@ function WorkflowDetailDialog({
 
         <div className="flex flex-1 min-h-0">
           {/* Left: Flowchart */}
-          <div className="w-1/2 border-r overflow-auto p-6">
+          <div className="w-[65%] border-r overflow-auto p-6">
             <h3 className="text-sm font-medium text-muted-foreground mb-4">
               Sơ đồ trạng thái
             </h3>
@@ -350,7 +354,7 @@ function WorkflowDetailDialog({
           </div>
 
           {/* Right: Transition table */}
-          <div className="w-1/2 overflow-auto p-6">
+          <div className="w-[35%] overflow-auto p-6">
             <TransitionTable
               workflowId={workflow.id}
               transitions={workflow.transitions}
@@ -439,6 +443,7 @@ function TransitionTable({
           accessorKey: "actionLabel",
           header: "Thao tác",
           meta: { label: "Thao tác" },
+          size: 100,
           cell: ({ row }) => (
             <span className="text-sm font-medium">
               {row.original.actionLabel}
@@ -525,6 +530,21 @@ function TransitionTable({
         enableRowReorder
         onRowReorder={handleReorder}
         getRowId={(t) => t.id}
+        renderContextMenu={(t) => (
+          <ContextMenuContent>
+            <ContextMenuItem onClick={() => setEditTarget(t)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Chỉnh sửa
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() => setDeleteTarget(t.id)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Xóa
+            </ContextMenuItem>
+          </ContextMenuContent>
+        )}
         actions={
           <Button
             variant="outline"
