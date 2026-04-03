@@ -42,6 +42,8 @@ export interface UseWorkpaperShellParams {
   updatedAt?: string | null;
   /** If provided and content is null, fetch the assigned template for this entity type */
   templateEntityType?: string | null;
+  /** Sub-type for template lookup (e.g. planning step config key) */
+  templateSubType?: string;
   /** Fallback content when both saved content and template are absent */
   fallbackContent?: JSONContent | null;
 }
@@ -89,9 +91,6 @@ export interface UseWorkpaperShellReturn {
   // Initial content & meta
   initialContent: JSONContent | null;
   initialLastSavedAt: Date | null;
-
-  // Template loading state
-  isLoadingTemplate: boolean;
 }
 
 // =============================================================================
@@ -109,13 +108,15 @@ export function useWorkpaperShell(
     content,
     updatedAt,
     templateEntityType,
+    templateSubType,
     fallbackContent,
   } = params;
 
   // ── Template fetch (only when content is empty) ──
   const shouldFetchTemplate = !content && !!templateEntityType;
-  const { data: templateData, isLoading: isLoadingTemplate } = useTemplateForEntity(
+  const { data: templateData } = useTemplateForEntity(
     shouldFetchTemplate ? templateEntityType : null,
+    templateSubType,
   );
 
   const queryClient = useQueryClient();
@@ -161,14 +162,12 @@ export function useWorkpaperShell(
   const autoTransitionFired = React.useRef(false);
 
   // ── Initial content (prefer entity content → template → fallback) ──
-  // IMPORTANT: Only use fallback AFTER template query has completed (not while loading)
   const initialContent = React.useMemo<JSONContent | null>(() => {
     if (content) return content as JSONContent;
     if (templateData?.content) return templateData.content as JSONContent;
-    // Only fall back to fallbackContent if we're NOT waiting for template to load
-    if (!isLoadingTemplate && fallbackContent) return fallbackContent as JSONContent;
+    if (fallbackContent) return fallbackContent as JSONContent;
     return null;
-  }, [content, templateData, fallbackContent, isLoadingTemplate]);
+  }, [content, templateData, fallbackContent]);
 
   const initialLastSavedAt = React.useMemo<Date | null>(
     () => (updatedAt ? new Date(updatedAt) : null),
@@ -360,8 +359,5 @@ export function useWorkpaperShell(
     // Initial data
     initialContent,
     initialLastSavedAt,
-
-    // Template loading
-    isLoadingTemplate: shouldFetchTemplate && isLoadingTemplate,
   };
 }
