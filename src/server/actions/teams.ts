@@ -15,7 +15,9 @@ export async function checkAccess(
     select: { role: true },
   });
 
-  if (user?.role === 'cae') {
+  if (!user) return false;
+
+  if (user.role === 'cae') {
     return true;
   }
 

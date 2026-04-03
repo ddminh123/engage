@@ -72,10 +72,6 @@ export function InlineWorkpaperViewer({
   isStartLoading = false,
   subType = "",
 }: InlineWorkpaperViewerProps) {
-  // Show empty state when no content and onStart is provided
-  if (!content && onStart) {
-    return <WorkpaperEmptyState onStart={onStart} isLoading={isStartLoading} />;
-  }
   const queryClient = useQueryClient();
   const { data: threads = [] } = useCommentThreads(
     engagementId,
@@ -225,6 +221,11 @@ export function InlineWorkpaperViewer({
   const handleCancelPendingObjective = React.useCallback(() => {
     setPendingObjective(null);
   }, []);
+
+  // Show empty state when no content and onStart is provided
+  if (!content && onStart) {
+    return <WorkpaperEmptyState onStart={onStart} isLoading={isStartLoading} />;
+  }
 
   const objectivesSidebar = showObjectives ? (
     <ObjectivesTabContent
