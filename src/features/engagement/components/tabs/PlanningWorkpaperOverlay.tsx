@@ -77,7 +77,6 @@ export function PlanningWorkpaperOverlay({
     content: (workpaper.content as JSONContent) ?? null,
     updatedAt: workpaper.updatedAt,
     templateEntityType: workpaper.content ? null : "planning_workpaper",
-    templateSubType: step.key,
   });
 
   const objectivesTab: WorkpaperTab = React.useMemo(

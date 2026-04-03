@@ -42,8 +42,6 @@ export interface UseWorkpaperShellParams {
   updatedAt?: string | null;
   /** If provided and content is null, fetch the assigned template for this entity type */
   templateEntityType?: string | null;
-  /** Sub-type for template lookup (e.g. planning step config key) */
-  templateSubType?: string;
   /** Fallback content when both saved content and template are absent */
   fallbackContent?: JSONContent | null;
 }
@@ -111,7 +109,6 @@ export function useWorkpaperShell(
     content,
     updatedAt,
     templateEntityType,
-    templateSubType,
     fallbackContent,
   } = params;
 
@@ -119,7 +116,6 @@ export function useWorkpaperShell(
   const shouldFetchTemplate = !content && !!templateEntityType;
   const { data: templateData, isLoading: isLoadingTemplate } = useTemplateForEntity(
     shouldFetchTemplate ? templateEntityType : null,
-    templateSubType,
   );
 
   const queryClient = useQueryClient();
