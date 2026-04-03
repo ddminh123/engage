@@ -80,6 +80,7 @@ export function PlanningWorkpaperOverlay({
     updatedAt: workpaper.updatedAt,
     templateEntityType: workpaper.content ? null : "planning_workpaper",
     templateSubType: stepConfigKey,
+    subType: stepConfigKey ?? "",
   });
 
   const objectivesTab: WorkpaperTab = React.useMemo(
@@ -131,6 +132,7 @@ export function PlanningWorkpaperOverlay({
             signoffs={wpSignoffs}
             currentVersion={workpaper.currentVersion}
             onViewVersion={shell.setViewVersion}
+            subType={stepConfigKey ?? ""}
             actions={
               <WorkpaperActions
                 transitions={shell.transitions}

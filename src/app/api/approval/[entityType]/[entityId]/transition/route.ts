@@ -9,7 +9,7 @@ export const POST = withAccess(
     const { entityType, entityId } = await context.params;
     try {
       const body = await req.json();
-      const { transitionId, comment, nextAssigneeId } = body as { transitionId: string; comment?: string; nextAssigneeId?: string };
+      const { transitionId, comment, nextAssigneeId, subType } = body as { transitionId: string; comment?: string; nextAssigneeId?: string; subType?: string };
 
       if (!transitionId) {
         return Response.json(
@@ -36,6 +36,7 @@ export const POST = withAccess(
         engagementId,
         comment,
         nextAssigneeId,
+        subType ?? '',
       );
 
       return Response.json({ data });

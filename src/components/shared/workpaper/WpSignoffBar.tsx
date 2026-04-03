@@ -78,6 +78,8 @@ interface WpSignoffBarProps {
   editButton?: React.ReactNode;
   /** Remove background fill, keep border divider (for inline/section views) */
   compact?: boolean;
+  /** Sub-type for workflow resolution (e.g. planning step key) */
+  subType?: string;
 }
 
 export function WpSignoffBar({
@@ -90,10 +92,14 @@ export function WpSignoffBar({
   actions,
   editButton,
   compact = false,
+  subType = "",
 }: WpSignoffBarProps) {
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
-  const { data: signoffTypes = [] } = useWorkflowSignoffTypes(entityType);
+  const { data: signoffTypes = [] } = useWorkflowSignoffTypes(
+    entityType,
+    subType,
+  );
   const signMutation = useManualSign();
   const unsignMutation = useUnsign();
 
@@ -198,6 +204,7 @@ export function WpSignoffBar({
       engagementId,
       signoffType: slot.signoffType,
       signoffOrder: slot.signoffOrder,
+      subType,
     });
   };
 

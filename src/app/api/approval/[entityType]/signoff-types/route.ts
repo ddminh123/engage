@@ -6,8 +6,9 @@ export const GET = withAccess(
   'engagement:read',
   async (req: NextRequest, context: { params: Promise<Record<string, string>> }) => {
     const { entityType } = await context.params;
+    const subType = new URL(req.url).searchParams.get('subType') ?? '';
     try {
-      const data = await getWorkflowSignoffTypes(entityType);
+      const data = await getWorkflowSignoffTypes(entityType, subType);
       return Response.json({ data });
     } catch (error) {
       const message = (error as Error).message;

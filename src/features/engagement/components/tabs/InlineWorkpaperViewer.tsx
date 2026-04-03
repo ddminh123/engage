@@ -50,6 +50,8 @@ interface InlineWorkpaperViewerProps {
   onStart?: () => void;
   /** Loading state for the empty-state CTA button */
   isStartLoading?: boolean;
+  /** Sub-type for workflow resolution (e.g. planning step key) */
+  subType?: string;
 }
 
 export function InlineWorkpaperViewer({
@@ -67,6 +69,7 @@ export function InlineWorkpaperViewer({
   showObjectives = false,
   onStart,
   isStartLoading = false,
+  subType = "",
 }: InlineWorkpaperViewerProps) {
   // Show empty state when no content and onStart is provided
   if (!content && onStart) {
@@ -237,6 +240,7 @@ export function InlineWorkpaperViewer({
       signoffs={signoffs}
       currentVersion={currentVersion}
       compact
+      subType={subType}
       actions={
         <WorkpaperActions
           transitions={transitions}

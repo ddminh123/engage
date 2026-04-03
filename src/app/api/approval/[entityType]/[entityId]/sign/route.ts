@@ -9,9 +9,10 @@ export const POST = withAccess(
     const { entityType, entityId } = await context.params;
     try {
       const body = await req.json();
-      const { signoffType, signoffOrder } = body as {
+      const { signoffType, signoffOrder, subType } = body as {
         signoffType: string;
         signoffOrder: number;
+        subType?: string;
       };
 
       if (!signoffType || !signoffOrder) {
@@ -36,6 +37,7 @@ export const POST = withAccess(
         signoffType,
         signoffOrder,
         userId: session.user.id,
+        subType: subType ?? '',
       });
 
       return Response.json({ data: { ok: true } });

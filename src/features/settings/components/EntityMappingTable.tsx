@@ -26,23 +26,19 @@ import {
   useUpsertEntityBinding,
   useDeleteEntityBinding,
 } from "../hooks/useApprovalWorkflows";
-
-// ── Constants ──
-
-const ENTITY_TYPE_OPTIONS = [
-  { value: "procedure", label: "Thủ tục kiểm toán" },
-  { value: "work_program", label: "Chương trình kiểm toán" },
-  { value: "planning_workpaper", label: "Giấy tờ kế hoạch" },
-];
-
-const entityTypeLabel = (et: string) =>
-  ENTITY_TYPE_OPTIONS.find((o) => o.value === et)?.label ?? et;
+import {
+  useEntityTypeOptions,
+  encodeEntityOption,
+  decodeEntityOption,
+} from "../hooks/useEntityTypeOptions";
 
 // ── Row type ──
 
 interface BindingRow {
   id: string;
   entityType: string;
+  subType: string;
+  encodedKey: string;
   workflowId: string;
   workflowName: string;
   isDefault: boolean;
@@ -54,11 +50,15 @@ export function EntityMappingTable() {
   const { data: workflows = [], isLoading } = useApprovalWorkflows();
   const upsertBinding = useUpsertEntityBinding();
   const deleteBinding = useDeleteEntityBinding();
+  const { options: entityTypeOptions, optionLabel } = useEntityTypeOptions();
 
   const [showAddDialog, setShowAddDialog] = React.useState(false);
-  const [newEntityType, setNewEntityType] = React.useState("");
+  const [newEncodedType, setNewEncodedType] = React.useState("");
   const [newWorkflowId, setNewWorkflowId] = React.useState("");
-  const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<{
+    entityType: string;
+    subType: string;
+  } | null>(null);
 
   // Collect all bindings from all workflows
   const allBindings: BindingRow[] = React.useMemo(() => {
@@ -68,6 +68,8 @@ export function EntityMappingTable() {
         bindings.push({
           id: b.id,
           entityType: b.entityType,
+          subType: b.subType,
+          encodedKey: encodeEntityOption(b.entityType, b.subType),
           workflowId: b.workflowId,
           workflowName: wf.name,
           isDefault: wf.isDefault,
@@ -77,29 +79,30 @@ export function EntityMappingTable() {
     return bindings;
   }, [workflows]);
 
-  const boundTypes = new Set(allBindings.map((b) => b.entityType));
-  const availableEntityTypes = ENTITY_TYPE_OPTIONS.filter(
-    (o) => !boundTypes.has(o.value),
+  const boundKeys = new Set(allBindings.map((b) => b.encodedKey));
+  const availableEntityTypes = entityTypeOptions.filter(
+    (o) => !boundKeys.has(o.value),
   );
 
   // Find default workflow
   const defaultWorkflow = workflows.find((wf) => wf.isDefault);
 
   const handleChangeWorkflow = React.useCallback(
-    (entityType: string, workflowId: string) => {
-      upsertBinding.mutate({ entityType, workflowId });
+    (entityType: string, subType: string, workflowId: string) => {
+      upsertBinding.mutate({ entityType, subType, workflowId });
     },
     [upsertBinding],
   );
 
   const handleAdd = () => {
-    if (!newEntityType || !newWorkflowId) return;
+    if (!newEncodedType || !newWorkflowId) return;
+    const { entityType, subType } = decodeEntityOption(newEncodedType);
     upsertBinding.mutate(
-      { entityType: newEntityType, workflowId: newWorkflowId },
+      { entityType, subType, workflowId: newWorkflowId },
       {
         onSuccess: () => {
           setShowAddDialog(false);
-          setNewEntityType("");
+          setNewEncodedType("");
           setNewWorkflowId("");
         },
       },
@@ -115,7 +118,7 @@ export function EntityMappingTable() {
         meta: { label: "Loại thực thể" },
         cell: ({ row }) => (
           <Badge variant="secondary" className="text-xs font-normal">
-            {entityTypeLabel(row.original.entityType)}
+            {optionLabel(row.original.encodedKey)}
           </Badge>
         ),
       },
@@ -129,7 +132,7 @@ export function EntityMappingTable() {
             <Select
               value={b.workflowId}
               onValueChange={(v) => {
-                if (v) handleChangeWorkflow(b.entityType, v);
+                if (v) handleChangeWorkflow(b.entityType, b.subType, v);
               }}
             >
               <SelectTrigger className="h-8 w-[280px] text-xs">
@@ -174,7 +177,12 @@ export function EntityMappingTable() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={() => setDeleteTarget(row.original.entityType)}
+            onClick={() =>
+              setDeleteTarget({
+                entityType: row.original.entityType,
+                subType: row.original.subType,
+              })
+            }
             title="Xóa gán"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -209,12 +217,10 @@ export function EntityMappingTable() {
         pageSize={10}
         hideToolbar={false}
         actions={
-          availableEntityTypes.length > 0 ? (
-            <Button size="sm" onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Thêm gán
-            </Button>
-          ) : undefined
+          <Button size="sm" onClick={() => setShowAddDialog(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Thêm gán
+          </Button>
         }
       />
 
@@ -224,7 +230,7 @@ export function EntityMappingTable() {
         onOpenChange={(open) => {
           if (!open) {
             setShowAddDialog(false);
-            setNewEntityType("");
+            setNewEncodedType("");
             setNewWorkflowId("");
           }
         }}
@@ -237,18 +243,18 @@ export function EntityMappingTable() {
             <div className="space-y-1.5">
               <label className="text-xs font-medium">Loại thực thể</label>
               <Select
-                value={newEntityType}
-                onValueChange={(v) => v && setNewEntityType(v)}
+                value={newEncodedType}
+                onValueChange={(v) => v && setNewEncodedType(v)}
               >
                 <SelectTrigger className="h-9 text-sm">
                   <span
                     className={cn(
                       "flex flex-1 text-left truncate",
-                      !newEntityType && "text-muted-foreground",
+                      !newEncodedType && "text-muted-foreground",
                     )}
                   >
-                    {newEntityType
-                      ? entityTypeLabel(newEntityType)
+                    {newEncodedType
+                      ? optionLabel(newEncodedType)
                       : "Chọn loại thực thể..."}
                   </span>
                 </SelectTrigger>
@@ -300,7 +306,7 @@ export function EntityMappingTable() {
               variant="outline"
               onClick={() => {
                 setShowAddDialog(false);
-                setNewEntityType("");
+                setNewEncodedType("");
                 setNewWorkflowId("");
               }}
             >
@@ -309,7 +315,7 @@ export function EntityMappingTable() {
             <Button
               onClick={handleAdd}
               disabled={
-                !newEntityType || !newWorkflowId || upsertBinding.isPending
+                !newEncodedType || !newWorkflowId || upsertBinding.isPending
               }
             >
               {upsertBinding.isPending && (
@@ -327,7 +333,7 @@ export function EntityMappingTable() {
           if (!open) setDeleteTarget(null);
         }}
         title="Xóa gán thực thể?"
-        description={`Bỏ gán quy trình soát xét khỏi "${deleteTarget !== null ? entityTypeLabel(deleteTarget) : ""}"? Thực thể này sẽ sử dụng quy trình mặc định.`}
+        description={`Bỏ gán quy trình soát xét khỏi "${deleteTarget ? optionLabel(encodeEntityOption(deleteTarget.entityType, deleteTarget.subType)) : ""}"? Thực thể này sẽ sử dụng quy trình mặc định.`}
         variant="destructive"
         confirmLabel="Xóa gán"
         onConfirm={() => {

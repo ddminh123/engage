@@ -7,6 +7,7 @@ export const GET = withAccess(
   'engagement:read',
   async (req: NextRequest, context: { params: Promise<Record<string, string>> }, session: Session) => {
     const { entityType, entityId } = await context.params;
+    const subType = new URL(req.url).searchParams.get('subType') ?? '';
     try {
       // Resolve engagementId from the entity
       const engagementId = await resolveEngagementId(entityType, entityId);
@@ -32,6 +33,7 @@ export const GET = withAccess(
         session.user.id,
         engagementId,
         status.lastPublishedBy,
+        subType,
       );
 
       return Response.json({ data });

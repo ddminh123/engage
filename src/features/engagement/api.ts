@@ -817,8 +817,11 @@ export interface SignoffTypeInfo {
   count: number;
 }
 
-export async function fetchWorkflowSignoffTypes(entityType: string): Promise<SignoffTypeInfo[]> {
-  const response = await fetch(API_ROUTES.APPROVAL_SIGNOFF_TYPES(entityType));
+export async function fetchWorkflowSignoffTypes(entityType: string, subType: string = ''): Promise<SignoffTypeInfo[]> {
+  const url = subType
+    ? `${API_ROUTES.APPROVAL_SIGNOFF_TYPES(entityType)}?subType=${encodeURIComponent(subType)}`
+    : API_ROUTES.APPROVAL_SIGNOFF_TYPES(entityType);
+  const response = await fetch(url);
   return handleResponse<SignoffTypeInfo[]>(response);
 }
 
@@ -827,8 +830,12 @@ export async function fetchWorkflowSignoffTypes(entityType: string): Promise<Sig
 export async function fetchAvailableTransitionsApi(
   entityType: string,
   entityId: string,
+  subType: string = '',
 ): Promise<AvailableTransition[]> {
-  const response = await fetch(API_ROUTES.APPROVAL_TRANSITIONS(entityType, entityId));
+  const url = subType
+    ? `${API_ROUTES.APPROVAL_TRANSITIONS(entityType, entityId)}?subType=${encodeURIComponent(subType)}`
+    : API_ROUTES.APPROVAL_TRANSITIONS(entityType, entityId);
+  const response = await fetch(url);
   return handleResponse<AvailableTransition[]>(response);
 }
 
@@ -838,11 +845,12 @@ export async function executeTransitionApi(
   transitionId: string,
   comment?: string,
   nextAssigneeId?: string,
+  subType?: string,
 ): Promise<{ newStatus: string; actionType: string }> {
   const response = await fetch(API_ROUTES.APPROVAL_EXECUTE_TRANSITION(entityType, entityId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transitionId, comment, nextAssigneeId }),
+    body: JSON.stringify({ transitionId, comment, nextAssigneeId, subType }),
   });
   return handleResponse<{ newStatus: string; actionType: string }>(response);
 }
@@ -851,11 +859,12 @@ export async function autoTransitionApi(
   entityType: string,
   entityId: string,
   actionType: string,
+  subType?: string,
 ): Promise<{ newStatus: string } | null> {
   const response = await fetch(API_ROUTES.APPROVAL_AUTO_TRANSITION(entityType, entityId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ actionType }),
+    body: JSON.stringify({ actionType, subType }),
   });
   return handleResponse<{ newStatus: string } | null>(response);
 }
@@ -867,11 +876,12 @@ export async function manualSignApi(
   entityId: string,
   signoffType: string,
   signoffOrder: number,
+  subType?: string,
 ): Promise<{ ok: true }> {
   const response = await fetch(API_ROUTES.APPROVAL_SIGN(entityType, entityId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ signoffType, signoffOrder }),
+    body: JSON.stringify({ signoffType, signoffOrder, subType }),
   });
   return handleResponse<{ ok: true }>(response);
 }

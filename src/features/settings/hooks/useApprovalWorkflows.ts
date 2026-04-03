@@ -136,7 +136,8 @@ export function useUpsertEntityBinding() {
 export function useDeleteEntityBinding() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (entityType: string) => deleteEntityBindingApi(entityType),
+    mutationFn: ({ entityType, subType }: { entityType: string; subType?: string }) =>
+      deleteEntityBindingApi(entityType, subType),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: WORKFLOWS_KEY });
     },

@@ -10,6 +10,7 @@ export const POST = withAccess(
     const { entityType, entityId } = await context.params;
     const body = await req.json();
     const actionType = body.actionType as string;
+    const subType = (body.subType as string) ?? '';
 
     if (!actionType) {
       return Response.json(
@@ -25,6 +26,7 @@ export const POST = withAccess(
         actionType,
         session.user.id,
         session.user.name,
+        subType,
       );
 
       if (!result) {

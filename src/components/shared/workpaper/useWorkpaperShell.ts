@@ -46,6 +46,8 @@ export interface UseWorkpaperShellParams {
   templateSubType?: string;
   /** Fallback content when both saved content and template are absent */
   fallbackContent?: JSONContent | null;
+  /** Sub-type for workflow resolution (e.g. planning step config key) */
+  subType?: string;
 }
 
 export interface UseWorkpaperShellReturn {
@@ -113,6 +115,7 @@ export function useWorkpaperShell(
     templateEntityType,
     templateSubType,
     fallbackContent,
+    subType = '',
   } = params;
 
   // ── Template fetch (only when content is empty) ──
@@ -155,6 +158,7 @@ export function useWorkpaperShell(
   const { data: transitions = [] } = useAvailableTransitions(
     entityType,
     entityId,
+    subType,
   );
   const transitionMutation = useExecuteTransition();
 
@@ -197,9 +201,9 @@ export function useWorkpaperShell(
       ) {
         autoTransitionFired.current = true;
         try {
-          await autoTransitionApi(entityType, entityId, "start");
+          await autoTransitionApi(entityType, entityId, "start", subType);
           queryClient.invalidateQueries({
-            queryKey: ["approvalTransitions", entityType, entityId],
+            queryKey: ["approvalTransitions", entityType, entityId, subType],
           });
           queryClient.invalidateQueries({
             queryKey: ["engagement", engagementId],
@@ -212,7 +216,7 @@ export function useWorkpaperShell(
         }
       }
     },
-    [contentMutation, entityType, entityId, engagementId, approvalStatus, queryClient],
+    [contentMutation, entityType, entityId, engagementId, approvalStatus, queryClient, subType],
   );
 
   // ── Transition handler ──
@@ -230,12 +234,13 @@ export function useWorkpaperShell(
           engagementId,
           comment,
           nextAssigneeId,
+          subType,
         });
       } catch {
         // Error handled by mutation state
       }
     },
-    [transitionMutation, entityType, entityId, engagementId],
+    [transitionMutation, entityType, entityId, engagementId, subType],
   );
 
   // ── Restore handler ──
