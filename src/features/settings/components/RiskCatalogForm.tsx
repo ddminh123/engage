@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
@@ -23,6 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { FormDialog } from "@/components/shared/FormDialog";
+import { cn } from "@/lib/utils";
 import { COMMON_LABELS, SETTINGS_LABELS, ENGAGEMENT_LABELS } from "@/constants/labels";
 import {
   useCreateRiskCatalogItem,
@@ -66,6 +66,16 @@ export function RiskCatalogForm({
   const createMutation = useCreateRiskCatalogItem();
   const updateMutation = useUpdateRiskCatalogItem();
   const { data: domains = [] } = useRiskCatalogTree();
+
+  // Build flat category lookup for display
+  const categoryLabel = (catId: string) => {
+    for (const d of domains) {
+      for (const c of d.categories) {
+        if (c.id === catId) return `${d.name} / ${c.name}`;
+      }
+    }
+    return catId;
+  };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -199,7 +209,14 @@ export function RiskCatalogForm({
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn danh mục" />
+                        <span
+                          className={cn(
+                            "flex flex-1 text-left truncate",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value ? categoryLabel(field.value) : "Chọn danh mục"}
+                        </span>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -253,7 +270,16 @@ export function RiskCatalogForm({
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn loại" />
+                        <span
+                          className={cn(
+                            "flex flex-1 text-left truncate",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value
+                            ? (RL.riskCategory[field.value] ?? field.value)
+                            : "Chọn loại"}
+                        </span>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -281,7 +307,16 @@ export function RiskCatalogForm({
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn mức" />
+                        <span
+                          className={cn(
+                            "flex flex-1 text-left truncate",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value
+                            ? (RL.riskRating[field.value] ?? field.value)
+                            : "Chọn mức"}
+                        </span>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -311,7 +346,16 @@ export function RiskCatalogForm({
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn" />
+                        <span
+                          className={cn(
+                            "flex flex-1 text-left truncate",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value
+                            ? (RL.likelihood[field.value] ?? field.value)
+                            : "Chọn"}
+                        </span>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -339,7 +383,16 @@ export function RiskCatalogForm({
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn" />
+                        <span
+                          className={cn(
+                            "flex flex-1 text-left truncate",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value
+                            ? (RL.impact[field.value] ?? field.value)
+                            : "Chọn"}
+                        </span>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>

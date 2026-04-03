@@ -138,8 +138,8 @@ export function CatalogPickerDialog({
 
   const title =
     entityType === "risk"
-      ? "Th\u00eam r\u1ee7i ro t\u1eeb th\u01b0 vi\u1ec7n"
-      : "Th\u00eam ki\u1ec3m so\u00e1t t\u1eeb th\u01b0 vi\u1ec7n";
+      ? "Thêm rủi ro từ thư viện"
+      : "Thêm kiểm soát từ thư viện";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -170,6 +170,7 @@ export function CatalogPickerDialog({
                   setSelectedDomainId(undefined);
                   setSelectedCategoryId(undefined);
                 }}
+                defaultCollapsed
               />
             </div>
           )}
@@ -182,20 +183,20 @@ export function CatalogPickerDialog({
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={entityType === "risk" ? "T\u00ecm r\u1ee7i ro..." : "T\u00ecm ki\u1ec3m so\u00e1t..."}
+                placeholder={entityType === "risk" ? "Tìm rủi ro..." : "Tìm kiểm soát..."}
                 className="pl-9"
               />
             </div>
 
-            {/* Items list */}
-            <div className="flex-1 overflow-y-auto rounded-md border">
+            {/* Items list — fixed min-height to avoid flickering on search */}
+            <div className="flex-1 overflow-y-auto rounded-md border min-h-[400px]">
               {isLoading ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
-                  \u0110ang t\u1ea3i...
+                  Đang tải...
                 </div>
               ) : items.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
-                  Kh\u00f4ng t\u00ecm th\u1ea5y m\u1ee5c n\u00e0o.
+                  Không tìm thấy mục nào.
                 </div>
               ) : (
                 <div className="divide-y">
@@ -294,15 +295,15 @@ export function CatalogPickerDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            H\u1ee7y
+            Hủy
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={selectedIds.size === 0 || isCopying}
           >
             {isCopying
-              ? "\u0110ang th\u00eam..."
-              : `Th\u00eam ${selectedIds.size} m\u1ee5c \u0111\u00e3 ch\u1ecdn`}
+              ? "Đang thêm..."
+              : `Thêm ${selectedIds.size} mục đã chọn`}
           </Button>
         </DialogFooter>
       </DialogContent>

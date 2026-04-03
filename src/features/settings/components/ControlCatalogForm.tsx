@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
@@ -23,6 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { FormDialog } from "@/components/shared/FormDialog";
+import { cn } from "@/lib/utils";
 import { COMMON_LABELS, SETTINGS_LABELS, ENGAGEMENT_LABELS } from "@/constants/labels";
 import {
   useCreateControlCatalogItem,
@@ -205,7 +205,9 @@ export function ControlCatalogForm({
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn" />
+                        <span className={cn("flex flex-1 text-left truncate", !field.value && "text-muted-foreground")}>
+                          {field.value ? (EL.controlType[field.value] ?? field.value) : "Chọn"}
+                        </span>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -233,7 +235,9 @@ export function ControlCatalogForm({
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn" />
+                        <span className={cn("flex flex-1 text-left truncate", !field.value && "text-muted-foreground")}>
+                          {field.value ? (EL.controlNature[field.value] ?? field.value) : "Chọn"}
+                        </span>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -261,7 +265,9 @@ export function ControlCatalogForm({
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn" />
+                        <span className={cn("flex flex-1 text-left truncate", !field.value && "text-muted-foreground")}>
+                          {field.value ? (EL.controlFrequency[field.value] ?? field.value) : "Chọn"}
+                        </span>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
