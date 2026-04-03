@@ -14,6 +14,7 @@ import {
 } from "@/features/engagement/hooks/useEngagements";
 import { useWorkpaperContentSave } from "@/hooks/useWorkpaper";
 import { WorkpaperViewer } from "@/components/shared/workpaper/WorkpaperViewer";
+import { WorkpaperEmptyState } from "@/components/shared/workpaper/WorkpaperEmptyState";
 import { WpSignoffBar } from "@/components/shared/workpaper/WpSignoffBar";
 import { WorkpaperActions } from "@/components/shared/workpaper/WorkpaperActions";
 import { autoTransitionApi } from "@/features/engagement/api";
@@ -45,6 +46,10 @@ interface InlineWorkpaperViewerProps {
   auditObjectives?: AuditObjective[];
   /** Enable objectives feature (sidebar + bubble menu) */
   showObjectives?: boolean;
+  /** If provided and content is null, shows WorkpaperEmptyState with this callback */
+  onStart?: () => void;
+  /** Loading state for the empty-state CTA button */
+  isStartLoading?: boolean;
 }
 
 export function InlineWorkpaperViewer({
@@ -60,7 +65,13 @@ export function InlineWorkpaperViewer({
   editButton,
   auditObjectives = [],
   showObjectives = false,
+  onStart,
+  isStartLoading = false,
 }: InlineWorkpaperViewerProps) {
+  // Show empty state when no content and onStart is provided
+  if (!content && onStart) {
+    return <WorkpaperEmptyState onStart={onStart} isLoading={isStartLoading} />;
+  }
   const queryClient = useQueryClient();
   const { data: threads = [] } = useCommentThreads(
     engagementId,
