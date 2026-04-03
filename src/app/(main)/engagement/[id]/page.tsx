@@ -231,7 +231,6 @@ function EngagementDetailContent() {
               members={engagement.members ?? []}
               auditObjectives={engagement.auditObjectives ?? []}
               wpSignoffs={wpSignoffs}
-              auditObjectives={engagement.auditObjectives}
             />
           );
         })()}

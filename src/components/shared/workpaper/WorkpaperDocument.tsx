@@ -385,17 +385,6 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
               onAddObjective={onAddObjective ? handleAddObjective : undefined}
             />
           )}
-          <WorkpaperEditor
-            ref={editorRef}
-            content={localContent}
-            onChange={handleContentChange}
-            onCommentActivated={handleCommentActivated}
-            onCommentClicked={handleCommentClicked}
-            onAddComment={handleAddComment}
-            readOnly={readOnly}
-            onAddFinding={onAddFinding ? handleAddFinding : undefined}
-            onAddObjective={onAddObjective ? handleAddObjective : undefined}
-          />
         </div>
 
         {/* Right: Configurable Task Pane */}

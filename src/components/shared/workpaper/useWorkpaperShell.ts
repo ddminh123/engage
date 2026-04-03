@@ -91,6 +91,9 @@ export interface UseWorkpaperShellReturn {
   // Initial content & meta
   initialContent: JSONContent | null;
   initialLastSavedAt: Date | null;
+
+  // Template loading state
+  isLoadingTemplate: boolean;
 }
 
 // =============================================================================
@@ -114,7 +117,7 @@ export function useWorkpaperShell(
 
   // ── Template fetch (only when content is empty) ──
   const shouldFetchTemplate = !content && !!templateEntityType;
-  const { data: templateData } = useTemplateForEntity(
+  const { data: templateData, isLoading: isLoadingTemplate } = useTemplateForEntity(
     shouldFetchTemplate ? templateEntityType : null,
     templateSubType,
   );
@@ -165,9 +168,12 @@ export function useWorkpaperShell(
   const initialContent = React.useMemo<JSONContent | null>(() => {
     if (content) return content as JSONContent;
     if (templateData?.content) return templateData.content as JSONContent;
-    if (fallbackContent) return fallbackContent as JSONContent;
+    // Only fall back when template fetch is done (avoids flash of fallback content)
+    if (!shouldFetchTemplate || !isLoadingTemplate) {
+      if (fallbackContent) return fallbackContent as JSONContent;
+    }
     return null;
-  }, [content, templateData, fallbackContent]);
+  }, [content, templateData, fallbackContent, shouldFetchTemplate, isLoadingTemplate]);
 
   const initialLastSavedAt = React.useMemo<Date | null>(
     () => (updatedAt ? new Date(updatedAt) : null),
@@ -359,5 +365,8 @@ export function useWorkpaperShell(
     // Initial data
     initialContent,
     initialLastSavedAt,
+
+    // Template loading
+    isLoadingTemplate: shouldFetchTemplate && isLoadingTemplate,
   };
 }
