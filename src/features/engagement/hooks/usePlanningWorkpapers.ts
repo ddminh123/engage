@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { API_ROUTES } from "@/constants";
+import { ApiError } from "@/lib/api-error";
 
 interface PlanningWorkpaperData {
   id: string;
@@ -27,7 +28,7 @@ interface PlanningWorkpaperData {
 
 async function handleResponse<T>(response: Response): Promise<T> {
   const json = await response.json();
-  if (!response.ok) throw new Error(json.error?.message ?? "Request failed");
+  if (!response.ok) throw new ApiError(response.status, json.error?.message ?? "Request failed", json.error?.code);
   return json.data;
 }
 

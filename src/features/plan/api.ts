@@ -1,4 +1,5 @@
 import { API_ROUTES } from '@/constants';
+import { ApiError } from '@/lib/api-error';
 import type {
   AuditPlan,
   PlanSummary,
@@ -13,19 +14,12 @@ interface ApiResponse<T> {
   data: T;
 }
 
-interface ApiError {
-  error: {
-    code: string;
-    message: string;
-  };
-}
-
 async function handleResponse<T>(response: Response): Promise<T> {
   const json = await response.json();
 
   if (!response.ok) {
-    const error = json as ApiError;
-    throw new Error(error.error?.message || 'Request failed');
+    const err = json as { error: { code: string; message: string } };
+    throw new ApiError(response.status, err.error?.message || 'Request failed', err.error?.code);
   }
 
   return (json as ApiResponse<T>).data;
