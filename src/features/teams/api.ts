@@ -1,4 +1,5 @@
 import { API_ROUTES } from '@/constants/routes';
+import { ApiError } from '@/lib/api-error';
 import type {
   User, UserDetail, Team, Expertise,
   CreateUserInput, UpdateUserInput,
@@ -13,7 +14,7 @@ import type {
 async function handleResponse<T>(res: Response): Promise<T> {
   const json = await res.json();
   if (!res.ok) {
-    throw new Error(json.error?.message || 'Request failed');
+    throw new ApiError(res.status, json.error?.message || 'Request failed', json.error?.code);
   }
   return json.data;
 }

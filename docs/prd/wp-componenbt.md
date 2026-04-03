@@ -27,11 +27,11 @@ Target: Replace fragmented form-based UX with a **Confluence-style document + si
 
 ### Full Page Layout
 
-| Left (70%)                        | Right (30%)      |
-| --------------------------------- | ---------------- |
-| Title (inline edit, notion style) | Task pane (tabs) |
-| Rich document editor              | - Fields         |
-| (Tiptap-based)                    | - Comments       |
+| Left (70%)                                              | Right (30%)      |
+| ------------------------------------------------------- | ---------------- |
+| Title (inline edit, notion style with save/cancel icon) | Task pane (tabs) |
+| Rich document editor                                    | - Fields         |
+| (Tiptap-based)                                          | - Comments       |
 
 ---
 
@@ -193,39 +193,6 @@ Behavior:
 
 ---
 
-## 8. Data Model (Simplified)
-
-### Workpaper
-
-- id
-- engagementId
-- title
-- content_json (Tiptap)
-- templateId
-- status
-- assigneeId
-- reviewerId
-
-### Fields (structured)
-
-- wpId
-- type
-- classification
-- priority
-- controlIds[]
-- result
-- findings[]
-
-### Comments
-
-- id
-- wpId
-- commentId (anchor reference)
-- thread status
-- messages[]
-
----
-
 ## 9. Key UX Decisions
 
 - Bubble menu for comment (PRIMARY)
@@ -237,9 +204,6 @@ Behavior:
 
 ## 10. Future (Not in MVP)
 
-- Versioning (diff, history)
-- Approval log
-- Mentions & notifications
 - Real-time collaboration
 - AI assist (summarize, suggest)
 
