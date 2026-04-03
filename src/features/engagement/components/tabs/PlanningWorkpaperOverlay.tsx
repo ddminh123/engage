@@ -50,6 +50,8 @@ export function PlanningWorkpaperOverlay({
   wpSignoffs = [],
   auditObjectives = [],
 }: PlanningWorkpaperOverlayProps) {
+  const isScope = stepConfigKey === "scope";
+
   const [pendingObjective, setPendingObjective] =
     React.useState<PendingObjectiveData | null>(null);
 
@@ -161,11 +163,11 @@ export function PlanningWorkpaperOverlay({
             />
           </>
         )}
-        tabs={[objectivesTab]}
-        defaultTab="objectives"
+        tabs={isScope ? [objectivesTab] : []}
+        defaultTab={isScope ? "objectives" : undefined}
         commentsTabLabel="Soát xét"
-        onAddObjective={handleAddObjective}
-        objectiveTabKey="objectives"
+        onAddObjective={isScope ? handleAddObjective : undefined}
+        objectiveTabKey={isScope ? "objectives" : undefined}
         threads={shell.threads}
         onCreateThread={shell.handleCreateThread}
         onReplyToThread={shell.handleReplyToThread}
