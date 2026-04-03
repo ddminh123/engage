@@ -457,7 +457,7 @@ export function usePlanningEditor(engagement: EngagementDetail) {
     const title = state.addingSectionTitle.trim();
     if (!title) return;
     createSec.mutate(
-      { engagementId: engagement.id, data: { title, addedFrom: "planning" } },
+      { engagementId: engagement.id, data: { title, phase: "planning" } },
       { onSuccess: () => dispatch({ type: "CANCEL_ADD_SECTION" }) },
     );
   }, [state.addingSectionTitle, createSec, engagement.id]);
@@ -491,7 +491,7 @@ export function usePlanningEditor(engagement: EngagementDetail) {
       const title = state.addingWpObjTitle.trim();
       if (!title) return;
       createWpObj.mutate(
-        { engagementId: engagement.id, sectionId, data: { title, addedFrom: "planning" } },
+        { engagementId: engagement.id, sectionId, data: { title, phase: "planning" } },
         { onSuccess: () => dispatch({ type: "CANCEL_ADD_WP_OBJ" }) },
       );
     },
@@ -529,7 +529,7 @@ export function usePlanningEditor(engagement: EngagementDetail) {
       const [prefix, id] = key.split(":");
       const data: ProcedureInput = {
         title,
-        addedFrom: "planning",
+        phase: "planning",
         sectionId: prefix === "sec" ? id : null,
         objectiveId: prefix === "obj" ? id : null,
       };

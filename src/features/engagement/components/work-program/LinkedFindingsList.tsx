@@ -82,7 +82,9 @@ export function LinkedFindingsList({
   const isSaving = createFinding.isPending || updateFinding.isPending;
 
   // Auto-open form when pendingFinding arrives from context menu
-  const prevPendingRef = React.useRef<PendingFindingData | null | undefined>(undefined);
+  const prevPendingRef = React.useRef<PendingFindingData | null | undefined>(
+    undefined,
+  );
   React.useEffect(() => {
     if (pendingFinding && pendingFinding !== prevPendingRef.current) {
       setEditingId(null);
@@ -195,61 +197,133 @@ export function LinkedFindingsList({
 
       {findings.length > 0 ? (
         <div className="space-y-1.5">
-          {findings.map((f) => (
-            <div
-              key={f.id}
-              className="group flex w-full items-center gap-2 rounded-md border border-muted px-2.5 py-2 text-sm transition-colors hover:border-primary/50 hover:bg-muted/50"
-            >
-              <button
-                type="button"
-                className="flex flex-1 items-center gap-2 text-left"
-                onClick={() => handleEdit(f)}
+          {findings.map((f) => {
+            // If editing this finding, show inline form instead of the item
+            if (editingId === f.id && showForm) {
+              return (
+                <div key={f.id} className="space-y-2 rounded-md border p-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tiêu đề</Label>
+                    <Input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Nhập tiêu đề..."
+                      className="h-8 text-sm"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Mức độ rủi ro</Label>
+                    <LabeledSelect
+                      value={rating}
+                      onChange={setRating}
+                      options={RISK_RATING_OPTIONS}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Mô tả (tùy chọn)</Label>
+                    <Textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Mô tả phát hiện..."
+                      className="min-h-[60px] text-sm"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Bằng chứng (tùy chọn)</Label>
+                    <Textarea
+                      value={evidence}
+                      onChange={(e) => setEvidence(e.target.value)}
+                      placeholder="Bằng chứng liên quan..."
+                      className="min-h-[60px] text-sm"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={handleSave}
+                      disabled={!title.trim() || isSaving}
+                    >
+                      {isSaving ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        "Cập nhật"
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs"
+                      onClick={handleCancel}
+                    >
+                      Hủy
+                    </Button>
+                  </div>
+                </div>
+              );
+            }
+
+            // Otherwise show the normal finding item
+            return (
+              <div
+                key={f.id}
+                className="group flex w-full items-center gap-2 rounded-md border border-muted px-2.5 py-2 text-sm transition-colors hover:border-primary/50 hover:bg-muted/50"
               >
-                <span className="flex-1 text-foreground">{f.title}</span>
-                {f.riskRating && (
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "text-[10px] shrink-0",
-                      f.riskRating === "critical" &&
-                        "border-red-300 bg-red-50 text-red-700",
-                      f.riskRating === "high" &&
-                        "border-orange-300 bg-orange-50 text-orange-700",
-                      f.riskRating === "medium" &&
-                        "border-yellow-300 bg-yellow-50 text-yellow-700",
-                      f.riskRating === "low" &&
-                        "border-green-300 bg-green-50 text-green-700",
-                    )}
-                  >
-                    {RISK_RATING_LABELS[f.riskRating] ?? f.riskRating}
-                  </Badge>
-                )}
-              </button>
-              <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
+                <button
+                  type="button"
+                  className="flex flex-1 items-center gap-2 text-left"
                   onClick={() => handleEdit(f)}
                 >
-                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-destructive hover:text-destructive"
-                  onClick={() => setDeleteTarget(f)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                  <span className="flex-1 text-foreground">{f.title}</span>
+                  {f.riskRating && (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] shrink-0",
+                        f.riskRating === "critical" &&
+                          "border-red-300 bg-red-50 text-red-700",
+                        f.riskRating === "high" &&
+                          "border-orange-300 bg-orange-50 text-orange-700",
+                        f.riskRating === "medium" &&
+                          "border-yellow-300 bg-yellow-50 text-yellow-700",
+                        f.riskRating === "low" &&
+                          "border-green-300 bg-green-50 text-green-700",
+                      )}
+                    >
+                      {RISK_RATING_LABELS[f.riskRating] ?? f.riskRating}
+                    </Badge>
+                  )}
+                </button>
+                <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => handleEdit(f)}
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-destructive hover:text-destructive"
+                    onClick={() => setDeleteTarget(f)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">Chưa có phát hiện.</p>
       )}
 
+      {/* Show add form at bottom only when adding new (not editing existing) */}
       {!showForm ? (
         <Button
           variant="outline"
@@ -260,7 +334,7 @@ export function LinkedFindingsList({
           <Plus className="mr-1.5 h-3 w-3" />
           Thêm phát hiện
         </Button>
-      ) : (
+      ) : !isEditing ? (
         <div className="mt-2 space-y-2 rounded-md border p-2">
           <div className="space-y-1">
             <Label className="text-xs">Tiêu đề</Label>
@@ -307,13 +381,7 @@ export function LinkedFindingsList({
               onClick={handleSave}
               disabled={!title.trim() || isSaving}
             >
-              {isSaving ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : isEditing ? (
-                "Cập nhật"
-              ) : (
-                "Lưu"
-              )}
+              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Lưu"}
             </Button>
             <Button
               size="sm"
@@ -325,7 +393,7 @@ export function LinkedFindingsList({
             </Button>
           </div>
         </div>
-      )}
+      ) : null}
 
       <ConfirmDialog
         open={deleteTarget !== null}

@@ -207,7 +207,6 @@ export interface EngagementSection {
   title: string;
   description: string | null;
   status: string;
-  addedFrom: string;
   phase: string;
   planningRefId: string | null;
   source: string;
@@ -225,7 +224,6 @@ export interface EngagementObjective {
   title: string;
   description: string | null;
   status: string;
-  addedFrom: string;
   phase: string;
   planningRefId: string | null;
   source: string;
@@ -252,7 +250,6 @@ export interface EngagementProcedure {
   approvedBy: string | null;
   approvedAt: string | null;
   approvedVersion: number | null;
-  addedFrom: string;
   phase: string;
   planningRefId: string | null;
   source: string;
@@ -286,7 +283,7 @@ export interface ProcedureInput {
   sectionId?: string | null;
   objectiveId?: string | null;
   priority?: string | null;
-  addedFrom?: string;
+  phase?: string;
   sortOrder?: number;
   controlRefIds?: string[];
   riskRefIds?: string[];
@@ -318,7 +315,6 @@ export interface ProcedureUpdateInput {
 export interface SectionInput {
   title: string;
   description?: string | null;
-  addedFrom?: string;
   phase?: string;
   sortOrder?: number;
 }
@@ -331,7 +327,6 @@ export interface SectionUpdateInput extends Partial<SectionInput> {
 export interface ObjectiveInput {
   title: string;
   description?: string | null;
-  addedFrom?: string;
   phase?: string;
   sortOrder?: number;
 }

@@ -152,7 +152,7 @@ export function PlanningTab({
   const planningProcedures = useMemo(
     () =>
       (engagement.ungroupedProcedures ?? []).filter(
-        (p) => p.addedFrom === "planning",
+        (p) => p.phase === "planning",
       ),
     [engagement.ungroupedProcedures],
   );

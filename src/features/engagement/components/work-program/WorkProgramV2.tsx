@@ -67,6 +67,7 @@ interface WorkProgramV2Props {
   members?: EngagementMember[];
   readOnly?: boolean;
   onOpenWorkpaper?: (procedureId: string) => void;
+  emptyMessage?: string;
 }
 
 // ── Main Component ──
@@ -82,6 +83,7 @@ export function WorkProgramV2({
   members = [],
   readOnly = false,
   onOpenWorkpaper,
+  emptyMessage,
 }: WorkProgramV2Props) {
   const editor = useWorkProgramEditor(
     engagementId,
@@ -574,7 +576,7 @@ export function WorkProgramV2({
       {/* ── Empty state ── */}
       {topNodes.length === 0 && !state.addingTopType && (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          {WP_LABELS.noData}
+          {emptyMessage ?? WP_LABELS.noData}
         </p>
       )}
 
