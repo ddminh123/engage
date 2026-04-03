@@ -10,8 +10,10 @@ export const GET = withAccess(
     const controlType = searchParams.get('controlType') || undefined;
     const source = searchParams.get('source') || undefined;
     const search = searchParams.get('search') || undefined;
+    const categoryId = searchParams.get('categoryId') || undefined;
+    const domainId = searchParams.get('domainId') || undefined;
 
-    const data = await getControlCatalogItems({ controlType, source, search });
+    const data = await getControlCatalogItems({ controlType, source, search, categoryId, domainId });
     return Response.json({ data });
   },
 );

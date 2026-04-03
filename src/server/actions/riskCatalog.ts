@@ -185,6 +185,8 @@ export async function getControlCatalogItems(filters?: {
   source?: string;
   controlType?: string;
   search?: string;
+  categoryId?: string;
+  domainId?: string;
 }) {
   const where: NonNullable<Parameters<typeof prisma.controlCatalogItem.findMany>[0]>['where'] = {
     is_active: true,
@@ -198,6 +200,12 @@ export async function getControlCatalogItems(filters?: {
 
   if (filters?.controlType) {
     conditions.push({ control_type: filters.controlType });
+  }
+
+  if (filters?.categoryId) {
+    conditions.push({ category_id: filters.categoryId });
+  } else if (filters?.domainId) {
+    conditions.push({ category: { domain_id: filters.domainId } });
   }
 
   if (filters?.search) {
@@ -241,6 +249,8 @@ export async function getProcedureCatalogItems(filters?: {
   source?: string;
   procedureType?: string;
   search?: string;
+  categoryId?: string;
+  domainId?: string;
 }) {
   const where: NonNullable<Parameters<typeof prisma.procedureCatalogItem.findMany>[0]>['where'] = {
     is_active: true,
@@ -254,6 +264,12 @@ export async function getProcedureCatalogItems(filters?: {
 
   if (filters?.procedureType) {
     conditions.push({ procedure_type: filters.procedureType });
+  }
+
+  if (filters?.categoryId) {
+    conditions.push({ category_id: filters.categoryId });
+  } else if (filters?.domainId) {
+    conditions.push({ category: { domain_id: filters.domainId } });
   }
 
   if (filters?.search) {

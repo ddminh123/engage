@@ -8,6 +8,8 @@ import { WpSignoffBar } from "@/components/shared/workpaper/WpSignoffBar";
 import { WorkpaperDocument } from "@/components/shared/workpaper/WorkpaperDocument";
 import { WorkflowChartDialog } from "@/components/shared/workpaper/WorkflowChartDialog";
 import { useWorkpaperShell } from "@/components/shared/workpaper/useWorkpaperShell";
+import { Button } from "@/components/ui/button";
+import { Save } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -151,6 +153,19 @@ export function PlanningWorkpaperOverlay({
             <StatusBadge status={workpaper.approvalStatus} />
 
             <div className="flex-1" />
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                await autoSave.saveNow?.();
+                shell.saveVersion();
+              }}
+              disabled={shell.isSavingVersion}
+              title="Lưu phiên bản"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
 
             <HistorySheet
               versions={shell.versions}

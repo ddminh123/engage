@@ -3,6 +3,8 @@
 // =============================================================================
 
 export const TEMPLATE_ENTITY_TYPES = [
+  { value: "section", label: "Phần hành" },
+  { value: "objective", label: "Mục tiêu kiểm toán" },
   { value: "procedure", label: "Thủ tục kiểm toán" },
   { value: "planning_workpaper", label: "Giấy tờ kế hoạch", subTypeSource: "planning_step" as const },
   { value: "entity_risk_assessment", label: "Đánh giá rủi ro" },

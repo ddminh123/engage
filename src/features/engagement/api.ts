@@ -805,6 +805,17 @@ export async function restoreWorkpaperVersionApi(
   return handleResponse<{ success: boolean; restoredVersion: number }>(response);
 }
 
+export async function createManualVersionApi(
+  entityType: string,
+  engagementId: string,
+  entityId: string,
+): Promise<EntityVersionSummary> {
+  const response = await fetch(workpaperVersionsUrl(entityType, engagementId, entityId), {
+    method: 'POST',
+  });
+  return handleResponse<EntityVersionSummary>(response);
+}
+
 // ── Approval Signoff Types ──
 
 export interface SignoffTypeInfo {

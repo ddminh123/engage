@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, XCircle } from "lucide-react";
+import { Check, XCircle, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Label } from "@/components/ui/label";
@@ -279,6 +279,19 @@ export function ProcedureWorkpaper({
             />
 
             <div className="flex-1" />
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                await autoSave.saveNow?.();
+                shell.saveVersion();
+              }}
+              disabled={shell.isSavingVersion}
+              title="Lưu phiên bản"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
 
             <HistorySheet
               versions={shell.versions}

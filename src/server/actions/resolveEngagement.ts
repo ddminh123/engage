@@ -35,6 +35,20 @@ export async function resolveEngagementId(
       });
       return pw?.engagement_id ?? null;
     }
+    case 'section': {
+      const s = await prisma.engagementSection.findUnique({
+        where: { id: entityId },
+        select: { engagement_id: true },
+      });
+      return s?.engagement_id ?? null;
+    }
+    case 'objective': {
+      const o = await prisma.engagementObjective.findUnique({
+        where: { id: entityId },
+        select: { engagement_id: true },
+      });
+      return o?.engagement_id ?? null;
+    }
     default:
       return null;
   }
@@ -86,6 +100,22 @@ export async function getEntityApprovalStatus(
       });
       if (!pw) return null;
       return { approvalStatus: pw.approval_status, lastPublishedBy: null };
+    }
+    case 'section': {
+      const s = await prisma.engagementSection.findUnique({
+        where: { id: entityId },
+        select: { status: true },
+      });
+      if (!s) return null;
+      return { approvalStatus: s.status, lastPublishedBy: null };
+    }
+    case 'objective': {
+      const o = await prisma.engagementObjective.findUnique({
+        where: { id: entityId },
+        select: { status: true },
+      });
+      if (!o) return null;
+      return { approvalStatus: o.status, lastPublishedBy: null };
     }
     default:
       return null;

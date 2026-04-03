@@ -42,6 +42,7 @@ export interface WorkpaperDocumentConfig {
   headerExtra?: (autoSave: {
     status: import("./useAutoSave").AutoSaveStatus;
     lastSavedAt: Date | null;
+    saveNow?: () => void;
   }) => React.ReactNode;
   readOnly?: boolean;
   /** Show loading spinner while content/template is loading */
@@ -332,6 +333,7 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
               {headerExtra({
                 status: autoSave.status,
                 lastSavedAt: autoSave.lastSavedAt,
+                saveNow: autoSave.saveNow,
               })}
             </div>
           )}
