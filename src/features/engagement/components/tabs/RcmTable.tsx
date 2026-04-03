@@ -350,6 +350,7 @@ export function RcmTable({
         entityType={state.catalogPickerType ?? "risk"}
         engagementId={engagementId}
         rcmObjectiveId={state.catalogPickerTargetObjectiveId ?? undefined}
+        linkToRiskId={state.catalogPickerTargetRiskId ?? undefined}
         onItemsAdded={() => dispatch({ type: "CLOSE_CATALOG_PICKER" })}
       />
     </div>
