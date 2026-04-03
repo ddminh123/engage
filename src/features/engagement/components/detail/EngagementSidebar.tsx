@@ -7,15 +7,6 @@ import {
   ChevronRight,
   ChevronLeft,
   ChevronDown,
-  ClipboardList,
-  PlayCircle,
-  AlertTriangle,
-  FileText,
-  Target,
-  BookOpen,
-  ShieldAlert,
-  Shield,
-  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,20 +15,9 @@ import { usePlanningSteps } from "@/features/settings/hooks/usePlanningSteps";
 
 const L = ENGAGEMENT_LABELS.engagement;
 
-// Icon map for planning steps
-const STEP_ICON_MAP: Record<string, React.ElementType> = {
-  FileText,
-  Target,
-  BookOpen,
-  ShieldAlert,
-  ShieldCheck: Shield,
-  ClipboardList,
-};
-
 interface NavItem {
   key: string;
   label: string;
-  icon: React.ElementType;
   href: string;
   children?: NavItem[];
 }
@@ -88,7 +68,6 @@ export function EngagementSidebar({
   const planningChildren: NavItem[] = activeSteps.map((step) => ({
     key: step.key,
     label: step.title,
-    icon: STEP_ICON_MAP[step.icon ?? "FileText"] ?? FileText,
     href: `/engagement/${engagementId}?tab=planning&section=${step.key}`,
   }));
 
@@ -96,38 +75,32 @@ export function EngagementSidebar({
     {
       key: "overview",
       label: "Tổng quan",
-      icon: Home,
       href: `/engagement/${engagementId}`,
     },
     {
       key: "planning",
       label: L.tab.planning,
-      icon: ClipboardList,
       href: `/engagement/${engagementId}?tab=planning`,
       children: planningChildren,
     },
     {
       key: "execution",
       label: L.tab.execution,
-      icon: PlayCircle,
       href: `/engagement/${engagementId}?tab=execution`,
     },
     {
       key: "findings",
       label: L.tab.findings,
-      icon: AlertTriangle,
       href: `/engagement/${engagementId}?tab=findings`,
     },
     {
       key: "reporting",
       label: L.tab.reporting,
-      icon: FileText,
       href: `/engagement/${engagementId}?tab=reporting`,
     },
   ];
 
   const renderNavItem = (item: NavItem) => {
-    const Icon = item.icon;
     // Overview is active when no tab param, others match by key
     const isActive =
       item.key === "overview"
@@ -164,7 +137,6 @@ export function EngagementSidebar({
             )}
             title={collapsed ? item.label : undefined}
           >
-            <Icon className="h-4 w-4 shrink-0" />
             {!collapsed && <span>{item.label}</span>}
           </Link>
         </div>
@@ -173,7 +145,6 @@ export function EngagementSidebar({
         {hasChildren && isExpanded && !collapsed && (
           <div className="ml-6 mt-1 space-y-0.5 border-l pl-3">
             {item.children!.map((child) => {
-              const ChildIcon = child.icon;
               const isChildActive =
                 currentTab === "planning" && currentSection === child.key;
 
@@ -188,7 +159,6 @@ export function EngagementSidebar({
                       : "hover:bg-accent hover:text-accent-foreground",
                   )}
                 >
-                  <ChildIcon className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">{child.label}</span>
                 </Link>
               );
