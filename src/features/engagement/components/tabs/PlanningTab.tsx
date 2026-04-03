@@ -56,7 +56,7 @@ import type {
 import { InlineInput } from "./InlineInput";
 import { RcmDataTable } from "./RcmDataTable";
 import { RcmTable } from "./RcmTable";
-import { PlanningWorkpaperCard } from "./PlanningWorkpaperCard";
+import { WorkpaperEmptyState } from "@/components/shared/workpaper/WorkpaperEmptyState";
 import { WorkProgramV2 } from "../work-program";
 import { PlanningCardStatus } from "./PlanningCardStatus";
 import { UserAvatar } from "@/components/shared/UserAvatar";
@@ -261,7 +261,10 @@ export function PlanningTab({
                       showObjectives
                     />
                   ) : (
-                    <ScopeSection engagement={engagement} />
+                    <ScopeSection
+                      engagement={engagement}
+                      onStart={() => onOpenPlanningWp?.(step.id)}
+                    />
                   )}
                 </div>
               );
@@ -502,20 +505,9 @@ export function PlanningTab({
                 ) : engagement.understanding ? (
                   <RichTextDisplay content={engagement.understanding} />
                 ) : (
-                  <div className="flex flex-col items-center gap-2 py-6">
-                    <BookOpen className="h-8 w-8 text-muted-foreground/50" />
-                    <p className="text-sm text-muted-foreground">
-                      {LP.noUnderstanding}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onOpenPlanningWp?.(step.id)}
-                    >
-                      <Plus className="mr-1 h-3.5 w-3.5" />
-                      Thêm nội dung
-                    </Button>
-                  </div>
+                  <WorkpaperEmptyState
+                    onStart={() => onOpenPlanningWp?.(step.id)}
+                  />
                 )}
               </div>
             );
@@ -634,10 +626,11 @@ export function PlanningTab({
             // Custom workpaper step
             if (step.stepType !== "workpaper") return null;
             const wp = wpByStep.get(step.id);
+            const customStatus = wp?.approvalStatus ?? "not_started";
             const customHeaderRight = cardHeaderRight(
               "planning_workpaper",
               wp?.id,
-              wp?.approvalStatus ?? "not_started",
+              customStatus,
             );
 
             // Main view: show navigable card
@@ -653,28 +646,52 @@ export function PlanningTab({
               );
             }
 
-            // Section page view: show header + content directly
+            // Section page: version info right-aligned
+            const customSectionHeaderRight = wp ? (
+              <ViewerVersionInfo
+                entityType="planning_workpaper"
+                entityId={wp.id}
+                engagementId={engagement.id}
+                currentVersion={wp.currentVersion}
+                updatedAt={wp.updatedAt}
+              />
+            ) : null;
+
+            const customEditButton = !isReviewMode ? (
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => onOpenPlanningWp?.(step.id)}
+              >
+                <Pencil className="mr-1 h-3 w-3" />
+                Chỉnh sửa
+              </Button>
+            ) : null;
+
+            // Section page view: show header + full workpaper viewer
             return (
               <div key={step.key}>
                 <SectionPageHeader
                   title={step.title}
                   icon={<StepIcon name={step.icon} />}
-                  headerRight={customHeaderRight}
+                  titleExtra={<StatusBadge status={customStatus} />}
+                  headerRight={customSectionHeaderRight}
                 />
-                <PlanningWorkpaperCard
-                  engagementId={engagement.id}
-                  stepConfigId={step.id}
-                  stepTitle={step.title}
-                  workpaper={
-                    wp
-                      ? {
-                          id: wp.id,
-                          content: wp.content,
-                          approvalStatus: wp.approvalStatus,
-                        }
-                      : null
-                  }
-                />
+                {wp?.content ? (
+                  <InlineWorkpaperViewer
+                    engagementId={engagement.id}
+                    entityId={wp.id}
+                    content={wp.content}
+                    approvalStatus={wp.approvalStatus}
+                    currentVersion={wp.currentVersion}
+                    members={engagement.members}
+                    editButton={customEditButton}
+                  />
+                ) : (
+                  <WorkpaperEmptyState
+                    onStart={() => onOpenPlanningWp?.(step.id)}
+                  />
+                )}
               </div>
             );
           }
@@ -873,14 +890,21 @@ function ViewerVersionInfo({
 
 // ── Scope Section (simplified - general info moved to OverviewTab) ──
 
-function ScopeSection({ engagement }: { engagement: EngagementDetail }) {
+function ScopeSection({
+  engagement,
+  onStart,
+}: {
+  engagement: EngagementDetail;
+  onStart?: () => void;
+}) {
   const hasContent = engagement.objective || engagement.scope;
 
   if (!hasContent) {
     return (
-      <p className="text-sm text-muted-foreground py-2">
-        Chưa có thông tin phạm vi kiểm toán.
-      </p>
+      <WorkpaperEmptyState
+        title="Chưa có thông tin phạm vi kiểm toán"
+        onStart={onStart}
+      />
     );
   }
 
