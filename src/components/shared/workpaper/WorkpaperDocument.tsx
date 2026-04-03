@@ -72,31 +72,13 @@ export interface WorkpaperDocumentConfig {
   // ── Finding flow (optional, procedure-specific) ──
   /** Callback when user clicks "Thêm phát hiện" in context menu */
   onAddFinding?: (quote: string, from: number, to: number) => void;
-  /** Callback when a finding mark is clicked in the editor */
-  onFindingClicked?: (findingId: string) => void;
   /** Tab key to switch to when finding flow is initiated */
   findingTabKey?: string;
-  /** Ref bridge for parent to control finding marks on the editor */
-  findingMarkRef?: React.MutableRefObject<{
-    applyFindingMark: (findingId: string, from: number, to: number) => void;
-    clearPendingFindingRange: () => void;
-    highlightFinding: (findingId: string | null) => void;
-    unsetFindingMark: (findingId: string) => void;
-  } | null>;
   // ── Objective flow (optional, planning workpaper-specific) ──
   /** Callback when user clicks "Thêm mục tiêu" in context menu */
   onAddObjective?: (quote: string, from: number, to: number) => void;
-  /** Callback when an objective mark is clicked in the editor */
-  onObjectiveClicked?: (objectiveId: string) => void;
   /** Tab key to switch to when objective flow is initiated */
   objectiveTabKey?: string;
-  /** Ref bridge for parent to control objective marks on the editor */
-  objectiveMarkRef?: React.MutableRefObject<{
-    applyObjectiveMark: (objectiveId: string, from: number, to: number) => void;
-    clearPendingObjectiveRange: () => void;
-    highlightObjective: (objectiveId: string | null) => void;
-    unsetObjectiveMark: (objectiveId: string) => void;
-  } | null>;
 }
 
 export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
@@ -127,13 +109,9 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     isCreatingThread = false,
     isReplying = false,
     onAddFinding,
-    onFindingClicked,
     findingTabKey,
-    findingMarkRef,
     onAddObjective,
-    onObjectiveClicked,
     objectiveTabKey,
-    objectiveMarkRef,
   } = config;
 
   const editorRef = React.useRef<WorkpaperEditorHandle>(null);
@@ -273,23 +251,7 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     editorRef.current?.clearPendingCommentRange();
   };
 
-  // ── Finding handlers (only active when onAddFinding is provided) ──
-
-  const handleFindingActivated = React.useCallback(
-    (_findingId: string | null) => {
-      // Could track active finding for sidebar highlight in future
-    },
-    [],
-  );
-
-  const handleFindingClicked = React.useCallback(
-    (findingId: string) => {
-      if (findingTabKey) setRightTab(findingTabKey);
-      onFindingClicked?.(findingId);
-      editorRef.current?.highlightFinding(findingId);
-    },
-    [findingTabKey, onFindingClicked],
-  );
+  // ── Finding handler ──
 
   const handleAddFinding = React.useCallback(
     (quote: string, from: number, to: number) => {
@@ -299,23 +261,7 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     [findingTabKey, onAddFinding],
   );
 
-  // ── Objective handlers (only active when onAddObjective is provided) ──
-
-  const handleObjectiveActivated = React.useCallback(
-    (_objectiveId: string | null) => {
-      // Could track active objective for sidebar highlight in future
-    },
-    [],
-  );
-
-  const handleObjectiveClicked = React.useCallback(
-    (objectiveId: string) => {
-      if (objectiveTabKey) setRightTab(objectiveTabKey);
-      onObjectiveClicked?.(objectiveId);
-      editorRef.current?.highlightObjective(objectiveId);
-    },
-    [objectiveTabKey, onObjectiveClicked],
-  );
+  // ── Objective handler ──
 
   const handleAddObjective = React.useCallback(
     (quote: string, from: number, to: number) => {
@@ -324,46 +270,6 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
     },
     [objectiveTabKey, onAddObjective],
   );
-
-  // Populate findingMarkRef so parent can control finding marks on the editor
-  React.useEffect(() => {
-    if (findingMarkRef) {
-      findingMarkRef.current = {
-        applyFindingMark: (findingId, from, to) => {
-          editorRef.current?.applyFindingMark(findingId, from, to);
-        },
-        clearPendingFindingRange: () => {
-          editorRef.current?.clearPendingFindingRange();
-        },
-        highlightFinding: (findingId) => {
-          editorRef.current?.highlightFinding(findingId);
-        },
-        unsetFindingMark: (findingId) => {
-          editorRef.current?.unsetFindingMark(findingId);
-        },
-      };
-    }
-  }, [findingMarkRef]);
-
-  // Populate objectiveMarkRef so parent can control objective marks on the editor
-  React.useEffect(() => {
-    if (objectiveMarkRef) {
-      objectiveMarkRef.current = {
-        applyObjectiveMark: (objectiveId, from, to) => {
-          editorRef.current?.applyObjectiveMark(objectiveId, from, to);
-        },
-        clearPendingObjectiveRange: () => {
-          editorRef.current?.clearPendingObjectiveRange();
-        },
-        highlightObjective: (objectiveId) => {
-          editorRef.current?.highlightObjective(objectiveId);
-        },
-        unsetObjectiveMark: (objectiveId) => {
-          editorRef.current?.unsetObjectiveMark(objectiveId);
-        },
-      };
-    }
-  }, [objectiveMarkRef]);
 
   const handleTitleSave = () => {
     setEditingTitle(false);
@@ -475,20 +381,21 @@ export function WorkpaperDocument(config: WorkpaperDocumentConfig) {
               onCommentClicked={handleCommentClicked}
               onAddComment={handleAddComment}
               readOnly={readOnly}
-              onFindingActivated={
-                onAddFinding ? handleFindingActivated : undefined
-              }
-              onFindingClicked={onAddFinding ? handleFindingClicked : undefined}
               onAddFinding={onAddFinding ? handleAddFinding : undefined}
-              onObjectiveActivated={
-                onAddObjective ? handleObjectiveActivated : undefined
-              }
-              onObjectiveClicked={
-                onAddObjective ? handleObjectiveClicked : undefined
-              }
               onAddObjective={onAddObjective ? handleAddObjective : undefined}
             />
           )}
+          <WorkpaperEditor
+            ref={editorRef}
+            content={localContent}
+            onChange={handleContentChange}
+            onCommentActivated={handleCommentActivated}
+            onCommentClicked={handleCommentClicked}
+            onAddComment={handleAddComment}
+            readOnly={readOnly}
+            onAddFinding={onAddFinding ? handleAddFinding : undefined}
+            onAddObjective={onAddObjective ? handleAddObjective : undefined}
+          />
         </div>
 
         {/* Right: Configurable Task Pane */}

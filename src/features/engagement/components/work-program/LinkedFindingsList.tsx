@@ -39,10 +39,6 @@ interface LinkedFindingsListProps {
   onFindingCreated?: (findingId: string, from: number, to: number) => void;
   /** Called when pending finding form is cancelled */
   onCancelPendingFinding?: () => void;
-  /** Called when a finding row is clicked (for scroll-to-mark behavior) */
-  onFindingClick?: (findingId: string) => void;
-  /** Called when a finding is deleted (to remove editor mark) */
-  onFindingDeleted?: (findingId: string) => void;
 }
 
 const RISK_RATING_OPTIONS = [
@@ -67,8 +63,6 @@ export function LinkedFindingsList({
   pendingFinding,
   onFindingCreated,
   onCancelPendingFinding,
-  onFindingClick,
-  onFindingDeleted,
 }: LinkedFindingsListProps) {
   const [showForm, setShowForm] = React.useState(false);
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -188,7 +182,6 @@ export function LinkedFindingsList({
       {
         onSuccess: () => {
           setDeleteTarget(null);
-          onFindingDeleted?.(targetId);
         },
       },
     );
@@ -210,10 +203,7 @@ export function LinkedFindingsList({
               <button
                 type="button"
                 className="flex flex-1 items-center gap-2 text-left"
-                onClick={() => {
-                  onFindingClick?.(f.id);
-                  handleEdit(f);
-                }}
+                onClick={() => handleEdit(f)}
               >
                 <span className="flex-1 text-foreground">{f.title}</span>
                 {f.riskRating && (
