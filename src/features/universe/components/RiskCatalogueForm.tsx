@@ -124,7 +124,6 @@ export function RiskCatalogueForm({
             code: values.code || null,
             description: values.description || null,
             riskType: values.riskType,
-            riskDomain: values.riskDomain || null,
             isActive: values.isActive,
           },
         });
@@ -134,7 +133,7 @@ export function RiskCatalogueForm({
           code: values.code || undefined,
           description: values.description || undefined,
           riskType: values.riskType,
-          riskDomain: values.riskDomain || undefined,
+          categoryId: '', // TODO: add category selector to form
         });
       }
       onOpenChange(false);

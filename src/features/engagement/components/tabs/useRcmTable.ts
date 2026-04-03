@@ -60,6 +60,11 @@ interface RcmTableState {
   openControlId: string | null;
   // Control linking popover
   linkingControlForRiskId: string | null;
+  // Catalog picker
+  catalogPickerOpen: boolean;
+  catalogPickerType: "risk" | "control" | null;
+  catalogPickerTargetObjectiveId: string | null;
+  catalogPickerTargetRiskId: string | null;
 }
 
 type RcmTableAction =
@@ -86,7 +91,9 @@ type RcmTableAction =
   | { type: "OPEN_CONTROL"; controlId: string }
   | { type: "CLOSE_CONTROL" }
   | { type: "START_LINK_CONTROL"; riskId: string }
-  | { type: "CANCEL_LINK_CONTROL" };
+  | { type: "CANCEL_LINK_CONTROL" }
+  | { type: "OPEN_CATALOG_PICKER"; pickerType: "risk" | "control"; objectiveId?: string; riskId?: string }
+  | { type: "CLOSE_CATALOG_PICKER" };
 
 const initialState: RcmTableState = {
   addingRiskForObjectiveId: null,
@@ -104,6 +111,10 @@ const initialState: RcmTableState = {
   openRiskId: null,
   openControlId: null,
   linkingControlForRiskId: null,
+  catalogPickerOpen: false,
+  catalogPickerType: null,
+  catalogPickerTargetObjectiveId: null,
+  catalogPickerTargetRiskId: null,
 };
 
 function reducer(state: RcmTableState, action: RcmTableAction): RcmTableState {
@@ -160,6 +171,22 @@ function reducer(state: RcmTableState, action: RcmTableAction): RcmTableState {
       return { ...state, linkingControlForRiskId: action.riskId };
     case "CANCEL_LINK_CONTROL":
       return { ...state, linkingControlForRiskId: null };
+    case "OPEN_CATALOG_PICKER":
+      return {
+        ...state,
+        catalogPickerOpen: true,
+        catalogPickerType: action.pickerType,
+        catalogPickerTargetObjectiveId: action.objectiveId ?? null,
+        catalogPickerTargetRiskId: action.riskId ?? null,
+      };
+    case "CLOSE_CATALOG_PICKER":
+      return {
+        ...state,
+        catalogPickerOpen: false,
+        catalogPickerType: null,
+        catalogPickerTargetObjectiveId: null,
+        catalogPickerTargetRiskId: null,
+      };
     default:
       return state;
   }

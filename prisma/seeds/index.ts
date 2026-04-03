@@ -1,0 +1,1 @@
+export { seedRiskCatalog } from './riskCatalog';

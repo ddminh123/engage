@@ -45,11 +45,14 @@ function useRiskCatalogueColumns(
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Loại rủi ro" />
         ),
-        cell: ({ row }) => (
-          <Badge variant="outline">
-            {RISK_TYPE_LABELS[row.original.riskType] ?? row.original.riskType}
-          </Badge>
-        ),
+        cell: ({ row }) =>
+          row.original.riskType ? (
+            <Badge variant="outline">
+              {RISK_TYPE_LABELS[row.original.riskType] ?? row.original.riskType}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
         filterFn: "equals",
       },
       {

@@ -74,9 +74,10 @@ function CopyFromCatalogueCommand({
   const grouped = React.useMemo(() => {
     const map = new Map<string, typeof available>();
     for (const item of available) {
-      const list = map.get(item.riskType) ?? [];
+      const key = item.riskType ?? 'other';
+      const list = map.get(key) ?? [];
       list.push(item);
-      map.set(item.riskType, list);
+      map.set(key, list);
     }
     return map;
   }, [available]);
