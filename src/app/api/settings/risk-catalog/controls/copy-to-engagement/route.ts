@@ -8,7 +8,7 @@ export const POST = withAccess(
   async (req: NextRequest) => {
     try {
       const body = await req.json();
-      const { catalogControlIds, engagementId } = body;
+      const { catalogControlIds, engagementId, linkToRiskId } = body;
 
       if (!Array.isArray(catalogControlIds) || !engagementId) {
         return Response.json(
@@ -17,7 +17,7 @@ export const POST = withAccess(
         );
       }
 
-      const data = await copyControlsToEngagement(catalogControlIds, engagementId);
+      const data = await copyControlsToEngagement(catalogControlIds, engagementId, linkToRiskId);
       return Response.json({ data }, { status: 201 });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to copy controls';

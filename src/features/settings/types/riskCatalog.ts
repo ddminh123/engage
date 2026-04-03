@@ -98,4 +98,5 @@ export interface CopyRisksToEngagementInput {
 export interface CopyControlsToEngagementInput {
   catalogControlIds: string[];
   engagementId: string;
+  linkToRiskId?: string;
 }

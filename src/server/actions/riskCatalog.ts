@@ -671,7 +671,7 @@ export async function copyRisksToEngagement(
         engagement_id: engagementId,
         rcm_objective_id: rcmObjectiveId ?? null,
         catalog_risk_id: catalogRisk.id,
-        risk_description: catalogRisk.name + (catalogRisk.description ? `\n${catalogRisk.description}` : ''),
+        risk_description: catalogRisk.name,
         risk_rating: catalogRisk.risk_rating,
         risk_category: catalogRisk.risk_type,
         likelihood: catalogRisk.likelihood,
@@ -693,6 +693,7 @@ export async function copyRisksToEngagement(
 export async function copyControlsToEngagement(
   catalogControlIds: string[],
   engagementId: string,
+  linkToRiskId?: string,
 ) {
   const catalogControls = await prisma.controlCatalogItem.findMany({
     where: { id: { in: catalogControlIds }, is_active: true },
@@ -712,13 +713,23 @@ export async function copyControlsToEngagement(
       data: {
         engagement_id: engagementId,
         catalog_control_id: catalogControl.id,
-        description: catalogControl.name + (catalogControl.description ? `\n${catalogControl.description}` : ''),
+        description: catalogControl.name,
         control_type: catalogControl.control_type,
         control_nature: catalogControl.control_nature,
         frequency: catalogControl.frequency,
         sort_order: nextOrder++,
       },
     });
+
+    // Link the new control to the specified risk
+    if (linkToRiskId) {
+      await prisma.riskControlRef.create({
+        data: {
+          risk_id: linkToRiskId,
+          control_id: control.id,
+        },
+      });
+    }
 
     createdControls.push(control);
   }

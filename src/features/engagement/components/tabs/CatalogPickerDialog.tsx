@@ -34,6 +34,8 @@ interface CatalogPickerDialogProps {
   entityType: "risk" | "control";
   engagementId: string;
   rcmObjectiveId?: string;
+  /** When copying controls, link them to this risk */
+  linkToRiskId?: string;
   onItemsAdded?: () => void;
 }
 
@@ -45,6 +47,7 @@ export function CatalogPickerDialog({
   entityType,
   engagementId,
   rcmObjectiveId,
+  linkToRiskId,
   onItemsAdded,
 }: CatalogPickerDialogProps) {
   const [search, setSearch] = React.useState("");
@@ -129,6 +132,7 @@ export function CatalogPickerDialog({
       await copyControls.mutateAsync({
         catalogControlIds: ids,
         engagementId,
+        linkToRiskId,
       });
     }
 
