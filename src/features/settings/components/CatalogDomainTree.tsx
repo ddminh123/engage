@@ -18,6 +18,8 @@ interface CatalogDomainTreeProps {
   onSelectDomain: (id: string) => void;
   onSelectCategory: (id: string, domainId: string) => void;
   onClear: () => void;
+  /** Start with all domains collapsed (default: false — all expanded) */
+  defaultCollapsed?: boolean;
 }
 
 export function CatalogDomainTree({
@@ -26,15 +28,16 @@ export function CatalogDomainTree({
   onSelectDomain,
   onSelectCategory,
   onClear,
+  defaultCollapsed = false,
 }: CatalogDomainTreeProps) {
   const { data: domains = [], isLoading } = useRiskCatalogTree();
   const [expandedDomains, setExpandedDomains] = React.useState<
     Record<string, boolean>
   >({});
 
-  // Auto-expand all domains on first load
+  // Auto-expand all domains on first load (unless defaultCollapsed)
   React.useEffect(() => {
-    if (domains.length > 0 && Object.keys(expandedDomains).length === 0) {
+    if (domains.length > 0 && Object.keys(expandedDomains).length === 0 && !defaultCollapsed) {
       const initial: Record<string, boolean> = {};
       domains.forEach((d) => {
         initial[d.id] = true;

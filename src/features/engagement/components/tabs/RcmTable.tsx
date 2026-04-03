@@ -65,17 +65,17 @@ function ratingColor(rating: string | null): string {
   }
 }
 
-// ─── Control badge border tint by effectiveness ─────────────────────────────
+// ─── Control effectiveness border tint ──────────────────────────────────────
 function effectivenessBorder(eff: string | null): string {
   switch (eff) {
     case "strong":
-      return "border-green-400";
+      return "border-l-green-500";
     case "adequate":
-      return "border-yellow-400";
+      return "border-l-yellow-500";
     case "weak":
-      return "border-red-400";
+      return "border-l-red-500";
     case "none":
-      return "border-gray-400";
+      return "border-l-gray-400";
     default:
       return "";
   }
@@ -87,6 +87,84 @@ function controlTooltip(c: EngagementControl): string {
   if (c.frequency) parts.push(LR.controlFrequency[c.frequency] ?? c.frequency);
   if (c.effectiveness) parts.push(LR.controlEffectiveness[c.effectiveness] ?? c.effectiveness);
   return parts.join(" · ") || c.description;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADD ITEM POPOVER — shared for risk & control add flow
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface AddItemPopoverProps {
+  value: string;
+  onChange: (v: string) => void;
+  onAdd: () => void;
+  onCancel: () => void;
+  onBrowseLibrary: () => void;
+  placeholder: string;
+  isAdding: boolean;
+}
+
+function AddItemPopover({
+  value,
+  onChange,
+  onAdd,
+  onCancel,
+  onBrowseLibrary,
+  placeholder,
+  isAdding,
+}: AddItemPopoverProps) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && value.trim()) onAdd();
+    if (e.key === "Escape") onCancel();
+  };
+
+  return (
+    <div className="rounded-md border bg-popover p-2 shadow-sm space-y-2">
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className="w-full rounded-sm border px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground bg-transparent"
+      />
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          className="h-7 text-xs"
+          onClick={onAdd}
+          disabled={!value.trim() || isAdding}
+        >
+          Thêm
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => {
+            onCancel();
+            onBrowseLibrary();
+          }}
+        >
+          <BookOpen className="mr-1 h-3 w-3" />
+          Tìm từ thư viện
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-1.5"
+          onClick={onCancel}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -111,14 +189,12 @@ export function RcmTable({
     openControl,
     riskMap,
     controlMap,
-    availableControlsForRisk,
     handleAddRisk,
     handleAddControl,
     handleAddObjective,
     handleUpdateObjective,
     handleConfirmDelete,
     handleConfirmUnlink,
-    handleLinkExistingControl,
     handleSyncObjectives,
     isDeleting,
     isUnlinking,
@@ -126,7 +202,6 @@ export function RcmTable({
     isAddingRisk,
     isAddingControl,
     isAddingObjective,
-    isLinking,
   } = useRcmTable({ engagementId, rcmObjectives, controls });
 
   // ── Compute linked risks for control workpaper ──
@@ -206,14 +281,11 @@ export function RcmTable({
           engagementId={engagementId}
           state={state}
           dispatch={dispatch}
-          availableControlsForRisk={availableControlsForRisk}
           handleAddRisk={handleAddRisk}
           handleAddControl={handleAddControl}
-          handleLinkExistingControl={handleLinkExistingControl}
           handleUpdateObjective={handleUpdateObjective}
           isAddingRisk={isAddingRisk}
           isAddingControl={isAddingControl}
-          isLinking={isLinking}
         />
       ))}
 
@@ -293,28 +365,22 @@ interface ObjectiveSectionProps {
   engagementId: string;
   state: ReturnType<typeof useRcmTable>["state"];
   dispatch: ReturnType<typeof useRcmTable>["dispatch"];
-  availableControlsForRisk: (riskId: string) => EngagementControl[];
   handleAddRisk: () => void;
   handleAddControl: () => void;
-  handleLinkExistingControl: (riskId: string, controlId: string) => void;
   handleUpdateObjective: () => void;
   isAddingRisk: boolean;
   isAddingControl: boolean;
-  isLinking: boolean;
 }
 
 function ObjectiveSection({
   objective,
   state,
   dispatch,
-  availableControlsForRisk,
   handleAddRisk,
   handleAddControl,
-  handleLinkExistingControl,
   handleUpdateObjective,
   isAddingRisk,
   isAddingControl,
-  isLinking,
 }: ObjectiveSectionProps) {
   const isCollapsed = state.collapsedObjectives.has(objective.id);
   const isEditing = state.editingObjectiveId === objective.id;
@@ -410,59 +476,46 @@ function ObjectiveSection({
                   risk={risk}
                   state={state}
                   dispatch={dispatch}
-                  availableControls={availableControlsForRisk(risk.id)}
                   handleAddControl={handleAddControl}
-                  handleLinkExistingControl={handleLinkExistingControl}
                   isAddingControl={isAddingControl}
-                  isLinking={isLinking}
                 />
               ))}
 
-              {/* Inline add risk */}
+              {/* Inline add risk — popover with text input + Thêm + Tìm từ thư viện */}
               {state.addingRiskForObjectiveId === objective.id ? (
                 <TableRow>
                   <TableCell colSpan={3}>
-                    <InlineInput
+                    <AddItemPopover
                       value={state.addingRiskDesc}
                       onChange={(v) => dispatch({ type: "SET_ADD_RISK_DESC", value: v })}
-                      onSubmit={handleAddRisk}
+                      onAdd={handleAddRisk}
                       onCancel={() => dispatch({ type: "CANCEL_ADD_RISK" })}
-                      placeholder={LR.field.riskDescription}
-                      autoFocus
+                      onBrowseLibrary={() =>
+                        dispatch({
+                          type: "OPEN_CATALOG_PICKER",
+                          pickerType: "risk",
+                          objectiveId: objective.id,
+                        })
+                      }
+                      placeholder="Mô tả rủi ro"
+                      isAdding={isAddingRisk}
                     />
                   </TableCell>
                 </TableRow>
               ) : (
                 <TableRow>
                   <TableCell colSpan={3} className="py-1.5">
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs text-muted-foreground"
-                        onClick={() =>
-                          dispatch({ type: "START_ADD_RISK", objectiveId: objective.id })
-                        }
-                      >
-                        <Plus className="mr-1 h-3 w-3" />
-                        {LR.createTitle}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs text-muted-foreground"
-                        onClick={() =>
-                          dispatch({
-                            type: "OPEN_CATALOG_PICKER",
-                            pickerType: "risk",
-                            objectiveId: objective.id,
-                          })
-                        }
-                      >
-                        <BookOpen className="mr-1 h-3 w-3" />
-                        Th&#432; vi&#7879;n
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground"
+                      onClick={() =>
+                        dispatch({ type: "START_ADD_RISK", objectiveId: objective.id })
+                      }
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      {LR.createTitle}
+                    </Button>
                   </TableCell>
                 </TableRow>
               )}
@@ -482,25 +535,18 @@ interface RiskRowProps {
   risk: EngagementRisk;
   state: ReturnType<typeof useRcmTable>["state"];
   dispatch: ReturnType<typeof useRcmTable>["dispatch"];
-  availableControls: EngagementControl[];
   handleAddControl: () => void;
-  handleLinkExistingControl: (riskId: string, controlId: string) => void;
   isAddingControl: boolean;
-  isLinking: boolean;
 }
 
 function RiskRow({
   risk,
   state,
   dispatch,
-  availableControls,
   handleAddControl,
-  handleLinkExistingControl,
   isAddingControl,
-  isLinking,
 }: RiskRowProps) {
   const isAddingControlHere = state.addingControlForRiskId === risk.id;
-  const isLinkingHere = state.linkingControlForRiskId === risk.id;
 
   return (
     <ContextMenu>
@@ -528,22 +574,31 @@ function RiskRow({
             )}
           </TableCell>
 
-          {/* Controls */}
+          {/* Controls — each on its own line with border */}
           <TableCell>
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="space-y-1">
               {risk.controls.map((ctrl) => (
-                <Badge
+                <div
                   key={ctrl.id}
-                  variant="secondary"
-                  className={`group/badge cursor-pointer border text-xs font-normal ${effectivenessBorder(ctrl.effectiveness)}`}
+                  className={`group/ctrl flex items-center gap-2 rounded-md border border-l-2 px-2.5 py-1.5 text-sm transition-colors hover:bg-accent/50 ${effectivenessBorder(ctrl.effectiveness)}`}
                   title={controlTooltip(ctrl)}
-                  onClick={() => dispatch({ type: "OPEN_CONTROL", controlId: ctrl.id })}
                 >
-                  <span className="max-w-[180px] truncate">
-                    {ctrl.description}
-                  </span>
                   <button
-                    className="ml-1 hidden rounded-full p-0.5 hover:bg-muted group-hover/badge:inline-flex"
+                    className="flex-1 text-left truncate hover:underline"
+                    onClick={() => dispatch({ type: "OPEN_CONTROL", controlId: ctrl.id })}
+                  >
+                    {ctrl.description}
+                  </button>
+                  {ctrl.effectiveness && (
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 text-[10px]"
+                    >
+                      {LR.controlEffectiveness[ctrl.effectiveness] ?? ctrl.effectiveness}
+                    </Badge>
+                  )}
+                  <button
+                    className="shrink-0 hidden rounded-full p-0.5 hover:bg-muted group-hover/ctrl:inline-flex"
                     onClick={(e) => {
                       e.stopPropagation();
                       dispatch({
@@ -558,57 +613,38 @@ function RiskRow({
                   >
                     <X className="h-3 w-3" />
                   </button>
-                </Badge>
+                </div>
               ))}
 
-              {/* Add control inline (create new) */}
+              {/* Add control — popover with text input + Thêm + Tìm từ thư viện */}
               {isAddingControlHere ? (
-                <div className="w-full mt-1">
-                  <InlineInput
-                    value={state.addingControlDesc}
-                    onChange={(v) => dispatch({ type: "SET_ADD_CONTROL_DESC", value: v })}
-                    onSubmit={handleAddControl}
-                    onCancel={() => dispatch({ type: "CANCEL_ADD_CONTROL" })}
-                    placeholder={L.control.addNew}
-                    autoFocus
-                  />
-                </div>
-              ) : isLinkingHere ? (
-                <LinkControlPicker
-                  availableControls={availableControls}
-                  onSelect={(controlId) => handleLinkExistingControl(risk.id, controlId)}
-                  onCancel={() => dispatch({ type: "CANCEL_LINK_CONTROL" })}
-                  onCreateNew={() => dispatch({ type: "START_ADD_CONTROL", riskId: risk.id })}
-                  isLinking={isLinking}
+                <AddItemPopover
+                  value={state.addingControlDesc}
+                  onChange={(v) => dispatch({ type: "SET_ADD_CONTROL_DESC", value: v })}
+                  onAdd={handleAddControl}
+                  onCancel={() => dispatch({ type: "CANCEL_ADD_CONTROL" })}
+                  onBrowseLibrary={() =>
+                    dispatch({
+                      type: "OPEN_CATALOG_PICKER",
+                      pickerType: "control",
+                      riskId: risk.id,
+                    })
+                  }
+                  placeholder="Mô tả kiểm soát"
+                  isAdding={isAddingControl}
                 />
               ) : (
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-1.5 text-[10px] text-muted-foreground"
-                    onClick={() =>
-                      dispatch({ type: "START_LINK_CONTROL", riskId: risk.id })
-                    }
-                  >
-                    <Plus className="mr-0.5 h-3 w-3" />
-                    {L.control.title}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-1.5 text-[10px] text-muted-foreground"
-                    onClick={() =>
-                      dispatch({
-                        type: "OPEN_CATALOG_PICKER",
-                        pickerType: "control",
-                        riskId: risk.id,
-                      })
-                    }
-                  >
-                    <BookOpen className="h-3 w-3" />
-                  </Button>
-                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1.5 text-[10px] text-muted-foreground"
+                  onClick={() =>
+                    dispatch({ type: "START_ADD_CONTROL", riskId: risk.id })
+                  }
+                >
+                  <Plus className="mr-0.5 h-3 w-3" />
+                  {L.control.title}
+                </Button>
               )}
             </div>
           </TableCell>
@@ -639,101 +675,5 @@ function RiskRow({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LINK CONTROL PICKER (select existing or create new)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface LinkControlPickerProps {
-  availableControls: EngagementControl[];
-  onSelect: (controlId: string) => void;
-  onCancel: () => void;
-  onCreateNew: () => void;
-  isLinking: boolean;
-}
-
-function LinkControlPicker({
-  availableControls,
-  onSelect,
-  onCancel,
-  onCreateNew,
-  isLinking,
-}: LinkControlPickerProps) {
-  const [search, setSearch] = React.useState("");
-  const inputRef = React.useRef<HTMLInputElement>(null);
-
-  React.useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const filtered = React.useMemo(() => {
-    if (!search.trim()) return availableControls;
-    const q = search.toLowerCase();
-    return availableControls.filter((c) =>
-      c.description.toLowerCase().includes(q),
-    );
-  }, [search, availableControls]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") onCancel();
-  };
-
-  return (
-    <div className="w-full mt-1 rounded-md border bg-popover p-1 shadow-md">
-      <input
-        ref={inputRef}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={L.control.addExisting}
-        className="w-full rounded-sm border-0 bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
-      />
-      <div className="max-h-[160px] overflow-y-auto">
-        {filtered.length > 0 ? (
-          filtered.map((c) => (
-            <button
-              key={c.id}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50"
-              onClick={() => onSelect(c.id)}
-              disabled={isLinking}
-            >
-              <span className="flex-1 truncate">{c.description}</span>
-              {c.effectiveness && (
-                <Badge variant="outline" className="shrink-0 text-[10px]">
-                  {LR.controlEffectiveness[c.effectiveness] ?? c.effectiveness}
-                </Badge>
-              )}
-            </button>
-          ))
-        ) : (
-          <p className="px-2 py-1.5 text-xs text-muted-foreground">
-            {availableControls.length === 0
-              ? L.control.noData
-              : L.control.noData}
-          </p>
-        )}
-      </div>
-      <div className="flex items-center justify-between border-t pt-1 mt-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs"
-          onClick={onCreateNew}
-        >
-          <Plus className="mr-1 h-3 w-3" />
-          {L.control.addNew}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs"
-          onClick={onCancel}
-        >
-          <X className="mr-1 h-3 w-3" />
-        </Button>
-      </div>
-    </div>
   );
 }
