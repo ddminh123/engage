@@ -1085,6 +1085,7 @@ export function useExecuteTransition() {
       qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId, subType) });
       qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
       qc.invalidateQueries({ queryKey: wpSignoffsKey(engagementId) });
+      qc.invalidateQueries({ queryKey: ["planning-workpapers", engagementId] });
     },
   });
 }
