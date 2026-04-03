@@ -11,8 +11,6 @@ import {
   Trash2,
   Pencil,
   Loader2,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
@@ -95,7 +93,6 @@ const ROLE_OPTIONS = [
 
 export function ApprovalWorkflowList() {
   const { data: workflows = [], isLoading } = useApprovalWorkflows();
-  const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
 
   if (isLoading) {
@@ -121,12 +118,7 @@ export function ApprovalWorkflowList() {
         </p>
       ) : (
         workflows.map((wf) => (
-          <WorkflowCard
-            key={wf.id}
-            workflow={wf}
-            isExpanded={expandedId === wf.id}
-            onToggle={() => setExpandedId(expandedId === wf.id ? null : wf.id)}
-          />
+          <WorkflowCard key={wf.id} workflow={wf} />
         ))
       )}
 
@@ -142,16 +134,13 @@ export function ApprovalWorkflowList() {
 
 function WorkflowCard({
   workflow,
-  isExpanded,
-  onToggle,
 }: {
   workflow: ApprovalWorkflow;
-  isExpanded: boolean;
-  onToggle: () => void;
 }) {
   const updateWorkflow = useUpdateApprovalWorkflow();
   const deleteWorkflow = useDeleteApprovalWorkflow();
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [showDetailDialog, setShowDetailDialog] = React.useState(false);
   const [editingName, setEditingName] = React.useState(false);
   const [nameValue, setNameValue] = React.useState(workflow.name);
   const nameInputRef = React.useRef<HTMLInputElement>(null);
@@ -175,14 +164,8 @@ function WorkflowCard({
       {/* Header */}
       <div
         className="flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/30 transition-colors"
-        onClick={onToggle}
+        onClick={() => setShowDetailDialog(true)}
       >
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4 shrink-0" />
-        ) : (
-          <ChevronRight className="h-4 w-4 shrink-0" />
-        )}
-
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             {editingName ? (
@@ -306,18 +289,11 @@ function WorkflowCard({
         </div>
       </div>
 
-      {/* Expanded content — flow chart + edit transitions */}
-      {isExpanded && (
-        <div className="border-t p-4 space-y-4 min-w-0 overflow-hidden">
-          {workflow.transitions.length > 0 && (
-            <WorkflowFlowChart transitions={workflow.transitions} />
-          )}
-          <TransitionSection
-            workflowId={workflow.id}
-            transitions={workflow.transitions}
-          />
-        </div>
-      )}
+      <WorkflowDetailDialog
+        open={showDetailDialog}
+        onOpenChange={setShowDetailDialog}
+        workflow={workflow}
+      />
 
       <ConfirmDialog
         open={showDeleteConfirm}
@@ -333,6 +309,59 @@ function WorkflowCard({
   );
 }
 
+// ── Full-screen Workflow Detail Dialog ──
+
+function WorkflowDetailDialog({
+  open,
+  onOpenChange,
+  workflow,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  workflow: ApprovalWorkflow;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[95vw] h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            {workflow.name}
+            {workflow.isDefault && (
+              <Badge variant="default" className="text-xs font-normal">
+                Mặc định
+              </Badge>
+            )}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-1 min-h-0">
+          {/* Left: Flowchart */}
+          <div className="w-1/2 border-r overflow-auto p-6">
+            <h3 className="text-sm font-medium text-muted-foreground mb-4">
+              Sơ đồ trạng thái
+            </h3>
+            {workflow.transitions.length > 0 ? (
+              <WorkflowFlowChart transitions={workflow.transitions} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Chưa có bước chuyển nào.
+              </p>
+            )}
+          </div>
+
+          {/* Right: Transition table */}
+          <div className="w-1/2 overflow-auto p-6">
+            <TransitionTable
+              workflowId={workflow.id}
+              transitions={workflow.transitions}
+            />
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Flow Chart — uses shared component ──
 
 function WorkflowFlowChart({
@@ -343,42 +372,13 @@ function WorkflowFlowChart({
   return <SharedWorkflowFlowChart transitions={transitions} />;
 }
 
-// ── Transition Section (collapsible via edit button) ──
+// ── Signoff type labels ──
 
-function TransitionSection({
-  workflowId,
-  transitions,
-}: {
-  workflowId: string;
-  transitions: ApprovalWorkflowTransition[];
-}) {
-  const [showTable, setShowTable] = React.useState(false);
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-center">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs gap-1.5"
-          onClick={() => setShowTable(!showTable)}
-        >
-          <Pencil className="h-3 w-3" />
-          {showTable ? "Ẩn" : "Chỉnh sửa quy trình"}
-          {showTable ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronRight className="h-3 w-3" />
-          )}
-        </Button>
-      </div>
-
-      {showTable && (
-        <TransitionTable workflowId={workflowId} transitions={transitions} />
-      )}
-    </div>
-  );
-}
+const SIGNOFF_TYPES = [
+  { value: "prepare", label: "Thực hiện (Prepare)" },
+  { value: "review", label: "Soát xét (Review)" },
+  { value: "approve", label: "Phê duyệt (Approve)" },
+];
 
 // ── Transition Table (DataTable with DnD) ──
 
@@ -447,7 +447,7 @@ function TransitionTable({
         },
         {
           id: "roles",
-          header: "Vai trò được phép",
+          header: "Vai trò",
           meta: { label: "Vai trò" },
           cell: ({ row }) => (
             <div className="flex flex-wrap gap-1">
@@ -462,6 +462,27 @@ function TransitionTable({
               ))}
             </div>
           ),
+        },
+        {
+          id: "signoff",
+          header: "Sign off",
+          meta: { label: "Sign off" },
+          cell: ({ row }) => {
+            const t = row.original;
+            if (!t.generatesSignoff) {
+              return (
+                <span className="text-xs text-muted-foreground">Không</span>
+              );
+            }
+            const label =
+              SIGNOFF_TYPES.find((s) => s.value === t.signoffType)?.label ??
+              t.signoffType;
+            return (
+              <Badge variant="secondary" className="text-xs font-normal">
+                {label}
+              </Badge>
+            );
+          },
         },
         {
           id: "_actions",
@@ -560,12 +581,6 @@ function TransitionTable({
 }
 
 // ── Transition Form Dialog ──
-
-const SIGNOFF_TYPES = [
-  { value: "prepare", label: "Thực hiện (Prepare)" },
-  { value: "review", label: "Soát xét (Review)" },
-  { value: "approve", label: "Phê duyệt (Approve)" },
-];
 
 const transitionSchema = z.object({
   fromStatus: z.string().min(1, "Bắt buộc"),

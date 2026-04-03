@@ -17,6 +17,7 @@ import { WorkpaperViewer } from "@/components/shared/workpaper/WorkpaperViewer";
 import { WorkpaperEmptyState } from "@/components/shared/workpaper/WorkpaperEmptyState";
 import { WpSignoffBar } from "@/components/shared/workpaper/WpSignoffBar";
 import { WorkpaperActions } from "@/components/shared/workpaper/WorkpaperActions";
+import { WorkflowChartDialog } from "@/components/shared/workpaper/WorkflowChartDialog";
 import { autoTransitionApi } from "@/features/engagement/api";
 import type {
   WpThreadType,
@@ -197,6 +198,9 @@ export function InlineWorkpaperViewer({
     [contentMutation, engagementId, entityType, entityId],
   );
 
+  // ── Workflow chart dialog ──
+  const [workflowChartOpen, setWorkflowChartOpen] = React.useState(false);
+
   // ── Objectives state (optional) ──
   const [pendingObjective, setPendingObjective] =
     React.useState<PendingObjectiveData | null>(null);
@@ -242,6 +246,7 @@ export function InlineWorkpaperViewer({
           transitions={transitions}
           onTransition={handleTransition}
           isTransitioning={transitionMutation.isPending}
+          onViewWorkflow={() => setWorkflowChartOpen(true)}
           members={members}
           compact
         />
@@ -251,21 +256,29 @@ export function InlineWorkpaperViewer({
   ) : null;
 
   return (
-    <WorkpaperViewer
-      content={content as JSONContent | null}
-      threads={threads}
-      onCreateThread={handleCreateThread}
-      onReplyToThread={handleReply}
-      onResolveThread={handleResolve}
-      onReopenThread={handleReopen}
-      onDeleteThread={handleDelete}
-      isCreatingThread={createThread.isPending}
-      isReplying={addReply.isPending}
-      onContentChange={handleContentChange}
-      className={className}
-      signoffBar={signoffBar}
-      onAddObjective={showObjectives ? handleAddObjective : undefined}
-      defaultSidebar={objectivesSidebar}
-    />
+    <>
+      <WorkpaperViewer
+        content={content as JSONContent | null}
+        threads={threads}
+        onCreateThread={handleCreateThread}
+        onReplyToThread={handleReply}
+        onResolveThread={handleResolve}
+        onReopenThread={handleReopen}
+        onDeleteThread={handleDelete}
+        isCreatingThread={createThread.isPending}
+        isReplying={addReply.isPending}
+        onContentChange={handleContentChange}
+        className={className}
+        signoffBar={signoffBar}
+        onAddObjective={showObjectives ? handleAddObjective : undefined}
+        defaultSidebar={objectivesSidebar}
+      />
+      <WorkflowChartDialog
+        open={workflowChartOpen}
+        onOpenChange={setWorkflowChartOpen}
+        entityType={entityType}
+        currentStatus={approvalStatus ?? "not_started"}
+      />
+    </>
   );
 }
