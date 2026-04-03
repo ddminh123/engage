@@ -34,6 +34,7 @@ export const DELETE = withAccess('settings:manage', async (req, _ctx, session) =
   try {
     const { searchParams } = new URL(req.url);
     const entityType = searchParams.get('entityType');
+    const subType = searchParams.get('subType') ?? '';
     if (!entityType) {
       return Response.json(
         { error: { code: 'VALIDATION_ERROR', message: 'entityType is required' } },
@@ -41,14 +42,14 @@ export const DELETE = withAccess('settings:manage', async (req, _ctx, session) =
       );
     }
 
-    await deleteEntityBinding(entityType);
+    await deleteEntityBinding(entityType, subType);
 
     await logAudit({
       userId: session.user.id,
       userName: session.user.name,
       action: 'delete',
       entityType: 'approval_entity_binding',
-      entityId: entityType,
+      entityId: `${entityType}${subType ? ':' + subType : ''}`,
     });
 
     return Response.json({ data: { success: true } });

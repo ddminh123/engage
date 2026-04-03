@@ -489,9 +489,11 @@ export async function upsertEntityBindingApi(data: EntityBindingInput): Promise<
   return handleResponse<ApprovalEntityBinding>(response);
 }
 
-export async function deleteEntityBindingApi(entityType: string): Promise<{ success: boolean }> {
+export async function deleteEntityBindingApi(entityType: string, subType: string = ''): Promise<{ success: boolean }> {
+  const params = new URLSearchParams({ entityType });
+  if (subType) params.set('subType', subType);
   const response = await fetch(
-    `${API_ROUTES.SETTINGS_ENTITY_BINDINGS}?entityType=${encodeURIComponent(entityType)}`,
+    `${API_ROUTES.SETTINGS_ENTITY_BINDINGS}?${params.toString()}`,
     { method: 'DELETE' },
   );
   return handleResponse<{ success: boolean }>(response);

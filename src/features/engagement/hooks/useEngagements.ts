@@ -1037,27 +1037,26 @@ export function usePublishProcedure() {
 
 // ── Workflow Signoff Types ──
 
-const workflowSignoffTypesKey = (entityType: string) =>
-  ['workflowSignoffTypes', entityType];
+const workflowSignoffTypesKey = (entityType: string, subType: string = '') =>
+  ['workflowSignoffTypes', entityType, subType];
 
-export function useWorkflowSignoffTypes(entityType: string) {
+export function useWorkflowSignoffTypes(entityType: string, subType: string = '') {
   return useQuery({
-    queryKey: workflowSignoffTypesKey(entityType),
-    queryFn: () => fetchWorkflowSignoffTypes(entityType),
+    queryKey: workflowSignoffTypesKey(entityType, subType),
+    queryFn: () => fetchWorkflowSignoffTypes(entityType, subType),
     enabled: !!entityType,
-    staleTime: 5 * 60 * 1000, // signoff types rarely change
   });
 }
 
 // ── Approval Transitions ──
 
-const approvalTransitionsKey = (entityType: string, entityId: string) =>
-  ['approvalTransitions', entityType, entityId];
+const approvalTransitionsKey = (entityType: string, entityId: string, subType: string = '') =>
+  ['approvalTransitions', entityType, entityId, subType];
 
-export function useAvailableTransitions(entityType: string, entityId: string) {
+export function useAvailableTransitions(entityType: string, entityId: string, subType: string = '') {
   return useQuery({
-    queryKey: approvalTransitionsKey(entityType, entityId),
-    queryFn: () => fetchAvailableTransitionsApi(entityType, entityId),
+    queryKey: approvalTransitionsKey(entityType, entityId, subType),
+    queryFn: () => fetchAvailableTransitionsApi(entityType, entityId, subType),
     enabled: !!entityType && !!entityId,
   });
 }
@@ -1072,6 +1071,7 @@ export function useExecuteTransition() {
       comment,
       nextAssigneeId,
       engagementId,
+      subType,
     }: {
       entityType: string;
       entityId: string;
@@ -1079,9 +1079,10 @@ export function useExecuteTransition() {
       comment?: string;
       nextAssigneeId?: string;
       engagementId: string;
-    }) => executeTransitionApi(entityType, entityId, transitionId, comment, nextAssigneeId),
-    onSuccess: (_, { entityType, entityId, engagementId }) => {
-      qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId) });
+      subType?: string;
+    }) => executeTransitionApi(entityType, entityId, transitionId, comment, nextAssigneeId, subType),
+    onSuccess: (_, { entityType, entityId, engagementId, subType }) => {
+      qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId, subType) });
       qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
       qc.invalidateQueries({ queryKey: wpSignoffsKey(engagementId) });
     },
@@ -1096,16 +1097,18 @@ export function useManualSign() {
       entityId,
       signoffType,
       signoffOrder,
+      subType,
     }: {
       entityType: string;
       entityId: string;
       signoffType: string;
       signoffOrder: number;
       engagementId: string;
-    }) => manualSignApi(entityType, entityId, signoffType, signoffOrder),
-    onSuccess: (_, { entityType, entityId, engagementId }) => {
+      subType?: string;
+    }) => manualSignApi(entityType, entityId, signoffType, signoffOrder, subType),
+    onSuccess: (_, { entityType, entityId, engagementId, subType }) => {
       qc.invalidateQueries({ queryKey: wpSignoffsKey(engagementId) });
-      qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId) });
+      qc.invalidateQueries({ queryKey: approvalTransitionsKey(entityType, entityId, subType) });
     },
   });
 }

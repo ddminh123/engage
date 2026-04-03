@@ -26,6 +26,7 @@ import {
   useCreateTemplate,
   useTemplateCategories,
   useCreateTemplateCategory,
+  useUpsertTemplateBinding,
 } from "../hooks/useTemplates";
 import {
   useEntityTypeOptions,
@@ -36,7 +37,10 @@ import type { Template } from "../types";
 const C = COMMON_LABELS;
 
 const schema = z.object({
-  name: z.string().min(1, "Bắt buộc"),
+  name: z
+    .string()
+    .min(1, "Bắt buộc")
+    .max(100, "Tên mẫu không được vượt quá 100 ký tự"),
   entity_type: z.string().min(1, "Bắt buộc"),
   category_id: z.string().optional(),
   new_category_name: z.string().optional(),
@@ -58,6 +62,7 @@ export function TemplateForm({
   const createMutation = useCreateTemplate();
   const { data: categories = [] } = useTemplateCategories();
   const createCategoryMutation = useCreateTemplateCategory();
+  const upsertBindingMutation = useUpsertTemplateBinding();
   const { options: entityOptions, optionLabel } = useEntityTypeOptions();
 
   const form = useForm<FormValues>({
@@ -84,7 +89,9 @@ export function TemplateForm({
   }, [open]);
 
   const isPending =
-    createMutation.isPending || createCategoryMutation.isPending;
+    createMutation.isPending ||
+    createCategoryMutation.isPending ||
+    upsertBindingMutation.isPending;
   const mutationError = createMutation.error?.message ?? null;
 
   // Flatten categories for the select (parent → child)
@@ -109,7 +116,7 @@ export function TemplateForm({
         categoryId = newCat.id;
       }
 
-      const { entityType: resolvedEntityType } = decodeEntityOption(
+      const { entityType: resolvedEntityType, subType } = decodeEntityOption(
         values.entity_type,
       );
       const created = await createMutation.mutateAsync({
@@ -117,6 +124,13 @@ export function TemplateForm({
         content: { type: "doc", content: [] },
         entity_type: resolvedEntityType,
         category_id: categoryId,
+      });
+
+      // Auto-create template binding for the selected entity type
+      await upsertBindingMutation.mutateAsync({
+        entityType: resolvedEntityType,
+        templateId: created.id,
+        subType: subType,
       });
 
       if (onCreated) {
@@ -179,7 +193,7 @@ export function TemplateForm({
                 <FormLabel>Loại đối tượng *</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <span className="flex flex-1 text-left truncate">
                         {optionLabel(field.value)}
                       </span>

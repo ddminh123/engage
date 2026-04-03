@@ -292,10 +292,11 @@ async function main() {
 
   // --- Entity binding: planning_workpaper → default workflow ---
   await prisma.approvalEntityBinding.upsert({
-    where: { entity_type: 'planning_workpaper' },
+    where: { entity_type_sub_type: { entity_type: 'planning_workpaper', sub_type: '' } },
     update: { workflow_id: defaultWorkflow.id },
     create: {
       entity_type: 'planning_workpaper',
+      sub_type: '',
       workflow_id: defaultWorkflow.id,
       label: 'Giấy tờ kế hoạch',
     },
@@ -317,10 +318,11 @@ async function main() {
 
   // Create entity binding for procedure → this workflow
   await prisma.approvalEntityBinding.upsert({
-    where: { entity_type: 'procedure' },
-    update: {},
+    where: { entity_type_sub_type: { entity_type: 'procedure', sub_type: '' } },
+    update: { workflow_id: procedureWorkflow.id },
     create: {
       entity_type: 'procedure',
+      sub_type: '',
       workflow_id: procedureWorkflow.id,
       label: 'Thủ tục kiểm toán',
     },

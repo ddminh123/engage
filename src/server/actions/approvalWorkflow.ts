@@ -15,6 +15,7 @@ export const createWorkflowSchema = z.object({
 
 export const upsertEntityBindingSchema = z.object({
   entityType: z.string().min(1),
+  subType: z.string().optional().default(''),
   workflowId: z.string().min(1),
   label: z.string().optional(),
 });
@@ -260,6 +261,7 @@ export async function getEntityBindings() {
   return bindings.map((b) => ({
     id: b.id,
     entityType: b.entity_type,
+    subType: b.sub_type,
     workflowId: b.workflow_id,
     workflowName: b.workflow.name,
     label: b.label,
@@ -270,13 +272,19 @@ export async function upsertEntityBinding(input: unknown) {
   const parsed = upsertEntityBindingSchema.parse(input);
 
   const binding = await prisma.approvalEntityBinding.upsert({
-    where: { entity_type: parsed.entityType },
+    where: {
+      entity_type_sub_type: {
+        entity_type: parsed.entityType,
+        sub_type: parsed.subType,
+      },
+    },
     update: {
       workflow_id: parsed.workflowId,
       label: parsed.label ?? null,
     },
     create: {
       entity_type: parsed.entityType,
+      sub_type: parsed.subType,
       workflow_id: parsed.workflowId,
       label: parsed.label ?? null,
     },
@@ -285,14 +293,20 @@ export async function upsertEntityBinding(input: unknown) {
   return {
     id: binding.id,
     entityType: binding.entity_type,
+    subType: binding.sub_type,
     workflowId: binding.workflow_id,
     label: binding.label,
   };
 }
 
-export async function deleteEntityBinding(entityType: string) {
+export async function deleteEntityBinding(entityType: string, subType: string = '') {
   await prisma.approvalEntityBinding.delete({
-    where: { entity_type: entityType },
+    where: {
+      entity_type_sub_type: {
+        entity_type: entityType,
+        sub_type: subType,
+      },
+    },
   });
   return { success: true };
 }
@@ -320,6 +334,7 @@ function mapWorkflow(w: NonNullable<WorkflowWithRelations>) {
     entityBindings: (w.entity_bindings ?? []).map((b) => ({
       id: b.id,
       entityType: b.entity_type,
+      subType: b.sub_type,
       workflowId: b.workflow_id,
       label: b.label,
     })),

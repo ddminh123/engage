@@ -1334,12 +1334,14 @@ model ApprovalWorkflow {
 // Maps entity types to workflows (many entity types → one workflow)
 model ApprovalEntityBinding {
   id           String @id @default(cuid())
-  entity_type  String @unique   // "procedure" | "work_program" | "planning_workpaper" | etc.
+  entity_type  String            // "procedure" | "work_program" | "planning_workpaper" | etc.
+  sub_type     String @default("") // "" for base types, step config key for planning_workpaper subtypes
   workflow_id  String
-  label        String?          // display name for the entity type, e.g. "Thủ tục kiểm toán"
+  label        String?           // display name for the entity type, e.g. "Thủ tục kiểm toán"
 
   workflow ApprovalWorkflow @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
 
+  @@unique([entity_type, sub_type])
   @@index([workflow_id])
   @@map("approval_entity_binding")
 }

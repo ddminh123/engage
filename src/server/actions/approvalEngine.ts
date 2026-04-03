@@ -31,23 +31,43 @@ export interface SignoffTypeInfo {
   count: number;
 }
 
-export async function getWorkflowSignoffTypes(entityType: string): Promise<SignoffTypeInfo[]> {
-  // 1. Load bound workflow (or default)
-  const binding = await prisma.approvalEntityBinding.findUnique({
-    where: { entity_type: entityType },
+/**
+ * Resolve the workflow ID for an entity type + optional sub_type.
+ * Lookup chain: exact match → base type fallback → default workflow.
+ */
+async function resolveWorkflowId(entityType: string, subType: string = ''): Promise<string | null> {
+  // 1. Exact match (entity_type + sub_type)
+  const exact = await prisma.approvalEntityBinding.findUnique({
+    where: { entity_type_sub_type: { entity_type: entityType, sub_type: subType } },
     select: { workflow_id: true },
   });
-
-  let wfId = binding?.workflow_id;
-
-  if (wfId) {
-    const wf = await prisma.approvalWorkflow.findUnique({ where: { id: wfId }, select: { is_active: true } });
-    if (!wf?.is_active) return [];
-  } else {
-    const wf = await prisma.approvalWorkflow.findFirst({ where: { is_default: true, is_active: true }, select: { id: true } });
-    if (!wf) return [];
-    wfId = wf.id;
+  if (exact) {
+    const wf = await prisma.approvalWorkflow.findUnique({ where: { id: exact.workflow_id }, select: { is_active: true } });
+    if (wf?.is_active) return exact.workflow_id;
+    return null;
   }
+
+  // 2. Fallback to base type (sub_type = '') if subType was specified
+  if (subType) {
+    const base = await prisma.approvalEntityBinding.findUnique({
+      where: { entity_type_sub_type: { entity_type: entityType, sub_type: '' } },
+      select: { workflow_id: true },
+    });
+    if (base) {
+      const wf = await prisma.approvalWorkflow.findUnique({ where: { id: base.workflow_id }, select: { is_active: true } });
+      if (wf?.is_active) return base.workflow_id;
+      return null;
+    }
+  }
+
+  // 3. Fallback to default workflow
+  const def = await prisma.approvalWorkflow.findFirst({ where: { is_default: true, is_active: true }, select: { id: true } });
+  return def?.id ?? null;
+}
+
+export async function getWorkflowSignoffTypes(entityType: string, subType: string = ''): Promise<SignoffTypeInfo[]> {
+  const wfId = await resolveWorkflowId(entityType, subType);
+  if (!wfId) return [];
 
   // 2. Query only transitions explicitly flagged to generate signoffs, sorted by sort_order.
   const flagged = await prisma.approvalTransition.findMany({
@@ -82,39 +102,24 @@ export async function getAvailableTransitions(
   userId: string,
   engagementId: string,
   lastPublishedBy?: string | null,
+  subType: string = '',
 ): Promise<AvailableTransition[]> {
   // Build list of statuses to query (current + aliases)
   const statusesToQuery = [currentStatus, ...(STATUS_ALIASES[currentStatus] ?? [])];
 
-  // 1. Load workflow for this entity type via binding, fallback to default
-  const binding = await prisma.approvalEntityBinding.findUnique({
-    where: { entity_type: entityType },
-    select: { workflow_id: true },
-  });
+  // 1. Resolve workflow via binding chain (exact → base → default)
+  const wfId = await resolveWorkflowId(entityType, subType);
+  if (!wfId) return [];
 
-  let workflow;
-  if (binding) {
-    workflow = await prisma.approvalWorkflow.findUnique({
-      where: { id: binding.workflow_id },
-      include: {
-        transitions: {
-          where: { from_status: { in: statusesToQuery } },
-          orderBy: { sort_order: 'asc' },
-        },
+  const workflow = await prisma.approvalWorkflow.findUnique({
+    where: { id: wfId },
+    include: {
+      transitions: {
+        where: { from_status: { in: statusesToQuery } },
+        orderBy: { sort_order: 'asc' },
       },
-    });
-  } else {
-    // Fallback to default workflow
-    workflow = await prisma.approvalWorkflow.findFirst({
-      where: { is_default: true, is_active: true },
-      include: {
-        transitions: {
-          where: { from_status: { in: statusesToQuery } },
-          orderBy: { sort_order: 'asc' },
-        },
-      },
-    });
-  }
+    },
+  });
 
   if (!workflow || !workflow.is_active) return [];
 
@@ -191,6 +196,7 @@ export async function executeTransition(
   engagementId: string,
   comment?: string | null,
   nextAssigneeId?: string | null,
+  subType: string = '',
 ): Promise<{ newStatus: string; actionType: string }> {
   // 1. Load the transition
   const transition = await prisma.approvalTransition.findUnique({
@@ -200,18 +206,10 @@ export async function executeTransition(
 
   if (!transition) throw new Error('Transition not found');
 
-  // Validate via binding: the workflow must be bound to this entity type, or be the default
-  const binding = await prisma.approvalEntityBinding.findFirst({
-    where: { entity_type: entityType, workflow_id: transition.workflow.id },
-  });
-  if (!binding) {
-    // Allow if this is the default workflow and entity has no explicit binding
-    const entityHasBinding = await prisma.approvalEntityBinding.findUnique({
-      where: { entity_type: entityType },
-    });
-    if (entityHasBinding || !transition.workflow.is_default) {
-      throw new Error('Transition does not match entity type');
-    }
+  // Validate: the resolved workflow for this entity must match the transition's workflow
+  const resolvedWfId = await resolveWorkflowId(entityType, subType);
+  if (resolvedWfId !== transition.workflow.id) {
+    throw new Error('Transition does not match entity type');
   }
 
   // 2. Validate user can perform this transition
@@ -234,6 +232,7 @@ export async function executeTransition(
     userId,
     engagementId,
     currentEntity.lastPublishedBy,
+    subType,
   );
 
   if (!available.find((a) => a.id === transitionId)) {
@@ -329,27 +328,14 @@ export async function executeAutoTransition(
   actionType: string,
   userId: string,
   userName: string,
+  subType: string = '',
 ): Promise<{ newStatus: string } | null> {
   // 1. Get current status
   const currentEntity = await getEntityStatus(entityType, entityId);
   if (!currentEntity) return null;
 
-  // 2. Find the workflow and matching auto-transition
-  const binding = await prisma.approvalEntityBinding.findUnique({
-    where: { entity_type: entityType },
-    select: { workflow_id: true },
-  });
-
-  let workflowId: string | undefined;
-  if (binding) {
-    workflowId = binding.workflow_id;
-  } else {
-    const defaultWf = await prisma.approvalWorkflow.findFirst({
-      where: { is_default: true, is_active: true },
-      select: { id: true },
-    });
-    workflowId = defaultWf?.id;
-  }
+  // 2. Resolve workflow via binding chain (exact → base → default)
+  const workflowId = await resolveWorkflowId(entityType, subType);
   if (!workflowId) return null;
 
   // Find transition matching current status (+ aliases) + action type
@@ -807,8 +793,9 @@ export async function manualSign(params: {
   signoffType: string;
   signoffOrder: number;
   userId: string;
+  subType?: string;
 }): Promise<void> {
-  const { entityType, entityId, engagementId, signoffType, signoffOrder, userId } = params;
+  const { entityType, entityId, engagementId, signoffType, signoffOrder, userId, subType = '' } = params;
 
   // 1. Check no active duplicate
   const existing = await prisma.wpSignoff.findFirst({
@@ -826,7 +813,7 @@ export async function manualSign(params: {
   const currentLevel = SIGNOFF_LEVEL[signoffType] ?? 0;
   if (currentLevel > 0) {
     // Get the workflow signoff stages to know what lower stages exist
-    const allStages = await getWorkflowSignoffTypes(entityType);
+    const allStages = await getWorkflowSignoffTypes(entityType, subType);
     for (const stage of allStages) {
       const stageLevel = SIGNOFF_LEVEL[stage.type] ?? 0;
       if (stageLevel >= currentLevel) continue;

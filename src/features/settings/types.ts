@@ -211,6 +211,7 @@ export interface ApprovalWorkflowTransition {
 export interface ApprovalEntityBinding {
   id: string;
   entityType: string;
+  subType: string;
   workflowId: string;
   label: string | null;
 }
@@ -238,6 +239,7 @@ export interface ApprovalWorkflowInput {
 
 export interface EntityBindingInput {
   entityType: string;
+  subType?: string;
   workflowId: string;
   label?: string;
 }
