@@ -69,15 +69,15 @@ function ratingColor(rating: string | null): string {
 function effectivenessBorder(eff: string | null): string {
   switch (eff) {
     case "strong":
-      return "border-l-green-500";
+      return "border-b-green-400";
     case "adequate":
-      return "border-l-yellow-500";
+      return "border-b-yellow-400";
     case "weak":
-      return "border-l-red-500";
+      return "border-b-red-400";
     case "none":
-      return "border-l-gray-400";
+      return "border-b-gray-300";
     default:
-      return "";
+      return "border-b-gray-200";
   }
 }
 
@@ -464,9 +464,9 @@ function ObjectiveSection({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[45%]">{LR.field.riskDescription}</TableHead>
-                <TableHead className="w-[15%]">{LR.field.riskRating}</TableHead>
-                <TableHead>{LR.field.linkedControls}</TableHead>
+                <TableHead className="w-80 min-w-80">{LR.field.riskDescription}</TableHead>
+                <TableHead className="w-24 min-w-24">{LR.field.riskRating}</TableHead>
+                <TableHead className="flex-1">{LR.field.linkedControls}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -553,10 +553,11 @@ function RiskRow({
       <ContextMenuTrigger asChild>
         <TableRow className="group">
           {/* Risk description */}
-          <TableCell>
+          <TableCell className="w-80 min-w-80">
             <button
-              className="text-left text-sm hover:underline"
+              className="text-left text-sm hover:underline break-words line-clamp-3 whitespace-normal"
               onClick={() => dispatch({ type: "OPEN_RISK", riskId: risk.id })}
+              title={risk.riskDescription}
             >
               {risk.riskDescription}
             </button>
@@ -580,7 +581,7 @@ function RiskRow({
               {risk.controls.map((ctrl) => (
                 <div
                   key={ctrl.id}
-                  className={`group/ctrl flex items-center gap-2 rounded-md border border-l-2 px-2.5 py-1.5 text-sm transition-colors hover:bg-accent/50 ${effectivenessBorder(ctrl.effectiveness)}`}
+                  className={`group/ctrl flex items-center gap-2 rounded-sm border-b-2 px-2 py-2 text-sm transition-colors hover:bg-accent/30 ${effectivenessBorder(ctrl.effectiveness)}`}
                   title={controlTooltip(ctrl)}
                 >
                   <button

@@ -232,8 +232,10 @@ export function useCopyRisksToEngagement() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: CopyRisksToEngagementInput) => api.copyRisksToEngagement(data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      // Invalidate both catalog and engagement queries
       qc.invalidateQueries({ queryKey: ["risk-catalog"] });
+      qc.invalidateQueries({ queryKey: ["engagement", variables.engagementId] });
     },
   });
 }
@@ -242,8 +244,10 @@ export function useCopyControlsToEngagement() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: CopyControlsToEngagementInput) => api.copyControlsToEngagement(data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      // Invalidate both catalog and engagement queries
       qc.invalidateQueries({ queryKey: ["risk-catalog"] });
+      qc.invalidateQueries({ queryKey: ["engagement", variables.engagementId] });
     },
   });
 }
