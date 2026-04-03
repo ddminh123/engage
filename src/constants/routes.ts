@@ -11,6 +11,19 @@ export const API_ROUTES = {
   SETTINGS_AUDIT_AREAS: "/api/settings/audit-areas",
   SETTINGS_AUDIT_AREAS_BY_ID: (id: string) => `/api/settings/audit-areas/${id}`,
 
+  // Risk Catalog Library
+  SETTINGS_RISK_CATALOG_DOMAINS: "/api/settings/risk-catalog/domains",
+  SETTINGS_RISK_CATALOG_DOMAIN_BY_ID: (id: string) => `/api/settings/risk-catalog/domains/${id}`,
+  SETTINGS_RISK_CATALOG_CATEGORIES: "/api/settings/risk-catalog/categories",
+  SETTINGS_RISK_CATALOG_CATEGORY_BY_ID: (id: string) => `/api/settings/risk-catalog/categories/${id}`,
+  SETTINGS_RISK_CATALOG_RISKS: "/api/settings/risk-catalog/risks",
+  SETTINGS_RISK_CATALOG_RISK_BY_ID: (id: string) => `/api/settings/risk-catalog/risks/${id}`,
+  SETTINGS_RISK_CATALOG_CONTROLS: "/api/settings/risk-catalog/controls",
+  SETTINGS_RISK_CATALOG_CONTROL_BY_ID: (id: string) => `/api/settings/risk-catalog/controls/${id}`,
+  SETTINGS_RISK_CATALOG_PROCEDURES: "/api/settings/risk-catalog/procedures",
+  SETTINGS_RISK_CATALOG_PROCEDURE_BY_ID: (id: string) => `/api/settings/risk-catalog/procedures/${id}`,
+  SETTINGS_RISK_CATALOG_TREE: "/api/settings/risk-catalog/tree",
+
   // Universe module
   UNIVERSE: "/api/universe",
   UNIVERSE_BY_ID: (id: string) => `/api/universe/${id}`,
@@ -134,6 +147,7 @@ export const PAGE_ROUTES = {
   TEAMS: "/teams",
   SETTINGS_USERS: "/settings/users",
   SETTINGS: "/settings",
+  SETTINGS_RISK_CATALOG: "/settings/risk-catalog",
   CONTACT_DETAIL: (id: string) => `/settings/contacts/${id}`,
   ORG_UNIT_DETAIL: (id: string) => `/settings/org-chart/${id}`,
 } as const;

@@ -153,8 +153,14 @@ export interface RiskCatalogueItem {
   name: string;
   code: string | null;
   description: string | null;
-  riskType: string;
-  riskDomain: string | null;
+  riskType: string | null;
+  riskDomain?: string | null; // deprecated — kept for backward compat
+  categoryId: string;
+  frameworkRef: string | null;
+  source: string;
+  riskRating: string | null;
+  likelihood: string | null;
+  impact: string | null;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
@@ -165,8 +171,13 @@ export interface RiskCatalogueItemInput {
   name: string;
   code?: string | null;
   description?: string | null;
-  riskType: string;
-  riskDomain?: string | null;
+  riskType?: string | null;
+  categoryId: string;
+  frameworkRef?: string | null;
+  source?: string;
+  riskRating?: string | null;
+  likelihood?: string | null;
+  impact?: string | null;
   sortOrder?: number;
 }
 

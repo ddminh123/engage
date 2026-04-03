@@ -8,6 +8,7 @@ export const SETTINGS_NAV_ITEMS = [
   { label: "Kế hoạch", href: "/settings/plan" },
   { label: "Cuộc kiểm toán", href: "/settings/engagement" },
   { label: "Phát hiện", href: "/settings/finding" },
+  { label: "Thư viện rủi ro", href: "/settings/risk-catalog" },
   { label: "Thư viện mẫu", href: "/settings/templates" },
   { label: "Bước kế hoạch", href: "/settings/planning-steps" },
   { label: "Quy trình soát xét", href: "/settings/approval-workflows" },

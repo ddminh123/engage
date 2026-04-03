@@ -10,6 +10,7 @@ import {
   X,
   Target,
   RefreshCw,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InlineInput } from "./InlineInput";
 import { RiskWorkpaper } from "./RiskWorkpaper";
 import { ControlWorkpaper } from "./ControlWorkpaper";
+import { CatalogPickerDialog } from "./CatalogPickerDialog";
 import { useRcmTable } from "./useRcmTable";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
 import type {
@@ -266,6 +268,18 @@ export function RcmTable({
         isLoading={isUnlinking}
         variant="destructive"
       />
+
+      {/* Catalog picker dialog */}
+      <CatalogPickerDialog
+        open={state.catalogPickerOpen}
+        onOpenChange={(open) => {
+          if (!open) dispatch({ type: "CLOSE_CATALOG_PICKER" });
+        }}
+        entityType={state.catalogPickerType ?? "risk"}
+        engagementId={engagementId}
+        rcmObjectiveId={state.catalogPickerTargetObjectiveId ?? undefined}
+        onItemsAdded={() => dispatch({ type: "CLOSE_CATALOG_PICKER" })}
+      />
     </div>
   );
 }
@@ -421,17 +435,34 @@ function ObjectiveSection({
               ) : (
                 <TableRow>
                   <TableCell colSpan={3} className="py-1.5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-muted-foreground"
-                      onClick={() =>
-                        dispatch({ type: "START_ADD_RISK", objectiveId: objective.id })
-                      }
-                    >
-                      <Plus className="mr-1 h-3 w-3" />
-                      {LR.createTitle}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground"
+                        onClick={() =>
+                          dispatch({ type: "START_ADD_RISK", objectiveId: objective.id })
+                        }
+                      >
+                        <Plus className="mr-1 h-3 w-3" />
+                        {LR.createTitle}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground"
+                        onClick={() =>
+                          dispatch({
+                            type: "OPEN_CATALOG_PICKER",
+                            pickerType: "risk",
+                            objectiveId: objective.id,
+                          })
+                        }
+                      >
+                        <BookOpen className="mr-1 h-3 w-3" />
+                        Th&#432; vi&#7879;n
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -551,17 +582,33 @@ function RiskRow({
                   isLinking={isLinking}
                 />
               ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-1.5 text-[10px] text-muted-foreground"
-                  onClick={() =>
-                    dispatch({ type: "START_LINK_CONTROL", riskId: risk.id })
-                  }
-                >
-                  <Plus className="mr-0.5 h-3 w-3" />
-                  {L.control.title}
-                </Button>
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5 text-[10px] text-muted-foreground"
+                    onClick={() =>
+                      dispatch({ type: "START_LINK_CONTROL", riskId: risk.id })
+                    }
+                  >
+                    <Plus className="mr-0.5 h-3 w-3" />
+                    {L.control.title}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5 text-[10px] text-muted-foreground"
+                    onClick={() =>
+                      dispatch({
+                        type: "OPEN_CATALOG_PICKER",
+                        pickerType: "control",
+                        riskId: risk.id,
+                      })
+                    }
+                  >
+                    <BookOpen className="h-3 w-3" />
+                  </Button>
+                </div>
               )}
             </div>
           </TableCell>

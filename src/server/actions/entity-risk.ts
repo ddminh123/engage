@@ -64,7 +64,7 @@ export async function createEntityRisk(entityId: string, data: z.infer<typeof cr
 }
 
 export async function copyFromCatalogue(entityId: string, catalogueItemIds: string[]) {
-  const items = await prisma.riskCatalogueItem.findMany({
+  const items = await prisma.riskCatalogItem.findMany({
     where: { id: { in: catalogueItemIds }, is_active: true },
   });
 
@@ -87,8 +87,8 @@ export async function copyFromCatalogue(entityId: string, catalogueItemIds: stri
       name: item.name,
       code: item.code,
       description: item.description,
-      risk_type: item.risk_type,
-      risk_domain: item.risk_domain,
+      risk_type: item.risk_type ?? 'operational',
+      risk_domain: null,
       is_primary: false,
       sort_order: item.sort_order,
     })),

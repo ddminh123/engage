@@ -472,27 +472,147 @@ model RiskAssessmentFactor {
 }
 
 // =============================================================================
-// RISK CATALOGUE — Master risk library managed in Settings
+// RISK CATALOG LIBRARY — Org-level risk, control & procedure library
+// Structured: Domain → Category → Items (risks, controls, procedures)
+// Pre-populated from frameworks (COBIT 2019, COSO ERM) + user-added
 // =============================================================================
 
-model RiskCatalogueItem {
+model RiskCatalogDomain {
   id          String   @id @default(cuid())
   name        String
-  code        String?  @unique
+  code        String   @unique
+  framework   String?  // "COBIT 2019" | "COSO ERM" | "Custom" | null
   description String?  @db.Text
-  risk_type   String   // operational | technology | credit | compliance | market | liquidity | strategic | reputational
-  risk_domain String?  // ESG | financial_reporting | regulatory | IT | operations | fraud | other
-  is_active   Boolean  @default(true)
   sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
-  entity_risks EntityRisk[] // entities referencing this catalogue item
+  categories RiskCatalogCategory[]
 
-  @@index([risk_type])
-  @@index([risk_domain])
+  @@index([framework])
   @@index([is_active])
-  @@map("risk_catalogue_item")
+  @@map("risk_catalog_domain")
+}
+
+model RiskCatalogCategory {
+  id          String   @id @default(cuid())
+  domain_id   String
+  name        String
+  code        String   @unique
+  description String?  @db.Text
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  domain RiskCatalogDomain @relation(fields: [domain_id], references: [id], onDelete: Cascade)
+  risks  RiskCatalogItem[]
+
+  @@index([domain_id])
+  @@index([is_active])
+  @@map("risk_catalog_category")
+}
+
+model RiskCatalogItem {
+  id            String   @id @default(cuid())
+  category_id   String
+  name          String
+  code          String?  @unique
+  description   String?  @db.Text
+  risk_type     String?  // operational | financial | compliance | strategic | it | governance | reputational
+  risk_rating   String?  // low | medium | high | critical
+  likelihood    String?  // rare | unlikely | possible | likely | almost_certain
+  impact        String?  // insignificant | minor | moderate | major | catastrophic
+  framework_ref String?  // e.g., "COBIT EDM01.01", "COSO P-03"
+  source        String   @default("system") // system | custom
+  is_active     Boolean  @default(true)
+  sort_order    Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  category     RiskCatalogCategory   @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  control_refs RiskControlCatalogRef[]
+  entity_risks EntityRisk[]          // universe entity risks referencing this catalog item
+  engagement_risks EngagementRisk[]  // engagement RCM risks referencing this catalog item
+
+  @@index([category_id])
+  @@index([source])
+  @@index([risk_type])
+  @@index([is_active])
+  @@map("risk_catalog_item")
+}
+
+model ControlCatalogItem {
+  id             String   @id @default(cuid())
+  name           String
+  code           String?  @unique
+  description    String?  @db.Text
+  control_type   String?  // preventive | detective | corrective
+  control_nature String?  // manual | automated | it_dependent
+  frequency      String?  // continuous | daily | weekly | monthly | quarterly | annually | event_driven
+  framework_ref  String?  // e.g., "COBIT APO01-C01"
+  source         String   @default("system") // system | custom
+  is_active      Boolean  @default(true)
+  sort_order     Int      @default(0)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  risk_refs      RiskControlCatalogRef[]
+  procedure_refs ControlProcedureCatalogRef[]
+  engagement_controls EngagementControl[] // engagement controls referencing this catalog item
+
+  @@index([source])
+  @@index([control_type])
+  @@index([is_active])
+  @@map("control_catalog_item")
+}
+
+model ProcedureCatalogItem {
+  id                 String   @id @default(cuid())
+  name               String
+  code               String?  @unique
+  description        String?  @db.Text
+  procedure_type     String?  // inquiry | observation | inspection | re_performance | analytical | walkthrough | other
+  procedure_category String?  // toc | substantive
+  framework_ref      String?  // e.g., "COBIT APO01-P01"
+  source             String   @default("system") // system | custom
+  is_active          Boolean  @default(true)
+  sort_order         Int      @default(0)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  control_refs       ControlProcedureCatalogRef[]
+  engagement_procedures EngagementProcedure[] // engagement procedures referencing this catalog item
+
+  @@index([source])
+  @@index([procedure_type])
+  @@index([is_active])
+  @@map("procedure_catalog_item")
+}
+
+// M:N junction: RiskCatalogItem ↔ ControlCatalogItem
+model RiskControlCatalogRef {
+  risk_catalog_id    String
+  control_catalog_id String
+
+  risk    RiskCatalogItem    @relation(fields: [risk_catalog_id], references: [id], onDelete: Cascade)
+  control ControlCatalogItem @relation(fields: [control_catalog_id], references: [id], onDelete: Cascade)
+
+  @@id([risk_catalog_id, control_catalog_id])
+  @@map("risk_control_catalog_ref")
+}
+
+// M:N junction: ControlCatalogItem ↔ ProcedureCatalogItem
+model ControlProcedureCatalogRef {
+  control_catalog_id   String
+  procedure_catalog_id String
+
+  control   ControlCatalogItem   @relation(fields: [control_catalog_id], references: [id], onDelete: Cascade)
+  procedure ProcedureCatalogItem @relation(fields: [procedure_catalog_id], references: [id], onDelete: Cascade)
+
+  @@id([control_catalog_id, procedure_catalog_id])
+  @@map("control_procedure_catalog_ref")
 }
 
 // =============================================================================
@@ -514,8 +634,8 @@ model EntityRisk {
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 
-  entity         AuditableEntity   @relation(fields: [entity_id], references: [id], onDelete: Cascade)
-  catalogue_item RiskCatalogueItem? @relation(fields: [catalogue_item_id], references: [id], onDelete: SetNull)
+  entity         AuditableEntity  @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+  catalogue_item RiskCatalogItem? @relation(fields: [catalogue_item_id], references: [id], onDelete: SetNull)
 
   @@unique([entity_id, catalogue_item_id]) // prevent duplicate catalogue references per entity
   @@index([entity_id])
@@ -826,6 +946,7 @@ model EngagementRisk {
   id                 String    @id @default(cuid())
   engagement_id      String
   rcm_objective_id   String?
+  catalog_risk_id    String?   // nullable FK — reference to catalog library item (traceability)
   risk_description   String    @db.Text
   risk_rating        String?   // low | medium | high | critical
   risk_category      String?   // operational | financial | compliance | strategic | it
@@ -838,34 +959,39 @@ model EngagementRisk {
 
   engagement      Engagement              @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
   rcm_objective   EngagementRcmObjective?  @relation(fields: [rcm_objective_id], references: [id], onDelete: SetNull)
+  catalog_risk    RiskCatalogItem?         @relation(fields: [catalog_risk_id], references: [id], onDelete: SetNull)
   control_refs    RiskControlRef[]
   procedure_refs  ProcedureRiskRef[]
 
   @@index([engagement_id])
   @@index([rcm_objective_id])
+  @@index([catalog_risk_id])
   @@index([sort_order])
   @@map("engagement_risk")
 }
 
 // Control — engagement-level entity, linked to risks via M:N junction table
 model EngagementControl {
-  id                String    @id @default(cuid())
-  engagement_id     String
-  description       String    @db.Text
-  effectiveness     String?   // strong | adequate | weak | none
-  control_type      String?   // preventive | detective | corrective
-  control_nature    String?   // manual | automated | it_dependent
-  frequency         String?   // continuous | daily | weekly | monthly | quarterly | annually | event_driven
-  workpaper_content Json?     // TipTap JSON for rich text workpaper
-  sort_order        Int       @default(0)
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  engagement_id       String
+  catalog_control_id  String?   // nullable FK — reference to catalog library item (traceability)
+  description         String    @db.Text
+  effectiveness       String?   // strong | adequate | weak | none
+  control_type        String?   // preventive | detective | corrective
+  control_nature      String?   // manual | automated | it_dependent
+  frequency           String?   // continuous | daily | weekly | monthly | quarterly | annually | event_driven
+  workpaper_content   Json?     // TipTap JSON for rich text workpaper
+  sort_order          Int       @default(0)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
 
-  engagement     Engagement       @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
-  risk_refs      RiskControlRef[]
-  procedure_refs ProcedureControlRef[]
+  engagement      Engagement          @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  catalog_control ControlCatalogItem? @relation(fields: [catalog_control_id], references: [id], onDelete: SetNull)
+  risk_refs       RiskControlRef[]
+  procedure_refs  ProcedureControlRef[]
 
   @@index([engagement_id])
+  @@index([catalog_control_id])
   @@index([sort_order])
   @@map("engagement_control")
 }
@@ -945,11 +1071,12 @@ model EngagementObjective {
 }
 
 model EngagementProcedure {
-  id             String    @id @default(cuid())
-  engagement_id  String
-  section_id     String?   // nullable — if null, procedure is directly under engagement
-  objective_id   String?   // nullable — if null, procedure is under section or engagement
-  title          String
+  id                   String    @id @default(cuid())
+  engagement_id        String
+  section_id           String?   // nullable — if null, procedure is directly under engagement
+  objective_id         String?   // nullable — if null, procedure is under section or engagement
+  catalog_procedure_id String?   // nullable FK — reference to catalog library item (traceability)
+  title                String
   description    String?   @db.Text
   procedures     String?   @db.Text  // detailed testing steps / methodology
   procedure_type     String?   // inquiry | observation | inspection | re_performance | analytical | walkthrough | other
@@ -980,19 +1107,21 @@ model EngagementProcedure {
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
-  engagement      Engagement           @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
-  section         EngagementSection?   @relation(fields: [section_id], references: [id], onDelete: Cascade)
-  objective       EngagementObjective? @relation(fields: [objective_id], references: [id], onDelete: Cascade)
-  planning_ref    EngagementProcedure? @relation("ProcedurePlanningRef", fields: [planning_ref_id], references: [id], onDelete: SetNull)
-  execution_refs  EngagementProcedure[] @relation("ProcedurePlanningRef")
-  findings   DraftFindingProcedure[]
-  ref_controls   ProcedureControlRef[]
-  ref_risks      ProcedureRiskRef[]
-  ref_objectives ProcedureObjectiveRef[]
+  engagement         Engagement            @relation(fields: [engagement_id], references: [id], onDelete: Cascade)
+  section            EngagementSection?    @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  objective          EngagementObjective?  @relation(fields: [objective_id], references: [id], onDelete: Cascade)
+  catalog_procedure  ProcedureCatalogItem? @relation(fields: [catalog_procedure_id], references: [id], onDelete: SetNull)
+  planning_ref       EngagementProcedure?  @relation("ProcedurePlanningRef", fields: [planning_ref_id], references: [id], onDelete: SetNull)
+  execution_refs     EngagementProcedure[] @relation("ProcedurePlanningRef")
+  findings           DraftFindingProcedure[]
+  ref_controls       ProcedureControlRef[]
+  ref_risks          ProcedureRiskRef[]
+  ref_objectives     ProcedureObjectiveRef[]
 
   @@index([engagement_id])
   @@index([section_id])
   @@index([objective_id])
+  @@index([catalog_procedure_id])
   @@index([phase])
   @@index([planning_ref_id])
   @@index([sort_order])
