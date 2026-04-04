@@ -102,6 +102,7 @@ export function InlineWorkpaperViewer({
         transitionId,
         comment,
         nextAssigneeId,
+        subType,
       });
       // Fire auto-transition after manual transition
       try {
@@ -113,7 +114,14 @@ export function InlineWorkpaperViewer({
         queryKey: ["planning-workpapers", engagementId],
       });
     },
-    [transitionMutation, entityType, entityId, engagementId, queryClient],
+    [
+      transitionMutation,
+      entityType,
+      entityId,
+      engagementId,
+      queryClient,
+      subType,
+    ],
   );
 
   const handleCreateThread = React.useCallback(
