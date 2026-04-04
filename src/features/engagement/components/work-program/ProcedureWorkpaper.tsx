@@ -301,6 +301,7 @@ export function ProcedureWorkpaper({
               isRestoring={shell.isRestoring}
               autoSaveStatus={autoSave.status}
               autoSaveLastSavedAt={autoSave.lastSavedAt}
+              signoffs={wpSignoffs}
             />
           </>
         )}

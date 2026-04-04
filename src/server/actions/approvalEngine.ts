@@ -256,12 +256,14 @@ export async function executeTransition(
   // 4. Create version snapshot on every transition
   // "start" actions get labeled "Bản thảo" (Draft) for the first version
   const versionLabel = transition.action_type === 'start' ? 'Bản thảo' : transition.action_label;
-  await createTransitionVersion(entityType, entityId, userId, userName, {
+  const newVersion = await createTransitionVersion(entityType, entityId, userId, userName, {
     comment: comment ?? null,
     actionLabel: versionLabel,
   });
 
   // 5. Create sign-off record if transition is flagged to generate signoff
+  // Use the version just created by createTransitionVersion (not the stale pre-transition version)
+  const signoffVersion = newVersion ?? currentEntity.currentVersion;
   const signoffType = transition.generates_signoff && transition.signoff_type ? transition.signoff_type : null;
   if (signoffType) {
     // Derive signoff_order from the forward path of the workflow
@@ -278,7 +280,7 @@ export async function executeTransition(
       signoffType,
       signoffOrder,
       userId,
-      version: currentEntity.currentVersion,
+      version: signoffVersion,
       transitionId,
       comment: comment ?? null,
     });
