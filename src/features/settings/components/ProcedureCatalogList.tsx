@@ -18,8 +18,17 @@ import type { ProcedureCatalogItem } from "../types/riskCatalog";
 const L = SETTINGS_LABELS.riskCatalog;
 const PL = ENGAGEMENT_LABELS.procedure;
 
-export function ProcedureCatalogList() {
-  const { data: items = [], isLoading } = useProcedureCatalogItems();
+interface ProcedureCatalogListProps {
+  domainId?: string;
+  categoryId?: string;
+}
+
+export function ProcedureCatalogList({ domainId, categoryId }: ProcedureCatalogListProps) {
+  const filters = React.useMemo(
+    () => ({ domainId, categoryId }),
+    [domainId, categoryId],
+  );
+  const { data: items = [], isLoading } = useProcedureCatalogItems(filters);
   const deleteMutation = useDeleteProcedureCatalogItem();
 
   const [formOpen, setFormOpen] = React.useState(false);

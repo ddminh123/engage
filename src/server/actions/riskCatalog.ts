@@ -63,6 +63,7 @@ export const createControlItemSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   code: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  categoryId: z.string().nullable().optional(),
   controlType: z.enum(CONTROL_TYPES).nullable().optional(),
   controlNature: z.enum(CONTROL_NATURES).nullable().optional(),
   frequency: z.enum(CONTROL_FREQUENCIES).nullable().optional(),
@@ -76,6 +77,7 @@ export const createProcedureItemSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   code: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  categoryId: z.string().nullable().optional(),
   procedureType: z.enum(PROCEDURE_TYPES).nullable().optional(),
   procedureCategory: z.enum(PROCEDURE_CATEGORIES).nullable().optional(),
   frameworkRef: z.string().nullable().optional(),
@@ -489,6 +491,7 @@ export async function createControlCatalogItem(input: unknown) {
       name: parsed.name,
       code: parsed.code ?? null,
       description: parsed.description ?? null,
+      category_id: parsed.categoryId ?? null,
       control_type: parsed.controlType ?? null,
       control_nature: parsed.controlNature ?? null,
       frequency: parsed.frequency ?? null,
@@ -517,6 +520,7 @@ export async function updateControlCatalogItem(id: string, input: unknown) {
       ...(parsed.name !== undefined && { name: parsed.name }),
       ...(parsed.code !== undefined && { code: parsed.code ?? null }),
       ...(parsed.description !== undefined && { description: parsed.description ?? null }),
+      ...(parsed.categoryId !== undefined && { category_id: parsed.categoryId ?? null }),
       ...(parsed.controlType !== undefined && { control_type: parsed.controlType ?? null }),
       ...(parsed.controlNature !== undefined && { control_nature: parsed.controlNature ?? null }),
       ...(parsed.frequency !== undefined && { frequency: parsed.frequency ?? null }),
@@ -552,6 +556,7 @@ export async function createProcedureCatalogItem(input: unknown) {
       name: parsed.name,
       code: parsed.code ?? null,
       description: parsed.description ?? null,
+      category_id: parsed.categoryId ?? null,
       procedure_type: parsed.procedureType ?? null,
       procedure_category: parsed.procedureCategory ?? null,
       framework_ref: parsed.frameworkRef ?? null,
@@ -579,6 +584,7 @@ export async function updateProcedureCatalogItem(id: string, input: unknown) {
       ...(parsed.name !== undefined && { name: parsed.name }),
       ...(parsed.code !== undefined && { code: parsed.code ?? null }),
       ...(parsed.description !== undefined && { description: parsed.description ?? null }),
+      ...(parsed.categoryId !== undefined && { category_id: parsed.categoryId ?? null }),
       ...(parsed.procedureType !== undefined && { procedure_type: parsed.procedureType ?? null }),
       ...(parsed.procedureCategory !== undefined && { procedure_category: parsed.procedureCategory ?? null }),
       ...(parsed.frameworkRef !== undefined && { framework_ref: parsed.frameworkRef ?? null }),
@@ -751,4 +757,42 @@ export async function copyControlsToEngagement(
   }
 
   return createdControls;
+}
+
+export async function copyProceduresToEngagement(
+  catalogProcedureIds: string[],
+  engagementId: string,
+  objectiveId?: string,
+) {
+  const catalogProcedures = await prisma.procedureCatalogItem.findMany({
+    where: { id: { in: catalogProcedureIds }, is_active: true },
+  });
+
+  const maxOrder = await prisma.engagementProcedure.aggregate({
+    where: { engagement_id: engagementId },
+    _max: { sort_order: true },
+  });
+
+  let nextOrder = (maxOrder._max.sort_order ?? 0) + 1;
+
+  const createdProcedures = [];
+
+  for (const catalogProc of catalogProcedures) {
+    const procedure = await prisma.engagementProcedure.create({
+      data: {
+        engagement_id: engagementId,
+        objective_id: objectiveId ?? null,
+        catalog_procedure_id: catalogProc.id,
+        title: catalogProc.name,
+        description: catalogProc.description,
+        procedure_type: catalogProc.procedure_type,
+        procedure_category: catalogProc.procedure_category,
+        sort_order: nextOrder++,
+      },
+    });
+
+    createdProcedures.push(procedure);
+  }
+
+  return createdProcedures;
 }

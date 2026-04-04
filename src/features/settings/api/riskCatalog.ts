@@ -11,6 +11,7 @@ import type {
   ProcedureCatalogItemFilters,
   CopyRisksToEngagementInput,
   CopyControlsToEngagementInput,
+  CopyProceduresToEngagementInput,
 } from '../types/riskCatalog';
 
 // =============================================================================
@@ -242,6 +243,15 @@ export async function copyRisksToEngagement(data: CopyRisksToEngagementInput): P
 
 export async function copyControlsToEngagement(data: CopyControlsToEngagementInput): Promise<{ success: boolean }> {
   const response = await fetch(`${API_ROUTES.SETTINGS_RISK_CATALOG_CONTROLS}/copy-to-engagement`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+export async function copyProceduresToEngagement(data: CopyProceduresToEngagementInput): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_ROUTES.SETTINGS_RISK_CATALOG_PROCEDURES}/copy-to-engagement`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),

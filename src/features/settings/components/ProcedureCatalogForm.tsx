@@ -27,6 +27,7 @@ import { COMMON_LABELS, SETTINGS_LABELS, ENGAGEMENT_LABELS } from "@/constants/l
 import {
   useCreateProcedureCatalogItem,
   useUpdateProcedureCatalogItem,
+  useRiskCatalogTree,
 } from "../hooks/useRiskCatalog";
 import type { ProcedureCatalogItem } from "../types/riskCatalog";
 
@@ -38,6 +39,7 @@ const schema = z.object({
   name: z.string().min(1, "Bắt buộc"),
   code: z.string().optional(),
   description: z.string().optional(),
+  categoryId: z.string().optional(),
   procedureType: z.string().optional(),
   procedureCategory: z.string().optional(),
   frameworkRef: z.string().optional(),
@@ -59,6 +61,7 @@ export function ProcedureCatalogForm({
   const isEdit = !!editItem;
   const createMutation = useCreateProcedureCatalogItem();
   const updateMutation = useUpdateProcedureCatalogItem();
+  const { data: domains = [] } = useRiskCatalogTree();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -66,6 +69,7 @@ export function ProcedureCatalogForm({
       name: "",
       code: "",
       description: "",
+      categoryId: "",
       procedureType: "",
       procedureCategory: "",
       frameworkRef: "",
@@ -78,6 +82,7 @@ export function ProcedureCatalogForm({
         name: editItem?.name ?? "",
         code: editItem?.code ?? "",
         description: editItem?.description ?? "",
+        categoryId: editItem?.categoryId ?? "",
         procedureType: editItem?.procedureType ?? "",
         procedureCategory: editItem?.procedureCategory ?? "",
         frameworkRef: editItem?.frameworkRef ?? "",
@@ -97,6 +102,7 @@ export function ProcedureCatalogForm({
       name: values.name,
       code: values.code || null,
       description: values.description || null,
+      categoryId: values.categoryId || null,
       procedureType: values.procedureType || null,
       procedureCategory: values.procedureCategory || null,
       frameworkRef: values.frameworkRef || null,
@@ -187,6 +193,54 @@ export function ProcedureCatalogForm({
                     {...field}
                   />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="categoryId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{L.field.category}</FormLabel>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <span className={cn("flex flex-1 text-left truncate", !field.value && "text-muted-foreground")}>
+                        {field.value
+                          ? domains
+                              .flatMap((d) =>
+                                d.categories.map((c) => ({
+                                  id: c.id,
+                                  label: `${d.name} / ${c.name}`,
+                                })),
+                              )
+                              .find((c) => c.id === field.value)?.label ?? field.value
+                          : "Chọn danh mục"}
+                      </span>
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="__none__" label="Không có">
+                      Không có
+                    </SelectItem>
+                    {domains.map((domain) =>
+                      domain.categories.map((cat) => (
+                        <SelectItem
+                          key={cat.id}
+                          value={cat.id}
+                          label={`${domain.name} / ${cat.name}`}
+                        >
+                          {domain.name} / {cat.name}
+                        </SelectItem>
+                      )),
+                    )}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

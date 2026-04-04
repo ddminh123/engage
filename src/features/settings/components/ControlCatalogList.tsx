@@ -18,8 +18,17 @@ import type { ControlCatalogItem } from "../types/riskCatalog";
 const L = SETTINGS_LABELS.riskCatalog;
 const EL = ENGAGEMENT_LABELS.risk;
 
-export function ControlCatalogList() {
-  const { data: items = [], isLoading } = useControlCatalogItems();
+interface ControlCatalogListProps {
+  domainId?: string;
+  categoryId?: string;
+}
+
+export function ControlCatalogList({ domainId, categoryId }: ControlCatalogListProps) {
+  const filters = React.useMemo(
+    () => ({ domainId, categoryId }),
+    [domainId, categoryId],
+  );
+  const { data: items = [], isLoading } = useControlCatalogItems(filters);
   const deleteMutation = useDeleteControlCatalogItem();
 
   const [formOpen, setFormOpen] = React.useState(false);

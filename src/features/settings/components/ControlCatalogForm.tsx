@@ -27,6 +27,7 @@ import { COMMON_LABELS, SETTINGS_LABELS, ENGAGEMENT_LABELS } from "@/constants/l
 import {
   useCreateControlCatalogItem,
   useUpdateControlCatalogItem,
+  useRiskCatalogTree,
 } from "../hooks/useRiskCatalog";
 import type { ControlCatalogItem } from "../types/riskCatalog";
 
@@ -38,6 +39,7 @@ const schema = z.object({
   name: z.string().min(1, "Bắt buộc"),
   code: z.string().optional(),
   description: z.string().optional(),
+  categoryId: z.string().optional(),
   controlType: z.string().optional(),
   controlNature: z.string().optional(),
   frequency: z.string().optional(),
@@ -60,6 +62,7 @@ export function ControlCatalogForm({
   const isEdit = !!editItem;
   const createMutation = useCreateControlCatalogItem();
   const updateMutation = useUpdateControlCatalogItem();
+  const { data: domains = [] } = useRiskCatalogTree();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -67,6 +70,7 @@ export function ControlCatalogForm({
       name: "",
       code: "",
       description: "",
+      categoryId: "",
       controlType: "",
       controlNature: "",
       frequency: "",
@@ -80,6 +84,7 @@ export function ControlCatalogForm({
         name: editItem?.name ?? "",
         code: editItem?.code ?? "",
         description: editItem?.description ?? "",
+        categoryId: editItem?.categoryId ?? "",
         controlType: editItem?.controlType ?? "",
         controlNature: editItem?.controlNature ?? "",
         frequency: editItem?.frequency ?? "",
@@ -100,6 +105,7 @@ export function ControlCatalogForm({
       name: values.name,
       code: values.code || null,
       description: values.description || null,
+      categoryId: values.categoryId || null,
       controlType: values.controlType || null,
       controlNature: values.controlNature || null,
       frequency: values.frequency || null,
@@ -187,6 +193,54 @@ export function ControlCatalogForm({
                     {...field}
                   />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="categoryId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{L.field.category}</FormLabel>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <span className={cn("flex flex-1 text-left truncate", !field.value && "text-muted-foreground")}>
+                        {field.value
+                          ? domains
+                              .flatMap((d) =>
+                                d.categories.map((c) => ({
+                                  id: c.id,
+                                  label: `${d.name} / ${c.name}`,
+                                })),
+                              )
+                              .find((c) => c.id === field.value)?.label ?? field.value
+                          : "Chọn danh mục"}
+                      </span>
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="__none__" label="Không có">
+                      Không có
+                    </SelectItem>
+                    {domains.map((domain) =>
+                      domain.categories.map((cat) => (
+                        <SelectItem
+                          key={cat.id}
+                          value={cat.id}
+                          label={`${domain.name} / ${cat.name}`}
+                        >
+                          {domain.name} / {cat.name}
+                        </SelectItem>
+                      )),
+                    )}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

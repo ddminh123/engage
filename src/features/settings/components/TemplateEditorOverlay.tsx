@@ -252,8 +252,17 @@ export function TemplateEditorOverlay({
             {optionLabel(entityType)}
           </Badge>
 
-          {/* Auto-save indicator */}
+          {/* Save + Auto-save indicator */}
           <div className="flex-1" />
+          <Button
+            variant="link"
+            size="sm"
+            className="text-xs"
+            onClick={() => autoSave.saveNow({ content: localContent })}
+            disabled={autoSave.status === "saving"}
+          >
+            Lưu
+          </Button>
           {autoSave.status === "saving" && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />

@@ -254,7 +254,7 @@ export function RcmTable({
             disabled={isSyncingObjectives}
           >
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-            {L.planning.areas}
+            {L.planning.syncObjectives}
           </Button>
         </div>
         <Button
@@ -270,7 +270,7 @@ export function RcmTable({
       {/* No data */}
       {rcmObjectives.length === 0 && !state.showAddObjective && (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {L.planning.noAreas}
+          {L.planning.noObjectives}
         </div>
       )}
 

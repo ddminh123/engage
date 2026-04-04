@@ -127,6 +127,8 @@ export const ENGAGEMENT_LABELS = {
     procedures: 'Chương trình kiểm toán',
     areas: 'Lĩnh vực',
     noAreas: 'Chưa có lĩnh vực.',
+    syncObjectives: 'Đồng bộ mục tiêu',
+    noObjectives: 'Chưa có mục tiêu kiểm toán.',
     noUnderstanding: 'Chưa có nội dung tìm hiểu.',
   },
   auditObjective: {

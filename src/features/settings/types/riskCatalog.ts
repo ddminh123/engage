@@ -41,6 +41,7 @@ export interface RiskCatalogItem {
 
 export interface ControlCatalogItem {
   id: string;
+  categoryId: string | null;
   name: string;
   code: string | null;
   description: string | null;
@@ -57,6 +58,7 @@ export interface ControlCatalogItem {
 
 export interface ProcedureCatalogItem {
   id: string;
+  categoryId: string | null;
   name: string;
   code: string | null;
   description: string | null;
@@ -103,4 +105,10 @@ export interface CopyControlsToEngagementInput {
   catalogControlIds: string[];
   engagementId: string;
   linkToRiskId?: string;
+}
+
+export interface CopyProceduresToEngagementInput {
+  catalogProcedureIds: string[];
+  engagementId: string;
+  objectiveId?: string;
 }

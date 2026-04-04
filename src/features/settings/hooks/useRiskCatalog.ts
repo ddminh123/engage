@@ -8,6 +8,7 @@ import type {
   ProcedureCatalogItemFilters,
   CopyRisksToEngagementInput,
   CopyControlsToEngagementInput,
+  CopyProceduresToEngagementInput,
 } from "../types/riskCatalog";
 
 const KEYS = {
@@ -246,6 +247,17 @@ export function useCopyControlsToEngagement() {
     mutationFn: (data: CopyControlsToEngagementInput) => api.copyControlsToEngagement(data),
     onSuccess: (_, variables) => {
       // Invalidate both catalog and engagement queries
+      qc.invalidateQueries({ queryKey: ["risk-catalog"] });
+      qc.invalidateQueries({ queryKey: ["engagement", variables.engagementId] });
+    },
+  });
+}
+
+export function useCopyProceduresToEngagement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CopyProceduresToEngagementInput) => api.copyProceduresToEngagement(data),
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ["risk-catalog"] });
       qc.invalidateQueries({ queryKey: ["engagement", variables.engagementId] });
     },

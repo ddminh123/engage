@@ -17,11 +17,13 @@ import { CatalogDomainTree } from "@/features/settings/components/CatalogDomainT
 import {
   useRiskCatalogItems,
   useControlCatalogItems,
+  useProcedureCatalogItems,
   useCopyRisksToEngagement,
   useCopyControlsToEngagement,
+  useCopyProceduresToEngagement,
 } from "@/features/settings/hooks/useRiskCatalog";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
-import type { RiskCatalogItem, ControlCatalogItem } from "@/features/settings/types/riskCatalog";
+import type { RiskCatalogItem, ControlCatalogItem, ProcedureCatalogItem } from "@/features/settings/types/riskCatalog";
 
 const L = ENGAGEMENT_LABELS;
 const LR = L.risk;
@@ -31,11 +33,13 @@ const LR = L.risk;
 interface CatalogPickerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  entityType: "risk" | "control";
+  entityType: "risk" | "control" | "procedure";
   engagementId: string;
   rcmObjectiveId?: string;
   /** When copying controls, link them to this risk */
   linkToRiskId?: string;
+  /** When copying procedures, link them to this objective */
+  objectiveId?: string;
   onItemsAdded?: () => void;
 }
 
@@ -48,6 +52,7 @@ export function CatalogPickerDialog({
   engagementId,
   rcmObjectiveId,
   linkToRiskId,
+  objectiveId,
   onItemsAdded,
 }: CatalogPickerDialogProps) {
   const [search, setSearch] = React.useState("");
@@ -82,21 +87,32 @@ export function CatalogPickerDialog({
     [search],
   );
 
+  const procedureFilters = React.useMemo(
+    () => ({
+      search: search || undefined,
+    }),
+    [search],
+  );
+
   const { data: risks = [], isLoading: isLoadingRisks } = useRiskCatalogItems(
     entityType === "risk" ? riskFilters : undefined,
   );
   const { data: controls = [], isLoading: isLoadingControls } = useControlCatalogItems(
     entityType === "control" ? controlFilters : undefined,
   );
+  const { data: procedures = [], isLoading: isLoadingProcedures } = useProcedureCatalogItems(
+    entityType === "procedure" ? procedureFilters : undefined,
+  );
 
   const copyRisks = useCopyRisksToEngagement();
   const copyControls = useCopyControlsToEngagement();
+  const copyProcedures = useCopyProceduresToEngagement();
 
-  const isLoading = entityType === "risk" ? isLoadingRisks : isLoadingControls;
-  const isCopying = copyRisks.isPending || copyControls.isPending;
+  const isLoading = entityType === "risk" ? isLoadingRisks : entityType === "control" ? isLoadingControls : isLoadingProcedures;
+  const isCopying = copyRisks.isPending || copyControls.isPending || copyProcedures.isPending;
 
-  const items: (RiskCatalogItem | ControlCatalogItem)[] =
-    entityType === "risk" ? risks : controls;
+  const items: (RiskCatalogItem | ControlCatalogItem | ProcedureCatalogItem)[] =
+    entityType === "risk" ? risks : entityType === "control" ? controls : procedures;
 
   // Toggle selection
   const toggleItem = (id: string) => {
@@ -128,11 +144,17 @@ export function CatalogPickerDialog({
         engagementId,
         rcmObjectiveId,
       });
-    } else {
+    } else if (entityType === "control") {
       await copyControls.mutateAsync({
         catalogControlIds: ids,
         engagementId,
         linkToRiskId,
+      });
+    } else {
+      await copyProcedures.mutateAsync({
+        catalogProcedureIds: ids,
+        engagementId,
+        objectiveId,
       });
     }
 
@@ -143,7 +165,9 @@ export function CatalogPickerDialog({
   const title =
     entityType === "risk"
       ? "Thêm rủi ro từ thư viện"
-      : "Thêm kiểm soát từ thư viện";
+      : entityType === "control"
+        ? "Thêm kiểm soát từ thư viện"
+        : "Thêm thủ tục từ thư viện";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -187,7 +211,7 @@ export function CatalogPickerDialog({
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={entityType === "risk" ? "Tìm rủi ro..." : "Tìm kiểm soát..."}
+                placeholder={entityType === "risk" ? "Tìm rủi ro..." : entityType === "control" ? "Tìm kiểm soát..." : "Tìm thủ tục..."}
                 className="pl-9"
               />
             </div>
@@ -211,10 +235,10 @@ export function CatalogPickerDialog({
                       onCheckedChange={toggleAll}
                     />
                     <span className="flex-1">
-                      {entityType === "risk" ? LR.field.riskDescription : L.control.title}
+                      {entityType === "risk" ? LR.field.riskDescription : entityType === "control" ? L.control.title : "Thủ tục"}
                     </span>
                     <span className="w-24 text-center">
-                      {entityType === "risk" ? LR.field.riskRating : LR.field.controlType}
+                      {entityType === "risk" ? LR.field.riskRating : entityType === "control" ? LR.field.controlType : "Loại"}
                     </span>
                   </div>
 
@@ -257,34 +281,70 @@ export function CatalogPickerDialog({
                       );
                     }
 
-                    const control = item as ControlCatalogItem;
+                    if (entityType === "control") {
+                      const control = item as ControlCatalogItem;
+                      return (
+                        <button
+                          key={control.id}
+                          type="button"
+                          className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent/50 ${isSelected ? "bg-accent/30" : ""}`}
+                          onClick={() => toggleItem(control.id)}
+                        >
+                          <Checkbox checked={isSelected} tabIndex={-1} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              {control.code && (
+                                <Badge variant="outline" className="shrink-0 text-[10px]">
+                                  {control.code}
+                                </Badge>
+                              )}
+                              <span className="text-sm truncate">{control.name}</span>
+                            </div>
+                            {control.description && (
+                              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+                                {control.description}
+                              </p>
+                            )}
+                          </div>
+                          <div className="w-24 text-center">
+                            {control.controlType && (
+                              <Badge variant="outline" className="text-[10px]">
+                                {LR.controlType[control.controlType] ?? control.controlType}
+                              </Badge>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    }
+
+                    const proc = item as ProcedureCatalogItem;
                     return (
                       <button
-                        key={control.id}
+                        key={proc.id}
                         type="button"
                         className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent/50 ${isSelected ? "bg-accent/30" : ""}`}
-                        onClick={() => toggleItem(control.id)}
+                        onClick={() => toggleItem(proc.id)}
                       >
                         <Checkbox checked={isSelected} tabIndex={-1} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            {control.code && (
+                            {proc.code && (
                               <Badge variant="outline" className="shrink-0 text-[10px]">
-                                {control.code}
+                                {proc.code}
                               </Badge>
                             )}
-                            <span className="text-sm truncate">{control.name}</span>
+                            <span className="text-sm truncate">{proc.name}</span>
                           </div>
-                          {control.description && (
+                          {proc.description && (
                             <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
-                              {control.description}
+                              {proc.description}
                             </p>
                           )}
                         </div>
                         <div className="w-24 text-center">
-                          {control.controlType && (
+                          {proc.procedureType && (
                             <Badge variant="outline" className="text-[10px]">
-                              {LR.controlType[control.controlType] ?? control.controlType}
+                              {L.procedure.procedureType[proc.procedureType] ?? proc.procedureType}
                             </Badge>
                           )}
                         </div>

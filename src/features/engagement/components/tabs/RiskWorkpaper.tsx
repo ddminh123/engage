@@ -4,9 +4,12 @@ import * as React from "react";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { LabeledSelect } from "@/components/shared/LabeledSelect";
+import { Button } from "@/components/ui/button";
 import { WorkpaperDocument } from "@/components/shared/workpaper/WorkpaperDocument";
 import { FieldRow } from "@/components/shared/workpaper/WorkpaperFieldsTab";
+import { textToDoc } from "@/components/shared/workpaper/tiptapUtils";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
+import { useCreateManualVersion } from "@/hooks/useWorkpaper";
 import { useUpdateEngagementRisk } from "../../hooks/useEngagements";
 import type { EngagementRisk, EngagementRiskUpdateInput } from "../../types";
 import type { JSONContent } from "@tiptap/react";
@@ -45,6 +48,7 @@ export function RiskWorkpaper({
   onBack,
 }: RiskWorkpaperProps) {
   const updateRisk = useUpdateEngagementRisk();
+  const manualVersion = useCreateManualVersion();
 
   // Local field state (auto-save on change)
   const [riskRating, setRiskRating] = React.useState(risk.riskRating ?? "");
@@ -177,11 +181,28 @@ export function RiskWorkpaper({
       entityId={risk.id}
       engagementId={engagementId}
       title={risk.riskDescription}
-      content={risk.workpaperContent as JSONContent | null}
+      content={(risk.workpaperContent as JSONContent | null) ?? textToDoc(risk.riskDescription)}
       onAutoSave={handleAutoSave}
       onSave={handleSave}
       onBack={onBack}
       isSaving={updateRisk.isPending}
+      headerExtra={(autoSave) => (
+        <>
+          <div className="flex-1" />
+          <Button
+            variant="link"
+            size="sm"
+            className="text-xs"
+            onClick={async () => {
+              await autoSave.saveNow?.();
+              manualVersion.mutate({ entityType: "risk", engagementId, entityId: risk.id });
+            }}
+            disabled={manualVersion.isPending}
+          >
+            Lưu phiên bản
+          </Button>
+        </>
+      )}
       tabs={[infoTab]}
       defaultTab="info"
     />
