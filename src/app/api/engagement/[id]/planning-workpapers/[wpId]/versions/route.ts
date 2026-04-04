@@ -19,12 +19,9 @@ export const GET = withAccess(
 
 export const POST = withAccess(
   'engagement:write',
-  async (req: NextRequest, context: { params: Promise<Record<string, string>> }, session: Session) => {
+  async (_req: NextRequest, context: { params: Promise<Record<string, string>> }, session: Session) => {
     const { wpId } = await context.params;
     try {
-      const body = await req.json().catch(() => ({}));
-      const description = body.description ? String(body.description).trim() : null;
-
       const snapshot = await buildEntitySnapshot('planning_workpaper', wpId);
       if (!snapshot) {
         return Response.json(
@@ -38,7 +35,7 @@ export const POST = withAccess(
         snapshot,
         session.user.id,
         session.user.name ?? '',
-        { actionLabel: 'Lưu phiên bản', versionType: 'manual', comment: description },
+        { actionLabel: 'Lưu phiên bản', versionType: 'manual' },
       );
       return Response.json({ data: version });
     } catch (error) {

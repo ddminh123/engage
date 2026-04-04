@@ -39,15 +39,8 @@ export function useWorkpaperContentSave() {
       entityId: string;
       content: unknown;
     }) => saveWorkpaperContentApi(entityType, engagementId, entityId, content),
-    onSuccess: (_, { engagementId, entityType }) => {
+    onSuccess: (_, { engagementId }) => {
       qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
-      // Also invalidate planning workpapers cache when saving planning workpapers
-      // This causes inline viewers to auto-refresh with new content
-      if (entityType === 'planning_workpaper') {
-        qc.invalidateQueries({
-          queryKey: ['planning-workpapers', engagementId]
-        });
-      }
     },
   });
 }
@@ -100,13 +93,11 @@ export function useCreateManualVersion() {
       entityType,
       engagementId,
       entityId,
-      description,
     }: {
       entityType: string;
       engagementId: string;
       entityId: string;
-      description?: string;
-    }) => createManualVersionApi(entityType, engagementId, entityId, description),
+    }) => createManualVersionApi(entityType, engagementId, entityId),
     onSuccess: (_, { entityType, entityId, engagementId }) => {
       qc.invalidateQueries({ queryKey: engagementKey(engagementId) });
       qc.invalidateQueries({ queryKey: workpaperVersionsKey(entityType, entityId) });

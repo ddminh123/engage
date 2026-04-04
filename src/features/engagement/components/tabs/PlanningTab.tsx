@@ -259,7 +259,6 @@ export function PlanningTab({
                       editButton={scopeEditButton}
                       auditObjectives={engagement.auditObjectives}
                       showObjectives
-                      subType={step.key}
                     />
                   ) : (
                     <ScopeSection
@@ -502,7 +501,6 @@ export function PlanningTab({
                     currentVersion={undWp.currentVersion}
                     members={engagement.members}
                     editButton={undEditButton}
-                    subType={step.key}
                   />
                 ) : engagement.understanding ? (
                   <RichTextDisplay content={engagement.understanding} />
@@ -688,7 +686,6 @@ export function PlanningTab({
                     currentVersion={wp.currentVersion}
                     members={engagement.members}
                     editButton={customEditButton}
-                    subType={step.key}
                   />
                 ) : (
                   <WorkpaperEmptyState
