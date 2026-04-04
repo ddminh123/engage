@@ -17,14 +17,8 @@ import {
   type MultiSelectOption,
 } from "@/components/shared/MultiSelectCommand";
 import { FileInput } from "@/components/shared/FileInput";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { WorkflowChartDialog } from "@/components/shared/workpaper/WorkflowChartDialog";
+import { VersionPreviewDialog } from "@/components/shared/workpaper/VersionPreviewDialog";
 import { WorkpaperDocument } from "@/components/shared/workpaper/WorkpaperDocument";
 import { useWorkpaperShell } from "@/components/shared/workpaper/useWorkpaperShell";
 import { FieldRow } from "@/components/shared/workpaper/WorkpaperFieldsTab";
@@ -297,8 +291,6 @@ export function ProcedureWorkpaper({
               versions={shell.versions}
               currentVersion={procedure.currentVersion}
               onViewVersion={shell.setViewVersion}
-              onRestoreVersion={(v) => shell.handleRestore(v)}
-              isRestoring={shell.isRestoring}
               autoSaveStatus={autoSave.status}
               autoSaveLastSavedAt={autoSave.lastSavedAt}
               signoffs={wpSignoffs}
@@ -320,46 +312,17 @@ export function ProcedureWorkpaper({
         findingTabKey="conclusion"
       />
 
-      {/* Version detail dialog */}
-      <Dialog
-        open={shell.viewVersion !== null}
-        onOpenChange={(open) => {
-          if (!open) shell.setViewVersion(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Phiên bản {shell.viewVersion}</DialogTitle>
-            {shell.versionDetail?.comment && (
-              <DialogDescription>
-                {shell.versionDetail.comment}
-              </DialogDescription>
-            )}
-          </DialogHeader>
-          {shell.versionDetail?.snapshot ? (
-            <div className="space-y-3 text-sm">
-              {Object.entries(
-                shell.versionDetail.snapshot as Record<string, unknown>,
-              ).map(([key, value]) =>
-                value != null && value !== "" ? (
-                  <div key={key}>
-                    <span className="font-medium text-muted-foreground">
-                      {key}
-                    </span>
-                    <p className="mt-0.5 whitespace-pre-wrap break-words">
-                      {typeof value === "object"
-                        ? JSON.stringify(value, null, 2).slice(0, 500)
-                        : String(value)}
-                    </p>
-                  </div>
-                ) : null,
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Đang tải...</p>
-          )}
-        </DialogContent>
-      </Dialog>
+      <VersionPreviewDialog
+        entityType="procedure"
+        entityId={procedure.id}
+        engagementId={engagementId}
+        version={shell.viewVersion}
+        onClose={() => shell.setViewVersion(null)}
+        onRestore={shell.handleRestore}
+        isRestoring={shell.isRestoring}
+        currentVersion={procedure.currentVersion}
+        signoffs={wpSignoffs}
+      />
 
       <WorkflowChartDialog
         open={shell.workflowChartOpen}

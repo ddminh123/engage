@@ -45,7 +45,8 @@ import { usePlanningEditor } from "../../hooks/usePlanningEditor";
 import { useIsReviewMode } from "@/features/settings/hooks/useApprovalStatuses";
 import { StatusBadge } from "@/components/shared/workpaper/StatusBadge";
 import { HistorySheet } from "@/components/shared/workpaper/HistorySheet";
-import { useWorkpaperVersions } from "@/hooks/useWorkpaper";
+import { VersionPreviewDialog } from "@/components/shared/workpaper/VersionPreviewDialog";
+import { useWorkpaperVersions, useRestoreWorkpaperVersion } from "@/hooks/useWorkpaper";
 import { useSyncRcmToWorkProgram } from "../../hooks/useEngagements";
 import { usePlanningSteps } from "@/features/settings/hooks/usePlanningSteps";
 import { usePlanningWorkpapers } from "../../hooks/usePlanningWorkpapers";
@@ -875,19 +876,43 @@ function ViewerVersionInfo({
   currentVersion: number;
   updatedAt?: string | null;
 }) {
+  const [viewVersion, setViewVersion] = useState<number | null>(null);
   const { data: versions = [] } = useWorkpaperVersions(
     entityType,
     engagementId,
     entityId,
   );
+  const restoreMutation = useRestoreWorkpaperVersion();
+
+  const handleRestore = async (version: number) => {
+    await restoreMutation.mutateAsync({
+      entityType,
+      engagementId,
+      entityId,
+      version,
+    });
+  };
 
   return (
-    <HistorySheet
-      versions={versions}
-      currentVersion={currentVersion}
-      autoSaveStatus="idle"
-      autoSaveLastSavedAt={updatedAt ? new Date(updatedAt) : null}
-    />
+    <>
+      <HistorySheet
+        versions={versions}
+        currentVersion={currentVersion}
+        onViewVersion={setViewVersion}
+        autoSaveStatus="idle"
+        autoSaveLastSavedAt={updatedAt ? new Date(updatedAt) : null}
+      />
+      <VersionPreviewDialog
+        entityType={entityType}
+        entityId={entityId}
+        engagementId={engagementId}
+        version={viewVersion}
+        onClose={() => setViewVersion(null)}
+        onRestore={handleRestore}
+        isRestoring={restoreMutation.isPending}
+        currentVersion={currentVersion}
+      />
+    </>
   );
 }
 

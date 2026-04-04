@@ -46,8 +46,6 @@ interface HistorySheetProps {
   versions: EntityVersionSummary[];
   currentVersion: number;
   onViewVersion?: (version: number) => void;
-  onRestoreVersion?: (version: number) => void;
-  isRestoring?: boolean;
   trigger?: React.ReactNode;
   /** Auto-save state — when provided, renders a combined save + version trigger */
   autoSaveStatus?: SaveStatus;
@@ -60,8 +58,6 @@ export function HistorySheet({
   versions,
   currentVersion,
   onViewVersion,
-  onRestoreVersion,
-  isRestoring,
   trigger,
   autoSaveStatus,
   autoSaveLastSavedAt,
@@ -157,8 +153,6 @@ export function HistorySheet({
             versions={versions}
             currentVersion={currentVersion}
             onView={onViewVersion}
-            onRestore={onRestoreVersion}
-            isRestoring={isRestoring}
             signoffs={signoffs}
           />
         </div>
@@ -173,15 +167,11 @@ function VersionList({
   versions,
   currentVersion,
   onView,
-  onRestore,
-  isRestoring,
   signoffs,
 }: {
   versions: EntityVersionSummary[];
   currentVersion: number;
   onView?: (version: number) => void;
-  onRestore?: (version: number) => void;
-  isRestoring?: boolean;
   signoffs?: WpSignoff[];
 }) {
   // Group active signoffs by version number
@@ -232,29 +222,16 @@ function VersionList({
                   </Badge>
                 )}
               </span>
-              <div className="flex items-center gap-1">
-                {onView && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 text-[11px] px-1.5"
-                    onClick={() => onView(v.version)}
-                  >
-                    Xem phiên bản
-                  </Button>
-                )}
-                {onRestore && v.version !== currentVersion && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 text-[11px] px-1.5 text-orange-600 hover:text-orange-700"
-                    onClick={() => onRestore(v.version)}
-                    disabled={isRestoring}
-                  >
-                    Khôi phục
-                  </Button>
-                )}
-              </div>
+              {onView && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 text-[11px] px-1.5"
+                  onClick={() => onView(v.version)}
+                >
+                  Xem
+                </Button>
+              )}
             </div>
             {v.comment && (
               <p className="text-xs text-muted-foreground truncate">
