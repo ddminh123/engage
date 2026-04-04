@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { AlertCircle, Cloud, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Cloud, Loader2 } from "lucide-react";
 import {
   Sheet,
   SheetTrigger,
@@ -15,7 +15,18 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import type { AutoSaveStatus as SaveStatus } from "./useAutoSave";
-import type { EntityVersionSummary } from "@/features/engagement/types";
+import type {
+  EntityVersionSummary,
+  WpSignoff,
+} from "@/features/engagement/types";
+
+// ── Signoff helpers ──
+
+const SIGNOFF_TYPE_LABELS: Record<string, string> = {
+  prepare: "Thực hiện",
+  review: "Soát xét",
+  approve: "Phê duyệt",
+};
 
 // ── Helpers ──
 
@@ -41,6 +52,8 @@ interface HistorySheetProps {
   /** Auto-save state — when provided, renders a combined save + version trigger */
   autoSaveStatus?: SaveStatus;
   autoSaveLastSavedAt?: Date | null;
+  /** Sign-off records — when provided, shows signoff indicators on each version */
+  signoffs?: WpSignoff[];
 }
 
 export function HistorySheet({
@@ -52,6 +65,7 @@ export function HistorySheet({
   trigger,
   autoSaveStatus,
   autoSaveLastSavedAt,
+  signoffs,
 }: HistorySheetProps) {
   // Tick every 15s to refresh relative time
   const [, setTick] = useState(0);
@@ -145,6 +159,7 @@ export function HistorySheet({
             onView={onViewVersion}
             onRestore={onRestoreVersion}
             isRestoring={isRestoring}
+            signoffs={signoffs}
           />
         </div>
       </SheetContent>
@@ -160,13 +175,28 @@ function VersionList({
   onView,
   onRestore,
   isRestoring,
+  signoffs,
 }: {
   versions: EntityVersionSummary[];
   currentVersion: number;
   onView?: (version: number) => void;
   onRestore?: (version: number) => void;
   isRestoring?: boolean;
+  signoffs?: WpSignoff[];
 }) {
+  // Group active signoffs by version number
+  const signoffsByVersion = React.useMemo(() => {
+    if (!signoffs?.length) return null;
+    const map = new Map<number, WpSignoff[]>();
+    for (const s of signoffs) {
+      if (s.version == null || s.invalidatedAt) continue;
+      const list = map.get(s.version) ?? [];
+      list.push(s);
+      map.set(s.version, list);
+    }
+    return map;
+  }, [signoffs]);
+
   if (versions.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
@@ -177,65 +207,83 @@ function VersionList({
 
   return (
     <div className="divide-y pt-1">
-      {versions.map((v) => (
-        <div
-          key={v.id}
-          className={cn(
-            "py-2.5 space-y-0.5",
-            v.version === currentVersion &&
-              "bg-primary/5 -mx-2 px-2 rounded-md",
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
-              v{v.version}
-              {v.actionLabel && (
-                <span className="text-xs font-normal text-muted-foreground ml-1.5">
-                  — {v.actionLabel}
-                </span>
-              )}
-              {v.version === currentVersion && (
-                <Badge variant="secondary" className="text-[10px] h-4 ml-1.5">
-                  Hiện tại
-                </Badge>
-              )}
-            </span>
-            <div className="flex items-center gap-1">
-              {onView && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 text-[11px] px-1.5"
-                  onClick={() => onView(v.version)}
-                >
-                  Xem phiên bản
-                </Button>
-              )}
-              {onRestore && v.version !== currentVersion && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 text-[11px] px-1.5 text-orange-600 hover:text-orange-700"
-                  onClick={() => onRestore(v.version)}
-                  disabled={isRestoring}
-                >
-                  Khôi phục
-                </Button>
-              )}
+      {versions.map((v) => {
+        const versionSignoffs = signoffsByVersion?.get(v.version);
+        return (
+          <div
+            key={v.id}
+            className={cn(
+              "py-2.5 space-y-0.5",
+              v.version === currentVersion &&
+                "bg-primary/5 -mx-2 px-2 rounded-md",
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">
+                v{v.version}
+                {v.actionLabel && (
+                  <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                    — {v.actionLabel}
+                  </span>
+                )}
+                {v.version === currentVersion && (
+                  <Badge variant="secondary" className="text-[10px] h-4 ml-1.5">
+                    Hiện tại
+                  </Badge>
+                )}
+              </span>
+              <div className="flex items-center gap-1">
+                {onView && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 text-[11px] px-1.5"
+                    onClick={() => onView(v.version)}
+                  >
+                    Xem phiên bản
+                  </Button>
+                )}
+                {onRestore && v.version !== currentVersion && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 text-[11px] px-1.5 text-orange-600 hover:text-orange-700"
+                    onClick={() => onRestore(v.version)}
+                    disabled={isRestoring}
+                  >
+                    Khôi phục
+                  </Button>
+                )}
+              </div>
             </div>
+            {v.comment && (
+              <p className="text-xs text-muted-foreground truncate">
+                {v.comment}
+              </p>
+            )}
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span>{v.publisher.name}</span>
+              <span>·</span>
+              <span>{formatDate(v.publishedAt)}</span>
+            </div>
+
+            {/* Signoff indicators */}
+            {versionSignoffs && versionSignoffs.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                {versionSignoffs.map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-px text-[10px] text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                  >
+                    <CheckCircle2 className="h-2.5 w-2.5" />
+                    {SIGNOFF_TYPE_LABELS[s.signoffType] ?? s.signoffType}: {s.user.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          {v.comment && (
-            <p className="text-xs text-muted-foreground truncate">
-              {v.comment}
-            </p>
-          )}
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span>{v.publisher.name}</span>
-            <span>·</span>
-            <span>{formatDate(v.publishedAt)}</span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

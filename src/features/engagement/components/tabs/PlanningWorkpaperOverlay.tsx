@@ -8,8 +8,13 @@ import { WpSignoffBar } from "@/components/shared/workpaper/WpSignoffBar";
 import { WorkpaperDocument } from "@/components/shared/workpaper/WorkpaperDocument";
 import { WorkflowChartDialog } from "@/components/shared/workpaper/WorkflowChartDialog";
 import { useWorkpaperShell } from "@/components/shared/workpaper/useWorkpaperShell";
-import { VersionDescriptionDialog } from "./VersionDescriptionDialog";
+import { VersionSaveContent } from "./VersionDescriptionDialog";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -113,17 +118,18 @@ export function PlanningWorkpaperOverlay({
     ],
   );
 
-  // Keyboard shortcut: Ctrl/Cmd+S → save content then open version dialog
+  // Keyboard shortcut: Ctrl/Cmd+S → save content then open version popover
   React.useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's' && !descriptionDialogOpen) {
         e.preventDefault();
-        await saveNowRef.current?.();
+        e.stopImmediatePropagation();
+        saveNowRef.current?.();
         setDescriptionDialogOpen(true);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [descriptionDialogOpen]);
 
   return (
@@ -171,18 +177,40 @@ export function PlanningWorkpaperOverlay({
 
             <div className="flex-1" />
 
-            <Button
-              variant="link"
-              size="sm"
-              className="text-xs"
-              onClick={async () => {
-                await autoSave.saveNow?.();
-                setDescriptionDialogOpen(true);
+            <Popover
+              open={descriptionDialogOpen}
+              onOpenChange={(o) => {
+                if (!o) setDescriptionDialogOpen(false);
               }}
-              disabled={shell.isSavingVersion}
             >
-              Lưu phiên bản
-            </Button>
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      autoSave.saveNow?.();
+                      setDescriptionDialogOpen(true);
+                    }}
+                    disabled={shell.isSavingVersion}
+                  />
+                }
+              >
+                Lưu phiên bản
+              </PopoverTrigger>
+
+              <PopoverContent align="end" className="w-80 p-0">
+                <VersionSaveContent
+                  onConfirm={async (description) => {
+                    await shell.saveVersion(description);
+                    setDescriptionDialogOpen(false);
+                  }}
+                  onCancel={() => setDescriptionDialogOpen(false)}
+                  isLoading={shell.isSavingVersion}
+                />
+              </PopoverContent>
+            </Popover>
 
             <HistorySheet
               versions={shell.versions}
@@ -192,6 +220,7 @@ export function PlanningWorkpaperOverlay({
               isRestoring={shell.isRestoring}
               autoSaveStatus={autoSave.status}
               autoSaveLastSavedAt={autoSave.lastSavedAt}
+              signoffs={wpSignoffs}
             />
           </>
           );
@@ -260,14 +289,6 @@ export function PlanningWorkpaperOverlay({
         subType={stepConfigKey ?? ""}
       />
 
-      <VersionDescriptionDialog
-        open={descriptionDialogOpen}
-        onOpenChange={setDescriptionDialogOpen}
-        onConfirm={async (description) => {
-          await shell.saveVersion(description);
-          setDescriptionDialogOpen(false);
-        }}
-      />
     </>
   );
 }
