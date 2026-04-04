@@ -8,6 +8,7 @@ import { WpSignoffBar } from "@/components/shared/workpaper/WpSignoffBar";
 import { WorkpaperDocument } from "@/components/shared/workpaper/WorkpaperDocument";
 import { WorkflowChartDialog } from "@/components/shared/workpaper/WorkflowChartDialog";
 import { useWorkpaperShell } from "@/components/shared/workpaper/useWorkpaperShell";
+import { VersionDescriptionDialog } from "./VersionDescriptionDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,6 +56,7 @@ export function PlanningWorkpaperOverlay({
 
   const [pendingObjective, setPendingObjective] =
     React.useState<PendingObjectiveData | null>(null);
+  const [descriptionDialogOpen, setDescriptionDialogOpen] = React.useState(false);
 
   const handleAddObjective = React.useCallback(
     (quote: string, _from: number, _to: number) => {
@@ -110,6 +112,20 @@ export function PlanningWorkpaperOverlay({
     ],
   );
 
+  // Keyboard shortcut handler for Ctrl/Cmd+S
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's' && !descriptionDialogOpen) {
+        e.preventDefault();
+        // Trigger same flow as save button click
+        // The autoSave callback will be triggered from headerExtra
+        setDescriptionDialogOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [descriptionDialogOpen]);
+
   return (
     <>
       <WorkpaperDocument
@@ -159,7 +175,7 @@ export function PlanningWorkpaperOverlay({
               className="text-xs"
               onClick={async () => {
                 await autoSave.saveNow?.();
-                shell.saveVersion();
+                setDescriptionDialogOpen(true);
               }}
               disabled={shell.isSavingVersion}
             >
@@ -238,6 +254,15 @@ export function PlanningWorkpaperOverlay({
         onOpenChange={shell.setWorkflowChartOpen}
         entityType="planning_workpaper"
         currentStatus={workpaper.approvalStatus}
+      />
+
+      <VersionDescriptionDialog
+        open={descriptionDialogOpen}
+        onOpenChange={setDescriptionDialogOpen}
+        onConfirm={async (description) => {
+          await shell.saveVersion(description);
+          setDescriptionDialogOpen(false);
+        }}
       />
     </>
   );
