@@ -16,6 +16,7 @@ interface WorkflowChartDialogProps {
   onOpenChange: (open: boolean) => void;
   entityType: string;
   currentStatus: string;
+  subType?: string;
 }
 
 export function WorkflowChartDialog({
@@ -23,17 +24,33 @@ export function WorkflowChartDialog({
   onOpenChange,
   entityType,
   currentStatus,
+  subType = "",
 }: WorkflowChartDialogProps) {
   const { data: workflows = [] } = useApprovalWorkflows();
 
-  // Find the workflow bound to this entity type, or fall back to default
+  // Find the workflow bound to this entity type + subType, or fall back to default
   const workflow = React.useMemo(() => {
-    const bound = workflows.find((w) =>
-      w.entityBindings.some((b) => b.entityType === entityType),
+    // 1. Try exact match (entityType + subType)
+    const exactMatch = workflows.find((w) =>
+      w.entityBindings.some(
+        (b) => b.entityType === entityType && b.subType === subType,
+      ),
     );
-    if (bound) return bound;
+    if (exactMatch) return exactMatch;
+
+    // 2. If subType provided, try base type fallback (entityType + '')
+    if (subType) {
+      const baseMatch = workflows.find((w) =>
+        w.entityBindings.some(
+          (b) => b.entityType === entityType && b.subType === "",
+        ),
+      );
+      if (baseMatch) return baseMatch;
+    }
+
+    // 3. Fall back to default workflow
     return workflows.find((w) => w.isDefault && w.isActive) ?? null;
-  }, [workflows, entityType]);
+  }, [workflows, entityType, subType]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

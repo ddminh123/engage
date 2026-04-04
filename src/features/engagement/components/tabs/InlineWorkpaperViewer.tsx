@@ -283,6 +283,7 @@ export function InlineWorkpaperViewer({
         onOpenChange={setWorkflowChartOpen}
         entityType={entityType}
         currentStatus={approvalStatus ?? "not_started"}
+        subType={subType}
       />
     </>
   );
