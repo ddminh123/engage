@@ -17,7 +17,13 @@ export function RiskCatalogManager() {
   >();
 
   return (
-    <Tabs defaultValue="risks">
+    <Tabs
+      defaultValue="risks"
+      onValueChange={() => {
+        setSelectedDomainId(undefined);
+        setSelectedCategoryId(undefined);
+      }}
+    >
       <TabsList>
         <TabsTrigger value="risks">{L.tab.risks}</TabsTrigger>
         <TabsTrigger value="controls">{L.tab.controls}</TabsTrigger>
@@ -52,10 +58,16 @@ export function RiskCatalogManager() {
             />
           </TabsContent>
           <TabsContent value="controls" className="mt-0">
-            <ControlCatalogList />
+            <ControlCatalogList
+              domainId={selectedDomainId}
+              categoryId={selectedCategoryId}
+            />
           </TabsContent>
           <TabsContent value="procedures" className="mt-0">
-            <ProcedureCatalogList />
+            <ProcedureCatalogList
+              domainId={selectedDomainId}
+              categoryId={selectedCategoryId}
+            />
           </TabsContent>
         </div>
       </div>

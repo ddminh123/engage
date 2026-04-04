@@ -4,9 +4,12 @@ import * as React from "react";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { LabeledSelect } from "@/components/shared/LabeledSelect";
+import { Button } from "@/components/ui/button";
 import { WorkpaperDocument } from "@/components/shared/workpaper/WorkpaperDocument";
 import { FieldRow } from "@/components/shared/workpaper/WorkpaperFieldsTab";
+import { textToDoc } from "@/components/shared/workpaper/tiptapUtils";
 import { ENGAGEMENT_LABELS } from "@/constants/labels";
+import { useCreateManualVersion } from "@/hooks/useWorkpaper";
 import { useUpdateEngagementControl } from "../../hooks/useEngagements";
 import type { EngagementControl, EngagementControlUpdateInput, EngagementRisk } from "../../types";
 import type { JSONContent } from "@tiptap/react";
@@ -48,6 +51,7 @@ export function ControlWorkpaper({
   onBack,
 }: ControlWorkpaperProps) {
   const updateControl = useUpdateEngagementControl();
+  const manualVersion = useCreateManualVersion();
 
   const [effectiveness, setEffectiveness] = React.useState(control.effectiveness ?? "");
   const [controlType, setControlType] = React.useState(control.controlType ?? "");
@@ -179,11 +183,28 @@ export function ControlWorkpaper({
       entityId={control.id}
       engagementId={engagementId}
       title={control.description}
-      content={control.workpaperContent as JSONContent | null}
+      content={(control.workpaperContent as JSONContent | null) ?? textToDoc(control.description)}
       onAutoSave={handleAutoSave}
       onSave={handleSave}
       onBack={onBack}
       isSaving={updateControl.isPending}
+      headerExtra={(autoSave) => (
+        <>
+          <div className="flex-1" />
+          <Button
+            variant="link"
+            size="sm"
+            className="text-xs"
+            onClick={async () => {
+              await autoSave.saveNow?.();
+              manualVersion.mutate({ entityType: "control", engagementId, entityId: control.id });
+            }}
+            disabled={manualVersion.isPending}
+          >
+            Lưu phiên bản
+          </Button>
+        </>
+      )}
       tabs={[infoTab]}
       defaultTab="info"
     />

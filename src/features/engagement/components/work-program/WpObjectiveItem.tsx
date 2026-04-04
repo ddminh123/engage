@@ -23,6 +23,7 @@ import { WpAddButton } from "./WpAddButton";
 import { WpInlineAdd } from "./WpInlineAdd";
 import { MoveObjectiveMenu } from "./WpMoveMenu";
 import { WpContextMenu } from "./WpContextMenu";
+import { CatalogPickerDialog } from "../tabs/CatalogPickerDialog";
 import { useBatchAction } from "../../hooks/useEngagements";
 
 interface WpObjectiveItemProps {
@@ -92,6 +93,8 @@ export function WpObjectiveItem({
     isCreatingProcedure,
     engagementId,
   } = editor;
+
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
 
   const batchAction = useBatchAction();
 
@@ -212,6 +215,7 @@ export function WpObjectiveItem({
   );
 
   return (
+    <>
     <Collapsible open={open} onOpenChange={onOpenChange}>
       {/* ── Objective header row ── */}
       {isEditing ? (
@@ -287,6 +291,7 @@ export function WpObjectiveItem({
               onCancel={() => dispatch({ type: "CANCEL_ADD" })}
               textRef={textRef}
               isSaving={isCreatingProcedure}
+              onBrowseLibrary={() => setCatalogPickerOpen(true)}
               onOpenForm={() => onOpenForm?.("procedure", objective.id)}
             />
           ) : (
@@ -303,5 +308,15 @@ export function WpObjectiveItem({
         </div>
       </CollapsibleContent>
     </Collapsible>
+
+      <CatalogPickerDialog
+        open={catalogPickerOpen}
+        onOpenChange={setCatalogPickerOpen}
+        entityType="procedure"
+        engagementId={engagementId}
+        objectiveId={objective.id}
+        onItemsAdded={() => setCatalogPickerOpen(false)}
+      />
+    </>
   );
 }

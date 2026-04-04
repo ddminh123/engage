@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback } from "react";
-import { Target, ClipboardList, Check, X, Maximize2 } from "lucide-react";
+import { Target, ClipboardList, Check, X, Maximize2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InlineTableInput } from "@/components/shared/InlineTableInput";
 
@@ -14,6 +14,7 @@ interface WpInlineAddProps {
   isSaving: boolean;
   placeholder?: string;
   onOpenForm?: () => void;
+  onBrowseLibrary?: () => void;
 }
 
 export function WpInlineAdd({
@@ -25,6 +26,7 @@ export function WpInlineAdd({
   isSaving,
   placeholder,
   onOpenForm,
+  onBrowseLibrary,
 }: WpInlineAddProps) {
   // Synchronous guard shared between Enter key and Check button
   const submittedRef = useRef(false);
@@ -78,6 +80,18 @@ export function WpInlineAdd({
       >
         <X className="h-3.5 w-3.5" />
       </Button>
+      {onBrowseLibrary && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          title="Tìm từ thư viện"
+          onClick={onBrowseLibrary}
+          disabled={isSaving}
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+        </Button>
+      )}
       {onOpenForm && (
         <Button
           type="button"

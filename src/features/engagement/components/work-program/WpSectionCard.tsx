@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   Layers,
   Check,
@@ -30,6 +30,7 @@ import { WpProcedureItem } from "./WpProcedureItem";
 import { WpAddButton } from "./WpAddButton";
 import { WpInlineAdd } from "./WpInlineAdd";
 import { WpContextMenu } from "./WpContextMenu";
+import { CatalogPickerDialog } from "../tabs/CatalogPickerDialog";
 import { useBatchAction } from "../../hooks/useEngagements";
 // Move menus are rendered by WpObjectiveItem and WpProcedureItem children
 
@@ -113,6 +114,7 @@ export function WpSectionCard({
     engagementId,
   } = editor;
 
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
   const batchAction = useBatchAction();
 
   const isEditingHeader = state.editingNodeId === section.id;
@@ -284,6 +286,7 @@ export function WpSectionCard({
   );
 
   return (
+    <>
     <Collapsible open={open} onOpenChange={onOpenChange}>
       <div className="rounded-lg border" data-node-id={section.id}>
         {/* ── Card header ── */}
@@ -396,6 +399,7 @@ export function WpSectionCard({
                 onCancel={() => dispatch({ type: "CANCEL_ADD" })}
                 textRef={textRef}
                 isSaving={isCreatingProcedure}
+                onBrowseLibrary={() => setCatalogPickerOpen(true)}
                 onOpenForm={() => onOpenForm?.("procedure", section.id)}
               />
             )}
@@ -423,5 +427,14 @@ export function WpSectionCard({
         </CollapsibleContent>
       </div>
     </Collapsible>
+
+      <CatalogPickerDialog
+        open={catalogPickerOpen}
+        onOpenChange={setCatalogPickerOpen}
+        entityType="procedure"
+        engagementId={engagementId}
+        onItemsAdded={() => setCatalogPickerOpen(false)}
+      />
+    </>
   );
 }

@@ -9,7 +9,6 @@ import { WorkpaperDocument } from "@/components/shared/workpaper/WorkpaperDocume
 import { WorkflowChartDialog } from "@/components/shared/workpaper/WorkflowChartDialog";
 import { useWorkpaperShell } from "@/components/shared/workpaper/useWorkpaperShell";
 import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -155,16 +154,16 @@ export function PlanningWorkpaperOverlay({
             <div className="flex-1" />
 
             <Button
-              variant="ghost"
+              variant="link"
               size="sm"
+              className="text-xs"
               onClick={async () => {
                 await autoSave.saveNow?.();
                 shell.saveVersion();
               }}
               disabled={shell.isSavingVersion}
-              title="Lưu phiên bản"
             >
-              <Save className="h-4 w-4" />
+              Lưu phiên bản
             </Button>
 
             <HistorySheet
