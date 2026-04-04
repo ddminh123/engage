@@ -152,7 +152,7 @@ export function VersionPreviewDialog({
           if (!open) onClose();
         }}
       >
-        <DialogContent size="xl" showCloseButton className="flex flex-col max-h-[85vh] gap-0 p-0">
+        <DialogContent showCloseButton className="sm:max-w-[95vw] h-[90vh] flex flex-col gap-0 p-0">
           {/* ── Header ── */}
           <DialogHeader className="shrink-0 px-4 py-3 border-b">
             <div className="flex items-center justify-between">
@@ -200,6 +200,7 @@ export function VersionPreviewDialog({
                 </div>
               ) : content ? (
                 <EngageEditor
+                  key={`${entityId}-v${version}`}
                   content={content}
                   onChange={() => {}}
                   readOnly
