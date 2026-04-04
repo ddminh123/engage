@@ -238,6 +238,7 @@ export function PlanningWorkpaperOverlay({
         onOpenChange={shell.setWorkflowChartOpen}
         entityType="planning_workpaper"
         currentStatus={workpaper.approvalStatus}
+        subType={stepConfigKey ?? ""}
       />
     </>
   );

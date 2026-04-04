@@ -129,6 +129,10 @@ export function useUpsertEntityBinding() {
     mutationFn: (data: EntityBindingInput) => upsertEntityBindingApi(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: WORKFLOWS_KEY });
+      // Invalidate all cached transitions so open workpapers pick up new workflow
+      qc.invalidateQueries({ queryKey: ['approvalTransitions'] });
+      // Also invalidate signoffs in case workflow signoff structure changed
+      qc.invalidateQueries({ queryKey: ['wp-signoffs'] });
     },
   });
 }
@@ -140,6 +144,9 @@ export function useDeleteEntityBinding() {
       deleteEntityBindingApi(entityType, subType),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: WORKFLOWS_KEY });
+      // Invalidate transitions and signoffs for affected entities
+      qc.invalidateQueries({ queryKey: ['approvalTransitions'] });
+      qc.invalidateQueries({ queryKey: ['wp-signoffs'] });
     },
   });
 }
