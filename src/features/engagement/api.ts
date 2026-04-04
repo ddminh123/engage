@@ -813,7 +813,9 @@ export async function createManualVersionApi(
 ): Promise<EntityVersionSummary> {
   const response = await fetch(workpaperVersionsUrl(entityType, engagementId, entityId), {
     method: 'POST',
-    body: description ? JSON.stringify({ description }) : undefined,
+    ...(description
+      ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description }) }
+      : {}),
   });
   return handleResponse<EntityVersionSummary>(response);
 }

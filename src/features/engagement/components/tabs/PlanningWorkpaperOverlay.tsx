@@ -57,6 +57,7 @@ export function PlanningWorkpaperOverlay({
   const [pendingObjective, setPendingObjective] =
     React.useState<PendingObjectiveData | null>(null);
   const [descriptionDialogOpen, setDescriptionDialogOpen] = React.useState(false);
+  const saveNowRef = React.useRef<(() => void) | null>(null);
 
   const handleAddObjective = React.useCallback(
     (quote: string, _from: number, _to: number) => {
@@ -114,11 +115,11 @@ export function PlanningWorkpaperOverlay({
 
   // Keyboard shortcut handler for Ctrl/Cmd+S
   React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's' && !descriptionDialogOpen) {
         e.preventDefault();
-        // Trigger same flow as save button click
-        // The autoSave callback will be triggered from headerExtra
+        // Save content first, then open description dialog
+        await saveNowRef.current?.();
         setDescriptionDialogOpen(true);
       }
     };
@@ -163,7 +164,10 @@ export function PlanningWorkpaperOverlay({
             }
           />
         }
-        headerExtra={(autoSave) => (
+        headerExtra={(autoSave) => {
+          // Capture saveNow for keyboard shortcut access
+          saveNowRef.current = autoSave.saveNow ?? null;
+          return (
           <>
             <StatusBadge status={workpaper.approvalStatus} />
 
@@ -192,7 +196,8 @@ export function PlanningWorkpaperOverlay({
               autoSaveLastSavedAt={autoSave.lastSavedAt}
             />
           </>
-        )}
+          );
+        }}
         tabs={isScope ? [objectivesTab] : []}
         defaultTab={isScope ? "objectives" : undefined}
         commentsTabLabel="Soát xét"

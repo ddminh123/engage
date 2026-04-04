@@ -4,10 +4,12 @@ import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
@@ -30,36 +32,27 @@ export function VersionDescriptionDialog({
     try {
       await onConfirm(description);
       setDescription("");
-      onOpenChange(false);
     } finally {
       setIsLoading(false);
     }
-  }, [description, onConfirm, onOpenChange]);
-
-  const handleCancel = React.useCallback(() => {
-    setDescription("");
-    onOpenChange(false);
-  }, [onOpenChange]);
+  }, [description, onConfirm]);
 
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverContent align="end" className="w-80 p-0">
-        <div className="p-3 space-y-3">
-          {/* Header */}
-          <div>
-            <div className="font-medium text-sm">Mô tả phiên bản</div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Thêm hoặc chỉnh sửa mô tả
-            </p>
-          </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm p-4">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-sm font-medium">
+            Lưu phiên bản
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Thêm mô tả cho phiên bản này (tùy chọn)
+          </DialogDescription>
+        </DialogHeader>
 
-          {/* Description Field */}
+        <div className="space-y-3 pt-1">
           <div className="space-y-1.5">
             <Label htmlFor="version-desc" className="text-xs">
-              Mô tả{" "}
-              <span className="text-muted-foreground font-normal">
-                (tùy chọn)
-              </span>
+              Mô tả
             </Label>
             <Textarea
               id="version-desc"
@@ -68,15 +61,18 @@ export function VersionDescriptionDialog({
               placeholder="Nhập mô tả..."
               rows={2}
               className="resize-none text-sm"
+              autoFocus
             />
           </div>
 
-          {/* Footer Actions */}
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={handleCancel}
+              onClick={() => {
+                setDescription("");
+                onOpenChange(false);
+              }}
               disabled={isLoading}
             >
               Hủy
@@ -89,7 +85,7 @@ export function VersionDescriptionDialog({
             </Button>
           </div>
         </div>
-      </PopoverContent>
-    </Popover>
+      </DialogContent>
+    </Dialog>
   );
 }
