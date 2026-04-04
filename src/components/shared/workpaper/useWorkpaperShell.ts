@@ -92,7 +92,7 @@ export interface UseWorkpaperShellReturn {
   isSavingContent: boolean;
 
   // Manual version save
-  saveVersion: () => Promise<void>;
+  saveVersion: (description?: string) => Promise<void>;
   isSavingVersion: boolean;
 
   // Initial content & meta
@@ -267,12 +267,13 @@ export function useWorkpaperShell(
   );
 
   // ── Save version handler ──
-  const saveVersion = React.useCallback(async () => {
+  const saveVersion = React.useCallback(async (description?: string) => {
     try {
       await manualVersionMutation.mutateAsync({
         entityType,
         engagementId,
         entityId,
+        description,
       });
     } catch {
       // Error handled by mutation state

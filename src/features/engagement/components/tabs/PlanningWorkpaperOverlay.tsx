@@ -8,6 +8,7 @@ import { WpSignoffBar } from "@/components/shared/workpaper/WpSignoffBar";
 import { WorkpaperDocument } from "@/components/shared/workpaper/WorkpaperDocument";
 import { WorkflowChartDialog } from "@/components/shared/workpaper/WorkflowChartDialog";
 import { useWorkpaperShell } from "@/components/shared/workpaper/useWorkpaperShell";
+import { VersionDescriptionDialog } from "./VersionDescriptionDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,6 +56,8 @@ export function PlanningWorkpaperOverlay({
 
   const [pendingObjective, setPendingObjective] =
     React.useState<PendingObjectiveData | null>(null);
+  const [descriptionDialogOpen, setDescriptionDialogOpen] = React.useState(false);
+  const saveNowRef = React.useRef<(() => void) | null>(null);
 
   const handleAddObjective = React.useCallback(
     (quote: string, _from: number, _to: number) => {
@@ -110,6 +113,19 @@ export function PlanningWorkpaperOverlay({
     ],
   );
 
+  // Keyboard shortcut: Ctrl/Cmd+S → save content then open version dialog
+  React.useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's' && !descriptionDialogOpen) {
+        e.preventDefault();
+        await saveNowRef.current?.();
+        setDescriptionDialogOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [descriptionDialogOpen]);
+
   return (
     <>
       <WorkpaperDocument
@@ -147,7 +163,9 @@ export function PlanningWorkpaperOverlay({
             }
           />
         }
-        headerExtra={(autoSave) => (
+        headerExtra={(autoSave) => {
+          saveNowRef.current = autoSave.saveNow ?? null;
+          return (
           <>
             <StatusBadge status={workpaper.approvalStatus} />
 
@@ -159,7 +177,7 @@ export function PlanningWorkpaperOverlay({
               className="text-xs"
               onClick={async () => {
                 await autoSave.saveNow?.();
-                shell.saveVersion();
+                setDescriptionDialogOpen(true);
               }}
               disabled={shell.isSavingVersion}
             >
@@ -176,7 +194,8 @@ export function PlanningWorkpaperOverlay({
               autoSaveLastSavedAt={autoSave.lastSavedAt}
             />
           </>
-        )}
+          );
+        }}
         tabs={isScope ? [objectivesTab] : []}
         defaultTab={isScope ? "objectives" : undefined}
         commentsTabLabel="Soát xét"
@@ -239,6 +258,15 @@ export function PlanningWorkpaperOverlay({
         entityType="planning_workpaper"
         currentStatus={workpaper.approvalStatus}
         subType={stepConfigKey ?? ""}
+      />
+
+      <VersionDescriptionDialog
+        open={descriptionDialogOpen}
+        onOpenChange={setDescriptionDialogOpen}
+        onConfirm={async (description) => {
+          await shell.saveVersion(description);
+          setDescriptionDialogOpen(false);
+        }}
       />
     </>
   );
