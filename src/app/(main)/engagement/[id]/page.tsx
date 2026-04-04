@@ -71,7 +71,7 @@ function EngagementDetailContent() {
 
   // Open Planning WP: lazy-create if needed, then set state + push URL
   const handleOpenPlanningWp = useCallback(
-    (stepConfigId: string) => {
+    async (stepConfigId: string) => {
       // Check if workpaper already exists for this step
       const existing = planningWorkpapers.find(
         (wp) => wp.stepConfigId === stepConfigId,
@@ -83,16 +83,17 @@ function EngagementDetailContent() {
         window.history.pushState({ pwp: stepConfigId }, "", url.toString());
         didPushPwpRef.current = true;
       } else {
-        // Lazy create
-        getOrCreatePwp.mutate(stepConfigId, {
-          onSuccess: () => {
-            setActivePwpStepId(stepConfigId);
-            const url = new URL(window.location.href);
-            url.searchParams.set("pwp", stepConfigId);
-            window.history.pushState({ pwp: stepConfigId }, "", url.toString());
-            didPushPwpRef.current = true;
-          },
-        });
+        // Lazy create and wait for query refetch before opening
+        try {
+          await getOrCreatePwp.mutateAsync(stepConfigId);
+          setActivePwpStepId(stepConfigId);
+          const url = new URL(window.location.href);
+          url.searchParams.set("pwp", stepConfigId);
+          window.history.pushState({ pwp: stepConfigId }, "", url.toString());
+          didPushPwpRef.current = true;
+        } catch {
+          // Error already handled by mutation
+        }
       }
     },
     [planningWorkpapers, getOrCreatePwp],
